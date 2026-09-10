@@ -743,13 +743,13 @@ function applyExtraNotesToGroups(groups, extraNotes) {
     // Insert highest index first so earlier splices don't shift the
     // position of entries still waiting to be inserted.
     inserts.sort((a, b) => b.entryIdx - a.entryIdx).forEach(({ entryIdx, text }) => {
-      g.entries.splice(entryIdx + 1, 0, { note: text, photos: [] });
+      g.entries.splice(entryIdx + 1, 0, { note: text, photos: [], isNote: true });
     });
   });
 
   const emptyNote = extraNotes.empty;
   if (emptyNote && emptyNote.trim() && cloned.length === 0) {
-    cloned.push({ key: "notes", entries: [{ note: emptyNote, photos: [] }] });
+    cloned.push({ key: "notes", entries: [{ note: emptyNote, photos: [], isNote: true }] });
   }
   return cloned;
 }
@@ -825,7 +825,9 @@ const buildReportHTML = (report) => {
   // photos into one grid with no way to tell which belongs to which.
   const entryHTML = (e) =>
     h("div", { style: "margin-bottom:20px;" },
-      h("p", { style: "font-size:14px;color:#303742;line-height:1.6;margin:0;" }, e.note),
+      e.isNote
+        ? h("p", { style: "font-size:12px;color:#303742;line-height:1.5;margin:0;" }, e.note)
+        : h("p", { style: "font-size:16px;font-weight:600;color:#0a1629;line-height:1.5;margin:0;" }, e.note),
       renderPhotos(e.photos)
     );
 
@@ -1054,7 +1056,7 @@ function ReportsTab() {
     if (savedNote) {
       return (
         <div style={{ display: "flex", alignItems: "flex-start", gap: 4, marginTop: 10 }}>
-          <p style={{ fontSize: 14, color: "#303742", lineHeight: "1.6", margin: 0, flex: 1 }}>{savedNote}</p>
+          <p style={{ fontSize: 12, color: "var(--tt-text-2)", lineHeight: "1.5", margin: 0, flex: 1 }}>{savedNote}</p>
           <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
             <button
               onClick={() => { setActiveNoteFormKey(key); setNoteDraft(savedNote); }}
@@ -1509,7 +1511,7 @@ function ReportsTab() {
                           const entryKey = `${g.key}_${i}`;
                           return (
                             <div key={entryKey} style={{ marginBottom: 20 }}>
-                              <p style={{ fontSize: 14, color: "#303742", lineHeight: "1.6", margin: 0 }}>{e.note}</p>
+                              <p style={{ fontSize: 16, fontWeight: 600, color: "#0a1629", lineHeight: "1.5", margin: 0 }}>{e.note}</p>
                               {e.photos.length > 0 && (
                                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 10 }}>
                                   {e.photos.map((k, pi) => (
