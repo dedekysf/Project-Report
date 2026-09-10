@@ -1056,7 +1056,7 @@ function ReportsTab() {
     if (previewSaved) {
       if (!savedNote) return null;
       return (
-        <p style={{ fontSize: 12, fontStyle: "italic", color: "var(--tt-text-2)", lineHeight: "1.5", margin: "10px 0 0", background: "var(--tt-grey02)", padding: 8, borderRadius: 4 }}>{savedNote}</p>
+        <p style={{ fontSize: 12, fontStyle: "italic", color: "var(--tt-text-2)", lineHeight: "1.5", margin: "10px 0 0", background: "var(--tt-grey02)", padding: 8, borderRadius: 8 }}>{savedNote}</p>
       );
     }
 
@@ -1099,22 +1099,22 @@ function ReportsTab() {
 
     if (savedNote) {
       return (
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 4, marginTop: 10, background: "var(--tt-grey02)", padding: 8, borderRadius: 4 }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 4, marginTop: 10, background: "var(--tt-grey02)", padding: 8, borderRadius: 8 }}>
           <p style={{ fontSize: 12, fontStyle: "italic", color: "var(--tt-text-2)", lineHeight: "1.5", margin: 0, flex: 1 }}>{savedNote}</p>
           <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
             <button
               onClick={() => { setActiveNoteFormKey(key); setNoteDraft(savedNote); }}
-              onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+              onMouseEnter={e => e.currentTarget.style.background = "white"}
               onMouseLeave={e => e.currentTarget.style.background = "none"}
-              style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", borderRadius: 6, color: "var(--tt-grey05)", cursor: "pointer", transition: "background 0.15s" }}
+              style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", borderRadius: 6, color: "var(--tt-grey06)", cursor: "pointer", transition: "background 0.15s" }}
             >
               <Pencil size={12} strokeWidth={SW} />
             </button>
             <button
               onClick={() => handleDeleteNote(key)}
-              onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+              onMouseEnter={e => e.currentTarget.style.background = "white"}
               onMouseLeave={e => e.currentTarget.style.background = "none"}
-              style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", borderRadius: 6, color: "var(--tt-grey05)", cursor: "pointer", transition: "background 0.15s" }}
+              style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", borderRadius: 6, color: "var(--tt-grey06)", cursor: "pointer", transition: "background 0.15s" }}
             >
               <Trash2 size={12} strokeWidth={SW} />
             </button>
