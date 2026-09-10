@@ -233,8 +233,7 @@ function DateRangeCalendar({ anchorRef, onClose, onApply }) {
 
   const effectiveEnd = rangeEnd || hovering;
 
-  const handleDay = (d) => {
-    const key = toKey(viewYear, viewMonth, d);
+  const handleDay = (key) => {
     if (key > todayKey) return; // dates after today can't be selected
     if (!rangeStart || rangeEnd) {
       setRangeStart(key); setRangeEnd(null);
@@ -311,7 +310,7 @@ function DateRangeCalendar({ anchorRef, onClose, onApply }) {
           const key      = toKey(cYear, cMonth, d);
           const isToday  = key === todayKey;
           const isFuture = key > todayKey;
-          const disabled = otherMonth || isFuture; // preview days from adjacent months aren't selectable
+          const disabled = isFuture; // prev/next-month preview days are selectable, just future dates aren't
           const start    = key === rangeStart;
           const end      = key === rangeEnd;
           const selected = start || end;
@@ -335,12 +334,12 @@ function DateRangeCalendar({ anchorRef, onClose, onApply }) {
               key={key}
               onMouseEnter={() => !disabled && setHovering(key)}
               onMouseLeave={() => setHovering(null)}
-              onClick={() => !disabled && handleDay(d)}
+              onClick={() => !disabled && handleDay(key)}
               style={{
                 position: "relative",
                 height: CELL, width: CELL,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                cursor: disabled ? (otherMonth ? "default" : "not-allowed") : "pointer",
+                cursor: disabled ? "not-allowed" : "pointer",
                 // seamless band background
                 background: inBand ? "var(--tt-grey03)" : "transparent",
                 borderRadius: bandRadius,
@@ -353,7 +352,7 @@ function DateRangeCalendar({ anchorRef, onClose, onApply }) {
                 borderRadius: "50%",
                 background: selected ? "#000" : "transparent",
                 border: isToday && !selected ? "1.5px solid #000" : "none",
-                color: otherMonth ? "var(--tt-grey03)" : isFuture ? "var(--tt-grey04)" : selected ? "#fff" : isToday ? "#000" : "var(--tt-text-2)",
+                color: selected ? "#fff" : isFuture ? "var(--tt-grey04)" : otherMonth ? "var(--tt-grey03)" : isToday ? "#000" : "var(--tt-text-2)",
                 fontSize: 13,
                 fontWeight: selected || isToday ? 600 : 400,
                 zIndex: 1,
