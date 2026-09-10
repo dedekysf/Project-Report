@@ -512,6 +512,24 @@ function FixedTooltipBtn({ children, label, onAction }) {
   );
 }
 
+// Photo grid thumbnail — the skeleton only covers the initial fixed delay,
+// not how long the actual image takes to download, so each photo keeps its
+// own shimmer placeholder up until it has genuinely finished loading.
+function PhotoThumb({ src }) {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <div style={{ position: "relative", width: "100%", aspectRatio: "4/3", borderRadius: 8, overflow: "hidden" }}>
+      {!loaded && <div className="tt-skeleton" style={{ position: "absolute", inset: 0, borderRadius: 0 }} />}
+      <img
+        src={src}
+        alt=""
+        onLoad={() => setLoaded(true)}
+        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: loaded ? 1 : 0, transition: "opacity 0.2s" }}
+      />
+    </div>
+  );
+}
+
 // Short/medium/long term tiers — chosen so each lands in a different
 // getGrouping() bucket (day <=14, week <=61, month beyond) without needing
 // to touch that logic: 7 days -> day, 30 days -> week, 90 days -> month.
@@ -1566,7 +1584,7 @@ function ReportsTab() {
                               {e.photos.length > 0 && (
                                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 10 }}>
                                   {e.photos.map((k, pi) => (
-                                    <img key={pi} src={IMG_MAP[k]} alt="" style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: 8, display: "block" }} />
+                                    <PhotoThumb key={pi} src={IMG_MAP[k]} />
                                   ))}
                                 </div>
                               )}
