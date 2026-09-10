@@ -541,7 +541,7 @@ const PERIOD_LABELS = {
 const PERIOD_RANGE = {
   this_week:  getWeekRange(0),
   last_week:  getWeekRange(-1),
-  custom:     "Custom range",
+  custom:     "Custom date",
   since_last: "Since last report",
 };
 
@@ -902,7 +902,6 @@ function ReportsTab() {
   const [activeNoteFormKey, setActiveNoteFormKey] = useState(null); // entryKey whose add/edit note form is open
   const [previewLoading,   setPreviewLoading]    = useState(false);
   const [previewSaved,     setPreviewSaved]      = useState(false); // footer switches from Save to Download/Copy link once true
-  const previewPrevDateRangeRef = useRef("this_week");
   const previewPeriodRef = useRef(null);
 
   useEffect(() => {
@@ -918,11 +917,6 @@ function ReportsTab() {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [openPeriod]);
-
-  const DATE_LABELS = {
-    since:  "Aug 4, 2026 – Sep 1, 2026",
-    custom: "Custom range",
-  };
 
   const reportOptions = [
     { id: "progress", title: "Progress report",  desc: "Schedule status, task rollup, and photos" },
@@ -1449,9 +1443,16 @@ function ReportsTab() {
                         <div key={id}>
                           <div
                             onClick={() => {
-                              if (id === "custom") previewPrevDateRangeRef.current = preview.dateRange;
+                              // "Custom date" only opens the calendar — dateRange/period
+                              // (and the data load they trigger) stay untouched until an
+                              // actual range is applied, not merely selected from this list.
+                              if (id === "custom") {
+                                setPreviewShowCal(true);
+                                setPreviewPeriodOpen(false);
+                                return;
+                              }
                               setPreview(p => ({ ...p, dateRange: id, period: getPeriodRange(id, p.customRange) }));
-                              setPreviewShowCal(id === "custom");
+                              setPreviewShowCal(false);
                               setPreviewPeriodOpen(false);
                             }}
                             style={{
@@ -1599,14 +1600,14 @@ function ReportsTab() {
             </div>
           </div>
 
-          {/* Custom date calendar for editing the period inside the modal */}
+          {/* Custom date calendar for editing the period inside the modal.
+              dateRange/period are only touched on a successful Apply — closing
+              or applying with nothing picked leaves the preview exactly as it
+              was, so no data reload happens for an incomplete filter. */}
           {previewShowCal && (
             <DateRangeCalendar
               anchorRef={previewPeriodRef}
-              onClose={() => {
-                if (!preview.customRange) setPreview(p => ({ ...p, dateRange: previewPrevDateRangeRef.current, period: getPeriodRange(previewPrevDateRangeRef.current, p.customRange) }));
-                setPreviewShowCal(false);
-              }}
+              onClose={() => setPreviewShowCal(false)}
               onApply={(start, end) => {
                 if (start && end) {
                   const fmt = (s) => {
@@ -1614,9 +1615,7 @@ function ReportsTab() {
                     return new Date(y, m-1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
                   };
                   const cr = { start: fmt(start), end: fmt(end) };
-                  setPreview(p => ({ ...p, customRange: cr, period: getPeriodRange("custom", cr) }));
-                } else if (!preview.customRange) {
-                  setPreview(p => ({ ...p, dateRange: previewPrevDateRangeRef.current, period: getPeriodRange(previewPrevDateRangeRef.current, p.customRange) }));
+                  setPreview(p => ({ ...p, dateRange: "custom", customRange: cr, period: getPeriodRange("custom", cr) }));
                 }
                 setPreviewShowCal(false);
               }}
