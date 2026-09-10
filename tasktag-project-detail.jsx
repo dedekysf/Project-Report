@@ -1072,7 +1072,7 @@ function ReportsTab() {
               if (e.key === "Enter") handleSaveNote(key);
               if (e.key === "Escape") { setActiveNoteFormKey(null); setNoteDraft(""); }
             }}
-            placeholder="Add a note for this list..."
+            placeholder="Describe the note for this task"
             style={{ width: "100%", height: 40, padding: "0 76px 0 12px", border: "1px solid var(--tt-grey03)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", color: "var(--tt-text-2)", outline: "none", boxSizing: "border-box" }}
           />
           <div style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)", display: "flex", gap: 4 }}>
