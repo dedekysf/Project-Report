@@ -841,7 +841,7 @@ const buildReportHTML = (report) => {
     ? h("p", { style: "font-size:13px;color:#828282;text-align:center;padding:32px 0;" }, "No activity entries for this period.")
     : groups.map(g =>
         h("div", { style: "margin-bottom:32px;" },
-          h("p", { style: "font-size:11px;font-weight:600;color:#828282;letter-spacing:.06em;text-transform:uppercase;margin:0 0 4px;" }, groupLabel(g).toUpperCase()),
+          h("p", { style: "font-size:11px;font-weight:600;color:#828282;letter-spacing:.06em;text-transform:uppercase;margin:0 0 2px;" }, groupLabel(g).toUpperCase()),
           ...g.entries.map(entryHTML)
         )
       ).join("");
@@ -1419,10 +1419,13 @@ function ReportsTab() {
 
             {/* Modal chrome */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid var(--tt-grey03)", flexShrink: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <p style={{ fontSize: 15, fontWeight: 600, color: "var(--tt-text-1)" }}>Draft {preview.reportType === "photo" ? "Photo Update" : "Progress Report"}</p>
 
-                {/* Borderless period dropdown, next to the title */}
+                {/* Circle-dot separator between title and period dropdown */}
+                <span style={{ width: 4, height: 4, borderRadius: "50%", background: "var(--tt-grey04)", flexShrink: 0 }} />
+
+                {/* Borderless period dropdown, font size matching the title */}
                 <div style={{ position: "relative" }} ref={previewPeriodRef}>
                   <button
                     onClick={() => setPreviewPeriodOpen(o => !o)}
@@ -1432,12 +1435,12 @@ function ReportsTab() {
                       display: "flex", alignItems: "center", gap: 4,
                       background: "none", border: "none", borderRadius: 6,
                       padding: "4px 8px", cursor: "pointer",
-                      fontSize: 12, fontWeight: 500, color: "var(--tt-grey05)",
+                      fontSize: 15, fontWeight: 500, color: "var(--tt-grey05)",
                       transition: "background 0.15s",
                     }}
                   >
                     {preview.period}
-                    <ChevronDown size={12} strokeWidth={SW}
+                    <ChevronDown size={14} strokeWidth={SW}
                       style={{ flexShrink: 0, transform: `rotate(${previewPeriodOpen ? "180deg" : "0deg"})`, transition: "transform 0.15s" }} />
                   </button>
                   {previewPeriodOpen && (
@@ -1532,7 +1535,7 @@ function ReportsTab() {
                     )}
                     {previewData && previewData.groups.map(g => (
                       <div key={g.key} style={{ marginBottom: 32 }}>
-                        <p style={{ fontSize: 11, fontWeight: 600, color: "#828282", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>
+                        <p style={{ fontSize: 11, fontWeight: 600, color: "#828282", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 2 }}>
                           {formatGroupLabel(g, previewData.grouping).toUpperCase()}
                         </p>
                         {g.entries.map((e, i) => {
