@@ -949,10 +949,16 @@ function ReportsTab() {
   };
 
   const handleGenerate = () => {
+    const period = getPeriodRange(dateRange);
+    const data = buildReportData(reportType, dateRange, period, customRange);
+    if (!hasGroupData(data.groups)) {
+      showToast("error", "No data for this period");
+      return; // don't open the modal on an empty period — just the toast
+    }
     setPreview({
       reportType,
       dateRange,
-      period: getPeriodRange(dateRange),
+      period,
       customRange,
       extraNotes: {},
     });
