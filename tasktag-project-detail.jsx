@@ -958,6 +958,8 @@ function ReportsTab() {
   const [previewLoading,   setPreviewLoading]    = useState(false);
   const [previewSaved,     setPreviewSaved]      = useState(false); // footer switches from Save to Download/Copy link once true
   const [previewCopied,    setPreviewCopied]     = useState(false); // Copy link button shows "Link copied" briefly
+  const [visibleCount,     setVisibleCount]      = useState(10); // infinite scroll — entries revealed so far
+  const [loadingMore,      setLoadingMore]       = useState(false);
   const previewPeriodRef = useRef(null);
 
   useEffect(() => {
@@ -1034,6 +1036,8 @@ function ReportsTab() {
     setNoteDraft("");
     setPreviewSaved(false);
     setPreviewCopied(false);
+    setVisibleCount(10);
+    setLoadingMore(false);
   };
 
   const closePreview = () => {
@@ -1044,6 +1048,8 @@ function ReportsTab() {
     setNoteDraft("");
     setPreviewSaved(false);
     setPreviewCopied(false);
+    setVisibleCount(10);
+    setLoadingMore(false);
   };
 
   useEffect(() => {
@@ -1060,6 +1066,8 @@ function ReportsTab() {
   useEffect(() => {
     if (!preview) return;
     setPreviewLoading(true);
+    setVisibleCount(10); // new period = new dataset, restart infinite scroll from the top
+    setLoadingMore(false);
     const t = setTimeout(() => {
       setPreviewLoading(false);
       const data = buildReportData(preview.reportType, preview.dateRange, preview.period, preview.customRange);
@@ -1075,6 +1083,34 @@ function ReportsTab() {
   // Final groups with manually-added notes spliced in at their entry —
   // what actually gets downloaded / copy-linked / saved.
   const previewFinalGroups = previewData ? applyExtraNotesToGroups(previewData.groups, preview.extraNotes) : [];
+
+  // Infinite scroll over the *displayed* groups (not previewFinalGroups —
+  // manual notes are only spliced in for real output, not the live modal).
+  const totalEntryCount = previewData ? previewData.groups.reduce((s, g) => s + g.entries.length, 0) : 0;
+  const hasMoreEntries = totalEntryCount > visibleCount;
+  let entryBudget = visibleCount;
+  const visibleGroups = previewData
+    ? previewData.groups
+        .map(g => {
+          if (entryBudget <= 0) return null;
+          const take = Math.min(g.entries.length, entryBudget);
+          entryBudget -= take;
+          return take === g.entries.length ? g : { ...g, entries: g.entries.slice(0, take) };
+        })
+        .filter(Boolean)
+    : [];
+
+  const handleModalScroll = (e) => {
+    if (previewLoading || loadingMore || !hasMoreEntries) return;
+    const el = e.currentTarget;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 150) {
+      setLoadingMore(true);
+      setTimeout(() => {
+        setVisibleCount(v => v + 10);
+        setLoadingMore(false);
+      }, 600);
+    }
+  };
 
   const handleSaveNote = (key) => {
     const text = noteDraft.trim();
@@ -1578,7 +1614,7 @@ function ReportsTab() {
             </div>
 
             {/* Scrollable body */}
-            <div style={{ overflowY: "auto", flex: 1 }}>
+            <div style={{ overflowY: "auto", flex: 1 }} onScroll={handleModalScroll}>
               <div style={{ padding: 20 }}>
                 {previewLoading ? (
                   <>
@@ -1621,7 +1657,7 @@ function ReportsTab() {
 
                     {/* No inline "no data" message here — the proactive toast already covers it */}
                     {previewData && previewData.groups.length === 0 && renderNoteSlot("empty")}
-                    {previewData && previewData.groups.map(g => (
+                    {previewData && visibleGroups.map(g => (
                       <div key={g.key} style={{ marginBottom: 32 }}>
                         <p style={{ fontSize: 11, fontWeight: 600, color: "var(--tt-grey05)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 2 }}>
                           {formatGroupLabel(g, previewData.grouping).toUpperCase()}
@@ -1638,6 +1674,18 @@ function ReportsTab() {
                         })}
                       </div>
                     ))}
+
+                    {/* Infinite scroll: one skeleton item while the next batch "loads" */}
+                    {loadingMore && (
+                      <div style={{ marginBottom: 20 }}>
+                        <div className="tt-skeleton" style={{ width: "85%", height: 16, marginBottom: 10 }} />
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
+                          {[0, 1, 2].map(pi => (
+                            <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "4/3" }} />
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
