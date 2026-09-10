@@ -352,7 +352,7 @@ function DateRangeCalendar({ anchorRef, onClose, onApply }) {
                 borderRadius: "50%",
                 background: selected ? "#000" : "transparent",
                 border: isToday && !selected ? "1.5px solid #000" : "none",
-                color: selected ? "#fff" : isFuture ? "var(--tt-grey04)" : otherMonth ? "var(--tt-grey03)" : isToday ? "#000" : "var(--tt-text-2)",
+                color: selected ? "#fff" : inBand ? "#000" : isFuture ? "var(--tt-grey04)" : otherMonth ? "var(--tt-grey03)" : isToday ? "#000" : "var(--tt-text-2)",
                 fontSize: 13,
                 fontWeight: selected || isToday ? 600 : 400,
                 zIndex: 1,
