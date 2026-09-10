@@ -133,10 +133,6 @@ style.textContent = `
     to   { transform: scaleX(1); }
   }
 
-  @keyframes tt-panel-slide-in {
-    from { transform: translateX(24px); opacity: 0; }
-    to   { transform: translateX(0); opacity: 1; }
-  }
 
   /* CTA button — icon + text */
   .tt-cta-btn {
@@ -964,6 +960,8 @@ function ReportsTab() {
   const [previewLoading,   setPreviewLoading]    = useState(false);
   const [previewSaved,     setPreviewSaved]      = useState(false); // footer switches from Save to Download/Copy link once true
   const [previewCopied,    setPreviewCopied]     = useState(false); // Copy link button shows "Link copied" briefly
+  const [panelClosing,     setPanelClosing]      = useState(false); // panel stays mounted during its exit slide
+  const [panelEntered,     setPanelEntered]      = useState(false); // flips true a tick after mount to animate in
   const [visibleCount,     setVisibleCount]      = useState(10); // infinite scroll — entries revealed so far
   const [loadingMore,      setLoadingMore]       = useState(false);
   const previewPeriodRef = useRef(null);
@@ -1037,6 +1035,8 @@ function ReportsTab() {
       customRange,
       extraNotes: {},
     });
+    setPanelClosing(false);
+    setPanelEntered(false); // starts off-screen; the mount effect below slides it in
     setPreviewPeriodOpen(false);
     setPreviewShowCal(false);
     setActiveNoteFormKey(null);
@@ -1047,17 +1047,33 @@ function ReportsTab() {
     setLoadingMore(false);
   };
 
+  // Slides the panel back out first; the actual unmount (setPreview(null))
+  // is deferred until the exit transition finishes, so closing animates
+  // just as smoothly as opening does.
   const closePreview = () => {
-    setPreview(null);
+    setPanelClosing(true);
+    setPanelEntered(false);
     setPreviewPeriodOpen(false);
     setPreviewShowCal(false);
-    setActiveNoteFormKey(null);
-    setNoteDraft("");
-    setPreviewSaved(false);
-    setPreviewCopied(false);
-    setVisibleCount(10);
-    setLoadingMore(false);
+    setTimeout(() => {
+      setPreview(null);
+      setPanelClosing(false);
+      setActiveNoteFormKey(null);
+      setNoteDraft("");
+      setPreviewSaved(false);
+      setPreviewCopied(false);
+      setVisibleCount(10);
+      setLoadingMore(false);
+    }, 260);
   };
+
+  // Slide the panel in a tick after it mounts (so the browser paints the
+  // off-screen starting position first, letting the transition actually run).
+  useEffect(() => {
+    if (!preview || panelClosing) return;
+    const raf = requestAnimationFrame(() => setPanelEntered(true));
+    return () => cancelAnimationFrame(raf);
+  }, [preview, panelClosing]);
 
   useEffect(() => {
     if (!preview) return;
@@ -1553,7 +1569,7 @@ function ReportsTab() {
           right edge *within* the centered maxWidth:1114 content wrapper
           (not the browser viewport) — an absolute-positioned element,
           right:0 inside a same-width invisible container. */}
-      {preview && (
+      {(preview || panelClosing) && (
         <div style={{ position: "fixed", inset: 0, zIndex: 2000, pointerEvents: "none" }}>
           <div style={{ maxWidth: 1114, height: "100%", margin: "0 auto", position: "relative" }}>
           <div
@@ -1561,10 +1577,14 @@ function ReportsTab() {
             style={{
             position: "absolute", top: 0, right: 0, height: "100%", width: 440,
             background: "white", borderLeft: "1px solid var(--tt-grey03)",
-            boxShadow: "-12px 0 32px rgba(10, 22, 41, 0.12)",
+            // Negative spread pulls the shadow rect in vertically so the blur
+            // reads as a left-edge-only shadow instead of wrapping top/bottom.
+            boxShadow: "-8px 0 24px -6px rgba(10, 22, 41, 0.25)",
             display: "flex", flexDirection: "column", overflow: "hidden",
             pointerEvents: "auto",
-            animation: "tt-panel-slide-in 0.25s ease-out",
+            transform: panelEntered ? "translateX(0)" : "translateX(100%)",
+            opacity: panelEntered ? 1 : 0,
+            transition: "transform 0.25s ease, opacity 0.25s ease",
           }}>
 
             {/* Modal chrome */}
