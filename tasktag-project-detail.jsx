@@ -167,7 +167,7 @@ document.head.appendChild(style);
 
 const SW = 1.2;
 
-// The app's fixed "today" — all mock data (DUMMY_ENTRIES, this_week/last_week
+// The app's fixed "today" — all mock data (DUMMY_ENTRIES, last-N-days
 // ranges) is anchored to this date rather than the real device clock.
 const APP_TODAY = new Date(2026, 8, 10); // Sep 10, 2026
 
@@ -512,43 +512,39 @@ function FixedTooltipBtn({ children, label, onAction }) {
   );
 }
 
+// Short/medium/long term tiers — chosen so each lands in a different
+// getGrouping() bucket (day <=14, week <=61, month beyond) without needing
+// to touch that logic: 7 days -> day, 30 days -> week, 90 days -> month.
 const PERIOD_OPTIONS_BASE = [
-  { id: "this_week", label: "This week" },
-  { id: "last_week", label: "Last week" },
-  { id: "custom",    label: "Custom date" },
+  { id: "last_7",  label: "Last 7 days" },
+  { id: "last_30", label: "Last 30 days" },
+  { id: "last_90", label: "Last 90 days" },
+  { id: "custom",  label: "Custom date" },
 ];
 
 const fmtDate = (d) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
-function getWeekRange(offset = 0) {
-  const now = new Date();
-  const day = now.getDay(); // 0=Sun
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - ((day + 6) % 7) + offset * 7);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  const fmt = (d) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  return `${fmt(monday)} – ${fmt(sunday)}`;
+function getLastNDaysRange(n) {
+  const end = APP_TODAY;
+  const start = new Date(end);
+  start.setDate(end.getDate() - (n - 1));
+  return `${fmtDate(start)} – ${fmtDate(end)}`;
 }
 
 const PERIOD_LABELS = {
-  this_week:  `This week · ${getWeekRange(0)}`,
-  last_week:  `Last week · ${getWeekRange(-1)}`,
+  last_7:     `Last 7 days · ${getLastNDaysRange(7)}`,
+  last_30:    `Last 30 days · ${getLastNDaysRange(30)}`,
+  last_90:    `Last 90 days · ${getLastNDaysRange(90)}`,
   custom:     "Custom date",
   since_last: "Since last report",
 };
 
 const PERIOD_RANGE = {
-  this_week:  getWeekRange(0),
-  last_week:  getWeekRange(-1),
+  last_7:     getLastNDaysRange(7),
+  last_30:    getLastNDaysRange(30),
+  last_90:    getLastNDaysRange(90),
   custom:     "Custom date",
   since_last: "Since last report",
-};
-
-const PERIOD_DISPLAY = {
-  this_week: `This week`,
-  last_week: `Last week`,
-  custom:    "Custom date",
 };
 
 // ── Dummy data ──
@@ -603,17 +599,10 @@ function parseDate(str) {
 function parsePeriodDates(periodStr, dateRange, customRange) {
   const now = APP_TODAY;
 
-  if (dateRange === "this_week") {
-    const day = now.getDay();
-    const mon = new Date(now); mon.setDate(now.getDate() - ((day + 6) % 7));
-    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-    return { start: mon, end: sun };
-  }
-  if (dateRange === "last_week") {
-    const day = now.getDay();
-    const mon = new Date(now); mon.setDate(now.getDate() - ((day + 6) % 7) - 7);
-    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-    return { start: mon, end: sun };
+  if (dateRange === "last_7" || dateRange === "last_30" || dateRange === "last_90") {
+    const n = dateRange === "last_7" ? 7 : dateRange === "last_30" ? 30 : 90;
+    const start = new Date(now); start.setDate(now.getDate() - (n - 1));
+    return { start, end: now };
   }
   if (dateRange === "since_last" || dateRange === "custom") {
     // Parse from periodStr like "Sep 3 – Sep 10" or "Sep 10 – Sep 10"
@@ -880,10 +869,10 @@ const buildReportHTML = (report) => {
 // ── Reports Tab ──
 function ReportsTab() {
   const [reportType,  setReportType]  = useState("progress");
-  const [dateRange,   setDateRange]   = useState("this_week");
+  const [dateRange,   setDateRange]   = useState("last_7");
   const [showCal,     setShowCal]     = useState(false);
   const [customRange, setCustomRange] = useState(null); // { start, end } date strings
-  const prevDateRangeRef = useRef("this_week"); // dateRange to fall back to if custom is opened but no date is picked
+  const prevDateRangeRef = useRef("last_7"); // dateRange to fall back to if custom is opened but no date is picked
   const [reports,     setReports]     = useState([]);
   const [openType,    setOpenType]    = useState(false);
   const [openPeriod,  setOpenPeriod]  = useState(false);
