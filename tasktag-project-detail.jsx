@@ -288,13 +288,23 @@ function DateRangeCalendar({ anchorRef, onClose, onApply }) {
     >
       {/* Month nav */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, padding: "0 4px" }}>
-        <button onClick={() => shiftMonth(-1)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: "var(--tt-text-2)", display: "flex" }}>
+        <button
+          onClick={() => shiftMonth(-1)}
+          onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+          onMouseLeave={e => e.currentTarget.style.background = "none"}
+          style={{ background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 4, color: "var(--tt-text-2)", display: "flex", transition: "background 0.15s" }}
+        >
           <ChevronLeft size={16} strokeWidth={SW} />
         </button>
         <span style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)" }}>
           {MONTHS[viewMonth]} {viewYear}
         </span>
-        <button onClick={() => shiftMonth(1)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: "var(--tt-text-2)", display: "flex", transform: "rotate(180deg)" }}>
+        <button
+          onClick={() => shiftMonth(1)}
+          onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+          onMouseLeave={e => e.currentTarget.style.background = "none"}
+          style={{ background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 4, color: "var(--tt-text-2)", display: "flex", transform: "rotate(180deg)", transition: "background 0.15s" }}
+        >
           <ChevronLeft size={16} strokeWidth={SW} />
         </button>
       </div>
@@ -371,16 +381,24 @@ function DateRangeCalendar({ anchorRef, onClose, onApply }) {
 
       {/* Footer */}
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--tt-grey03)" }}>
-        <button onClick={onClose} style={{
-          padding: "6px 16px", borderRadius: 8,
-          border: "1px solid var(--tt-grey03)", background: "white",
-          fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer",
-        }}>Cancel</button>
-        <button onClick={() => onApply ? onApply(rangeStart, rangeEnd) : onClose()} style={{
-          padding: "6px 16px", borderRadius: 8,
-          border: "none", background: "#000",
-          fontSize: 13, fontWeight: 500, color: "#fff", cursor: "pointer",
-        }}>Apply</button>
+        <button
+          onClick={onClose}
+          onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+          onMouseLeave={e => e.currentTarget.style.background = "white"}
+          style={{
+            padding: "6px 16px", borderRadius: 8,
+            border: "1px solid var(--tt-grey03)", background: "white",
+            fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s",
+          }}>Cancel</button>
+        <button
+          onClick={() => onApply ? onApply(rangeStart, rangeEnd) : onClose()}
+          onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
+          onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+          style={{
+            padding: "6px 16px", borderRadius: 8,
+            border: "none", background: "#000",
+            fontSize: 13, fontWeight: 500, color: "#fff", cursor: "pointer", transition: "opacity 0.15s",
+          }}>Apply</button>
       </div>
     </div>
   );
@@ -940,14 +958,26 @@ function ReportsTab() {
           style={{ width: "100%", border: "none", outline: "none", fontSize: 14, fontFamily: "inherit", resize: "vertical", color: "var(--tt-text-2)" }}
         />
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
-          <button onClick={() => { setAddingNoteKey(null); setNoteDraft(""); }} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer" }}>Cancel</button>
-          <button onClick={handleAddNote} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#000", fontSize: 13, fontWeight: 500, color: "#fff", cursor: "pointer" }}>Add</button>
+          <button
+            onClick={() => { setAddingNoteKey(null); setNoteDraft(""); }}
+            onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+            onMouseLeave={e => e.currentTarget.style.background = "white"}
+            style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s" }}
+          >Cancel</button>
+          <button
+            onClick={handleAddNote}
+            onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
+            onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+            style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#000", fontSize: 13, fontWeight: 500, color: "#fff", cursor: "pointer", transition: "opacity 0.15s" }}
+          >Add</button>
         </div>
       </div>
     ) : (
       <button
         onClick={() => { setAddingNoteKey(key); setNoteDraft(""); }}
-        style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "1px dashed var(--tt-grey03)", borderRadius: 8, padding: "6px 12px", marginTop: 10, cursor: "pointer", fontSize: 12, fontWeight: 500, color: "var(--tt-text-2)" }}
+        onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+        onMouseLeave={e => e.currentTarget.style.background = "none"}
+        style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "1px dashed var(--tt-grey03)", borderRadius: 8, padding: "6px 12px", marginTop: 10, cursor: "pointer", fontSize: 12, fontWeight: 500, color: "var(--tt-text-2)", transition: "background 0.15s" }}
       >
         <Plus size={12} strokeWidth={SW} /> Add note
       </button>
@@ -1040,13 +1070,15 @@ function ReportsTab() {
             <Label style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)", marginBottom: 6, display: "block" }}>Report type</Label>
             <div
               onClick={() => setOpenType(o => !o)}
+              onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+              onMouseLeave={e => e.currentTarget.style.background = "white"}
               style={{
                 width: "100%", height: 40, padding: "0 12px",
                 background: "white", border: `1px solid ${openType ? "#000" : "var(--tt-grey03)"}`,
                 borderRadius: 8, fontSize: 13, fontWeight: 500,
                 color: "var(--tt-text-1)", cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "space-between",
-                userSelect: "none", transition: "border-color 0.15s",
+                userSelect: "none", transition: "border-color 0.15s, background 0.15s",
               }}
             >
               <span>{reportType === "progress" ? "Progress report" : "Photo update"}</span>
@@ -1091,13 +1123,15 @@ function ReportsTab() {
             <Label style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)", marginBottom: 6, display: "block" }}>Period</Label>
             <div
               onClick={() => setOpenPeriod(o => !o)}
+              onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+              onMouseLeave={e => e.currentTarget.style.background = "white"}
               style={{
                 width: "100%", height: 40, padding: "0 12px",
                 background: "white", border: `1px solid ${openPeriod ? "#000" : "var(--tt-grey03)"}`,
                 borderRadius: 8, fontSize: 13, fontWeight: 500,
                 color: "var(--tt-text-1)", cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "space-between",
-                userSelect: "none", transition: "border-color 0.15s",
+                userSelect: "none", transition: "border-color 0.15s, background 0.15s",
               }}
             >
               <span>{getPeriodLabel(dateRange)}</span>
@@ -1248,7 +1282,12 @@ function ReportsTab() {
             {/* Modal chrome */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid var(--tt-grey03)", flexShrink: 0 }}>
               <p style={{ fontSize: 15, fontWeight: 600, color: "var(--tt-text-1)" }}>Draft {preview.reportType === "photo" ? "Photo Update" : "Progress Report"}</p>
-              <button onClick={closePreview} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, display: "flex", color: "var(--tt-text-2)" }}>
+              <button
+                onClick={closePreview}
+                onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+                onMouseLeave={e => e.currentTarget.style.background = "none"}
+                style={{ background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 4, display: "flex", color: "var(--tt-text-2)", transition: "background 0.15s" }}
+              >
                 <X size={18} strokeWidth={SW} />
               </button>
             </div>
@@ -1260,7 +1299,9 @@ function ReportsTab() {
                 <div style={{ position: "relative", marginBottom: 24, display: "inline-block" }} ref={previewPeriodRef}>
                   <button
                     onClick={() => setPreviewPeriodOpen(o => !o)}
-                    style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 11, fontFamily: "inherit", color: "#828282", textTransform: "uppercase" }}
+                    onMouseEnter={e => e.currentTarget.style.color = "var(--tt-text-1)"}
+                    onMouseLeave={e => e.currentTarget.style.color = "#828282"}
+                    style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 11, fontFamily: "inherit", color: "#828282", textTransform: "uppercase", transition: "color 0.15s" }}
                   >
                     Period: {preview.period}
                     <ChevronDown size={12} strokeWidth={SW} style={{ transform: `rotate(${previewPeriodOpen ? "180deg" : "0deg"})`, transition: "transform 0.15s" }} />
@@ -1348,19 +1389,25 @@ function ReportsTab() {
             <div style={{ display: "flex", gap: 8, padding: "16px 20px", borderTop: "1px solid var(--tt-grey03)", flexShrink: 0 }}>
               <button
                 onClick={() => handleDownload({ reportType: preview.reportType, period: preview.period, data: previewData })}
-                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer" }}
+                onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+                onMouseLeave={e => e.currentTarget.style.background = "white"}
+                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s" }}
               >
                 <Download size={14} strokeWidth={SW} /> Download
               </button>
               <button
                 onClick={(e) => handleCopy(e.currentTarget.getBoundingClientRect(), { reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period })}
-                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer" }}
+                onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+                onMouseLeave={e => e.currentTarget.style.background = "white"}
+                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s" }}
               >
                 <Link size={14} strokeWidth={SW} /> Copy link
               </button>
               <button
                 onClick={handlePreviewSave}
-                style={{ flex: 2, padding: "8px 16px", borderRadius: 8, border: "none", background: "var(--tt-text-1)", fontSize: 13, fontWeight: 500, color: "white", cursor: "pointer" }}
+                onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
+                onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+                style={{ flex: 2, padding: "8px 16px", borderRadius: 8, border: "none", background: "var(--tt-text-1)", fontSize: 13, fontWeight: 500, color: "white", cursor: "pointer", transition: "opacity 0.15s" }}
               >
                 Save report
               </button>
