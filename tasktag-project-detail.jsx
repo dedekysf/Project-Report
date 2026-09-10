@@ -530,6 +530,39 @@ function PhotoThumb({ src }) {
   );
 }
 
+// Fixed 4-column photo grid. Beyond 4 photos, only the first row renders —
+// the 4th thumbnail gets a "+N more" overlay, and clicking it reveals (and
+// only then starts loading) the rest.
+function PhotoGrid({ photos }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!photos || photos.length === 0) return null;
+
+  const remaining = photos.length - 4;
+  const visible = expanded || remaining <= 0 ? photos : photos.slice(0, 4);
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 10 }}>
+      {visible.map((k, i) => (
+        <div key={i} style={{ position: "relative" }}>
+          <PhotoThumb src={IMG_MAP[k]} />
+          {!expanded && remaining > 0 && i === 3 && (
+            <button
+              onClick={() => setExpanded(true)}
+              style={{
+                position: "absolute", inset: 0, background: "rgba(10,22,41,0.55)",
+                border: "none", borderRadius: 8, color: "white",
+                fontSize: 13, fontWeight: 600, cursor: "pointer",
+              }}
+            >
+              +{remaining} more
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Short/medium/long term tiers — chosen so each lands in a different
 // getGrouping() bucket (day <=14, week <=61, month beyond) without needing
 // to touch that logic: 7 days -> day, 30 days -> week, 90 days -> month.
@@ -1583,13 +1616,7 @@ function ReportsTab() {
                           return (
                             <div key={entryKey} style={{ marginBottom: 20 }}>
                               <p style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.5", margin: 0 }}>{e.note}</p>
-                              {e.photos.length > 0 && (
-                                <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 10 }}>
-                                  {e.photos.map((k, pi) => (
-                                    <PhotoThumb key={pi} src={IMG_MAP[k]} />
-                                  ))}
-                                </div>
-                              )}
+                              <PhotoGrid photos={e.photos} />
                               {renderNoteSlot(entryKey)}
                             </div>
                           );
