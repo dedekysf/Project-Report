@@ -1576,17 +1576,14 @@ function ReportsTab() {
             ref={previewPanelRef}
             style={{
             position: "absolute", top: 0, right: 0, height: "100%", width: 580,
-            background: "white", borderLeft: "1px solid var(--tt-grey03)",
+            background: "white",
             // Negative spread pulls the shadow rect in vertically so the blur
             // reads as a left-edge-only shadow instead of wrapping top/bottom.
             boxShadow: "-8px 0 24px -6px rgba(10, 22, 41, 0.25)",
             display: "flex", flexDirection: "column", overflow: "hidden",
             pointerEvents: "auto",
-            // Reveal via clip-path (growing from the wrapper's right edge
-            // leftward) instead of translateX, which would slide the panel
-            // in from past the wrapper's edge / off-screen.
-            clipPath: panelEntered ? "inset(0 0 0 0%)" : "inset(0 0 0 100%)",
-            transition: "clip-path 0.25s ease",
+            transform: panelEntered ? "translateX(0)" : "translateX(100%)",
+            transition: "transform 0.25s ease",
           }}>
 
             {/* Modal chrome */}
