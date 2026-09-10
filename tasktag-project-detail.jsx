@@ -1112,13 +1112,11 @@ function ReportsTab() {
   const handlePreviewDownload = () => {
     if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to export"); return; }
     handleDownload({ reportType: preview.reportType, period: preview.period, data: { ...previewData, groups: previewFinalGroups } });
-    showToast("success", "Downloaded");
   };
 
   const handlePreviewCopy = async () => {
     if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to export"); return; }
     await handleCopy({ reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period });
-    showToast("success", "Link copied");
     setPreviewCopied(true);
     setTimeout(() => setPreviewCopied(false), 2000);
   };
@@ -1596,7 +1594,7 @@ function ReportsTab() {
                     onClick={handlePreviewCopy}
                     onMouseEnter={e => !previewLoading && (e.currentTarget.style.background = "var(--tt-grey02)")}
                     onMouseLeave={e => e.currentTarget.style.background = "white"}
-                    style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: previewCopied ? "var(--tt-secondary)" : "var(--tt-text-2)", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "background 0.15s" }}
+                    style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "background 0.15s" }}
                   >
                     {previewCopied
                       ? <><CheckCircle2 size={14} strokeWidth={SW} /> Link copied</>
