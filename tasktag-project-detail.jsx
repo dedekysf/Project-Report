@@ -8,7 +8,7 @@ import {
   LayoutGrid, MapPin, Hash, FileText, FileImage,
   Activity, Users, BarChart2, SlidersHorizontal,
   ArrowUpDown, Calendar, AlignJustify, Clock,
-  UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2,
+  UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, CheckCircle2,
 } from "lucide-react";
 
 import logoImg from "./src/Img/tasktag-logo.13f1babda8fdbb1b7251572a0fe11f9e.png";
@@ -891,6 +891,7 @@ function ReportsTab() {
   const [activeNoteFormKey, setActiveNoteFormKey] = useState(null); // entryKey whose add/edit note form is open
   const [previewLoading,   setPreviewLoading]    = useState(false);
   const [previewSaved,     setPreviewSaved]      = useState(false); // footer switches from Save to Download/Copy link once true
+  const [previewCopied,    setPreviewCopied]     = useState(false); // Copy link button shows "Link copied" briefly
   const previewPeriodRef = useRef(null);
 
   useEffect(() => {
@@ -960,6 +961,7 @@ function ReportsTab() {
     setActiveNoteFormKey(null);
     setNoteDraft("");
     setPreviewSaved(false);
+    setPreviewCopied(false);
   };
 
   const closePreview = () => {
@@ -969,6 +971,7 @@ function ReportsTab() {
     setActiveNoteFormKey(null);
     setNoteDraft("");
     setPreviewSaved(false);
+    setPreviewCopied(false);
   };
 
   useEffect(() => {
@@ -1116,6 +1119,8 @@ function ReportsTab() {
     if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to export"); return; }
     await handleCopy({ reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period });
     showToast("success", "Link copied");
+    setPreviewCopied(true);
+    setTimeout(() => setPreviewCopied(false), 2000);
   };
 
   const handlePreviewSave = () => {
@@ -1591,9 +1596,11 @@ function ReportsTab() {
                     onClick={handlePreviewCopy}
                     onMouseEnter={e => !previewLoading && (e.currentTarget.style.background = "var(--tt-grey02)")}
                     onMouseLeave={e => e.currentTarget.style.background = "white"}
-                    style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "background 0.15s" }}
+                    style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: previewCopied ? "var(--tt-secondary)" : "var(--tt-text-2)", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "background 0.15s" }}
                   >
-                    <Link size={14} strokeWidth={SW} /> Copy link
+                    {previewCopied
+                      ? <><CheckCircle2 size={14} strokeWidth={SW} /> Link copied</>
+                      : <><Link size={14} strokeWidth={SW} /> Copy link</>}
                   </button>
                 </>
               ) : (
