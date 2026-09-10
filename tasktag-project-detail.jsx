@@ -805,18 +805,18 @@ const buildReportPDF = async (report) => {
   const renderPhotosPDF = (photos, yStart) => {
     if (!photos || photos.length === 0) return yStart;
     let y = yStart;
-    const cols = 4, gap = 8;
-    const cellW = (CONTENT_W - gap * (cols - 1)) / cols;
+    const cols = 4, colGap = 8, rowGap = 12;
+    const cellW = (CONTENT_W - colGap * (cols - 1)) / cols;
     const cellH = cellW * 3 / 4;
     for (let i = 0; i < photos.length; i += cols) {
       y = checkPageBreak(y, cellH);
       photos.slice(i, i + cols).forEach((k, ci) => {
         const src = photoDataCache[k];
         if (!src) return;
-        const x = CONTENT_X + ci * (cellW + gap);
+        const x = CONTENT_X + ci * (cellW + colGap);
         drawRoundedImage(src, x, y, cellW, cellH, 8);
       });
-      y += cellH + gap;
+      y += cellH + rowGap;
     }
     return y;
   };
@@ -861,9 +861,7 @@ const buildReportPDF = async (report) => {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.setTextColor(GREY05);
-  const addressText = rType === "progress"
-    ? "11 North Raintree Hollow Court, Sienna Plantation, Missouri City \xB7 Target opening Sep 20, 2026"
-    : "11 North Raintree Hollow Court, Sienna Plantation, Missouri City";
+  const addressText = "11 North Raintree Hollow Court, Sienna Plantation, Missouri City";
   const addressLines = doc.splitTextToSize(addressText, CONTENT_W);
   addressLines.forEach((line, i) => doc.text(line, CONTENT_X, y + i * 13));
   y += (addressLines.length - 1) * 13 + 24;
@@ -915,10 +913,9 @@ const buildReportPDF = async (report) => {
       lines.forEach((line, i) => doc.text(line, CONTENT_X, y + i * 14));
       y += lines.length * 14 + 8;
       y = renderPhotosPDF(e.photos, y);
-      y += 12;
+      y += 20; // gap between entries within the same section
     });
-    y += 12; // additional gap between sections (date/week groups), on top of the last entry's own 12px
-
+    y += 24; // extra gap between sections (date/week groups), on top of the last entry's own 20px
   });
 
   return doc;
