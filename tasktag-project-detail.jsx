@@ -1024,6 +1024,13 @@ function ReportsTab() {
   const renderNoteSlot = (key) => {
     const savedNote = preview.extraNotes[key];
 
+    // Locked once saved — notes can't be added/edited/removed anymore,
+    // since Download/Copy link now act on the saved snapshot.
+    if (previewSaved) {
+      if (!savedNote) return null;
+      return <p style={{ fontSize: 12, color: "var(--tt-text-2)", lineHeight: "1.5", margin: "10px 0 0" }}>{savedNote}</p>;
+    }
+
     if (activeNoteFormKey === key) {
       return (
         <div style={{ position: "relative", marginTop: 10 }}>
@@ -1118,6 +1125,9 @@ function ReportsTab() {
     // Closing is left to the user — the footer switches to Download/Copy
     // link so they can act on the just-saved report before dismissing it.
     setPreviewSaved(true);
+    setActiveNoteFormKey(null);
+    setNoteDraft("");
+    setPreviewPeriodOpen(false);
     showToast("success", "Report saved");
   };
 
@@ -1418,25 +1428,30 @@ function ReportsTab() {
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <p style={{ fontSize: 15, fontWeight: 600, color: "var(--tt-text-1)" }}>Draft {preview.reportType === "photo" ? "Photo Update" : "Progress Report"}</p>
 
-                {/* Borderless period dropdown, font size matching the title */}
+                {/* Borderless period dropdown, font size matching the title —
+                    locked once the report is saved, so it can't drift out of
+                    sync with what was actually saved */}
                 <div style={{ position: "relative" }} ref={previewPeriodRef}>
                   <button
-                    onClick={() => setPreviewPeriodOpen(o => !o)}
-                    onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+                    disabled={previewSaved}
+                    onClick={() => !previewSaved && setPreviewPeriodOpen(o => !o)}
+                    onMouseEnter={e => !previewSaved && (e.currentTarget.style.background = "var(--tt-grey02)")}
                     onMouseLeave={e => e.currentTarget.style.background = "none"}
                     style={{
                       display: "flex", alignItems: "center", gap: 4,
                       background: "none", border: "none", borderRadius: 6,
-                      padding: "4px 8px", cursor: "pointer",
+                      padding: "4px 8px", cursor: previewSaved ? "default" : "pointer",
                       fontSize: 15, fontWeight: 500, color: "var(--tt-grey05)",
                       transition: "background 0.15s",
                     }}
                   >
                     {preview.period}
-                    <ChevronDown size={14} strokeWidth={SW}
-                      style={{ flexShrink: 0, transform: `rotate(${previewPeriodOpen ? "180deg" : "0deg"})`, transition: "transform 0.15s" }} />
+                    {!previewSaved && (
+                      <ChevronDown size={14} strokeWidth={SW}
+                        style={{ flexShrink: 0, transform: `rotate(${previewPeriodOpen ? "180deg" : "0deg"})`, transition: "transform 0.15s" }} />
+                    )}
                   </button>
-                  {previewPeriodOpen && (
+                  {previewPeriodOpen && !previewSaved && (
                     <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 200, minWidth: 220, background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, overflow: "hidden" }}>
                       {PERIOD_OPTIONS.map(({ id }, i) => (
                         <div key={id}>
