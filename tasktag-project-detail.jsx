@@ -128,6 +128,11 @@ style.textContent = `
     animation: tt-pulse 1.2s ease-in-out infinite;
   }
 
+  @keyframes tt-toast-progress {
+    from { transform: scaleX(0); }
+    to   { transform: scaleX(1); }
+  }
+
   /* CTA button — icon + text */
   .tt-cta-btn {
     display: inline-flex; align-items: center; gap: 6px;
@@ -1629,11 +1634,14 @@ function ReportsTab() {
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 24px" }}>
             {toast.type === "success"
-              ? <Check size={18} color="white" strokeWidth={2.5} />
-              : <X size={18} color="white" strokeWidth={2.5} />}
+              ? <Check size={16} color="white" strokeWidth={2.5} />
+              : <X size={16} color="white" strokeWidth={2.5} />}
             <span style={{ color: "white", fontSize: 16, fontWeight: 700, whiteSpace: "nowrap" }}>{toast.message}</span>
           </div>
-          <div style={{ height: 4, background: toast.type === "success" ? "var(--tt-secondary)" : "var(--tt-red)" }} />
+          <div style={{
+            height: 4, background: toast.type === "success" ? "var(--tt-secondary)" : "var(--tt-red)",
+            transformOrigin: "left", animation: "tt-toast-progress 2.5s linear forwards",
+          }} />
         </div>
       )}
     </div>
