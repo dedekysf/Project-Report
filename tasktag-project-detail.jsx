@@ -979,11 +979,18 @@ function ReportsTab() {
   }, [preview]);
 
   // Show a loading skeleton whenever the previewed data would change —
-  // both on first open and whenever the period is edited.
+  // both on first open and whenever the period is edited. Once it resolves,
+  // proactively flag an empty period instead of waiting for the user to hit
+  // Download/Copy link/Save report and get blocked.
   useEffect(() => {
     if (!preview) return;
     setPreviewLoading(true);
-    const t = setTimeout(() => setPreviewLoading(false), 500);
+    const t = setTimeout(() => {
+      setPreviewLoading(false);
+      const data = buildReportData(preview.reportType, preview.dateRange, preview.period, preview.customRange);
+      const finalGroups = applyExtraNotesToGroups(data.groups, preview.extraNotes);
+      if (!hasGroupData(finalGroups)) showToast("error", "No data for this period");
+    }, 500);
     return () => clearTimeout(t);
   }, [preview?.period]);
 
