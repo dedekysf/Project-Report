@@ -896,6 +896,7 @@ function ReportsTab() {
   const [noteDraft,        setNoteDraft]        = useState("");
   const [activeNoteFormKey, setActiveNoteFormKey] = useState(null); // entryKey whose add/edit note form is open
   const [previewLoading,   setPreviewLoading]    = useState(false);
+  const [previewSaved,     setPreviewSaved]      = useState(false); // footer switches from Save to Download/Copy link once true
   const previewPrevDateRangeRef = useRef("this_week");
   const previewPeriodRef = useRef(null);
 
@@ -970,6 +971,7 @@ function ReportsTab() {
     setPreviewShowCal(false);
     setActiveNoteFormKey(null);
     setNoteDraft("");
+    setPreviewSaved(false);
   };
 
   const closePreview = () => {
@@ -978,6 +980,7 @@ function ReportsTab() {
     setPreviewShowCal(false);
     setActiveNoteFormKey(null);
     setNoteDraft("");
+    setPreviewSaved(false);
   };
 
   useEffect(() => {
@@ -1117,7 +1120,9 @@ function ReportsTab() {
     if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to save"); return; }
     pushReport({ reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period, data: { ...previewData, groups: previewFinalGroups } });
     setDateRange("since_last");
-    closePreview();
+    // Closing is left to the user — the footer switches to Download/Copy
+    // link so they can act on the just-saved report before dismissing it.
+    setPreviewSaved(true);
     showToast("success", "Report saved");
   };
 
@@ -1551,35 +1556,41 @@ function ReportsTab() {
               </div>
             </div>
 
-            {/* Footer CTAs — Download 25% / Copy link 25% / Save report 50% */}
+            {/* Footer CTAs — defaults to just "Save report"; once saved,
+                switches to Download/Copy link (closing is left to the user) */}
             <div style={{ display: "flex", gap: 8, padding: "16px 20px", borderTop: "1px solid var(--tt-grey03)", flexShrink: 0 }}>
-              <button
-                disabled={previewLoading}
-                onClick={handlePreviewDownload}
-                onMouseEnter={e => !previewLoading && (e.currentTarget.style.background = "var(--tt-grey02)")}
-                onMouseLeave={e => e.currentTarget.style.background = "white"}
-                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "background 0.15s" }}
-              >
-                <Download size={14} strokeWidth={SW} /> Download
-              </button>
-              <button
-                disabled={previewLoading}
-                onClick={handlePreviewCopy}
-                onMouseEnter={e => !previewLoading && (e.currentTarget.style.background = "var(--tt-grey02)")}
-                onMouseLeave={e => e.currentTarget.style.background = "white"}
-                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "background 0.15s" }}
-              >
-                <Link size={14} strokeWidth={SW} /> Copy link
-              </button>
-              <button
-                disabled={previewLoading}
-                onClick={handlePreviewSave}
-                onMouseEnter={e => !previewLoading && (e.currentTarget.style.opacity = "0.85")}
-                onMouseLeave={e => e.currentTarget.style.opacity = previewLoading ? 0.5 : 1}
-                style={{ flex: 2, padding: "8px 16px", borderRadius: 8, border: "none", background: "var(--tt-text-1)", fontSize: 13, fontWeight: 500, color: "white", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "opacity 0.15s" }}
-              >
-                Save report
-              </button>
+              {previewSaved ? (
+                <>
+                  <button
+                    disabled={previewLoading}
+                    onClick={handlePreviewDownload}
+                    onMouseEnter={e => !previewLoading && (e.currentTarget.style.background = "var(--tt-grey02)")}
+                    onMouseLeave={e => e.currentTarget.style.background = "white"}
+                    style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "background 0.15s" }}
+                  >
+                    <Download size={14} strokeWidth={SW} /> Download
+                  </button>
+                  <button
+                    disabled={previewLoading}
+                    onClick={handlePreviewCopy}
+                    onMouseEnter={e => !previewLoading && (e.currentTarget.style.background = "var(--tt-grey02)")}
+                    onMouseLeave={e => e.currentTarget.style.background = "white"}
+                    style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "background 0.15s" }}
+                  >
+                    <Link size={14} strokeWidth={SW} /> Copy link
+                  </button>
+                </>
+              ) : (
+                <button
+                  disabled={previewLoading}
+                  onClick={handlePreviewSave}
+                  onMouseEnter={e => !previewLoading && (e.currentTarget.style.opacity = "0.85")}
+                  onMouseLeave={e => e.currentTarget.style.opacity = previewLoading ? 0.5 : 1}
+                  style={{ flex: 1, padding: "8px 16px", borderRadius: 8, border: "none", background: "var(--tt-text-1)", fontSize: 13, fontWeight: 500, color: "white", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "opacity 0.15s" }}
+                >
+                  Save report
+                </button>
+              )}
             </div>
           </div>
 
