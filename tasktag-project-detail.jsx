@@ -1535,15 +1535,15 @@ function ReportsTab() {
       )}
 
       {/* ── Generate preview side panel ── */}
-      {/* No backdrop — the page stays interactive. The panel is positioned
-          flush against the right edge of the centered maxWidth:1114 content
-          wrapper (not the browser viewport), via an absolute-positioned
-          element inside a same-width invisible container. */}
+      {/* No backdrop — the page stays interactive. The panel docks to the
+          right edge *within* the centered maxWidth:1114 content wrapper
+          (not the browser viewport) — an absolute-positioned element,
+          right:0 inside a same-width invisible container. */}
       {preview && (
         <div style={{ position: "fixed", inset: 0, zIndex: 2000, pointerEvents: "none" }}>
           <div style={{ maxWidth: 1114, height: "100%", margin: "0 auto", position: "relative" }}>
           <div style={{
-            position: "absolute", top: 0, left: "100%", height: "100%", width: 440,
+            position: "absolute", top: 0, right: 0, height: "100%", width: 440,
             background: "white", borderLeft: "1px solid var(--tt-grey03)",
             boxShadow: "-12px 0 32px rgba(10, 22, 41, 0.12)",
             display: "flex", flexDirection: "column", overflow: "hidden",
