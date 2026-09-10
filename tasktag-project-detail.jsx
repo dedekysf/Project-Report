@@ -1649,7 +1649,7 @@ export default function ProjectDetail() {
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <p className="text-[18px] font-semibold leading-[1.1] text-[var(--tt-text-1)] truncate">
-                11 North Raintree Hollow Court, Sienna Plantation, Missouri City
+                Raintree Hollow Residence Renovation
               </p>
               <Button variant="ghost" size="icon" className="w-6 h-6 shrink-0 text-[var(--tt-text-2)] hover:bg-[var(--tt-grey02)]" style={{ borderRadius: 12 }}>
                 <MoreVertical size={16} strokeWidth={SW} />
@@ -1660,7 +1660,7 @@ export default function ProjectDetail() {
                 <LayoutGrid size={11} strokeWidth={SW} /> Personal Projects
               </span>
               <span className="flex items-center gap-1 text-[12px] text-[var(--tt-grey05)]">
-                <MapPin size={11} strokeWidth={SW} /> Houston, Texas
+                <MapPin size={11} strokeWidth={SW} /> 11 North Raintree Hollow Court, Sienna Plantation, Missouri City
               </span>
             </div>
           </div>
