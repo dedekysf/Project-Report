@@ -8,7 +8,7 @@ import {
   LayoutGrid, MapPin, Hash, FileText, FileImage,
   Activity, Users, BarChart2, SlidersHorizontal,
   ArrowUpDown, Calendar, AlignJustify, Clock,
-  UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, CheckCircle2,
+  UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2,
 } from "lucide-react";
 
 import logoImg from "./src/Img/tasktag-logo.13f1babda8fdbb1b7251572a0fe11f9e.png";
@@ -1603,7 +1603,7 @@ function ReportsTab() {
                     style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "background 0.15s" }}
                   >
                     {previewCopied
-                      ? <><CheckCircle2 size={14} strokeWidth={SW} /> Link copied</>
+                      ? <><Check size={14} strokeWidth={SW} /> Link copied</>
                       : <><Link size={14} strokeWidth={SW} /> Copy link</>}
                   </button>
                 </>
