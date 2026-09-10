@@ -8,7 +8,7 @@ import {
   LayoutGrid, MapPin, Hash, FileText, FileImage,
   Activity, Users, BarChart2, SlidersHorizontal,
   ArrowUpDown, Calendar, AlignJustify, Clock,
-  UserPlus, Link2, ChevronUp, ChevronDown, X,
+  UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2,
 } from "lucide-react";
 
 import logoImg from "./src/Img/tasktag-logo.13f1babda8fdbb1b7251572a0fe11f9e.png";
@@ -703,7 +703,23 @@ function applyPhotoCap(groups, maxPhotos = 45) {
 function buildReportData(reportType, dateRange, periodStr, customRange, extraEntries = []) {
   const { start, end } = parsePeriodDates(periodStr, dateRange, customRange);
   const grouping = getGrouping(start, end);
-  let groups = groupEntries([...DUMMY_ENTRIES, ...extraEntries], start, end, grouping);
+  let groups = groupEntries(DUMMY_ENTRIES, start, end, grouping);
+
+  // Manually added notes are always included regardless of the selected
+  // period — they were deliberately added by the user in this draft, so a
+  // note dated "today" shouldn't silently vanish just because the chosen
+  // period (e.g. "Last week") doesn't happen to span today.
+  if (extraEntries.length) {
+    const ALL_TIME = { start: new Date(-8640000000000000), end: new Date(8640000000000000) };
+    const extraGroups = groupEntries(extraEntries, ALL_TIME.start, ALL_TIME.end, grouping);
+    extraGroups.forEach(eg => {
+      const existing = groups.find(g => g.key === eg.key);
+      if (existing) existing.entries.push(...eg.entries);
+      else groups.push(eg);
+    });
+    groups.sort((a, b) => b.key.localeCompare(a.key));
+  }
+
   groups = applyPhotoCap(groups);
 
   const completed = DUMMY_TASKS.filter(t => t.done).length;
@@ -851,6 +867,7 @@ function ReportsTab() {
   const [previewShowCal,   setPreviewShowCal]   = useState(false);
   const [noteDraft,        setNoteDraft]        = useState("");
   const [addingNoteKey,    setAddingNoteKey]     = useState(null); // key of the entry the open "add note" form is under
+  const [editingNoteId,    setEditingNoteId]     = useState(null); // id of the manually-added note currently being edited
   const previewPrevDateRangeRef = useRef("this_week");
   const previewPeriodRef = useRef(null);
 
@@ -914,6 +931,7 @@ function ReportsTab() {
     setPreviewPeriodOpen(false);
     setPreviewShowCal(false);
     setAddingNoteKey(null);
+    setEditingNoteId(null);
     setNoteDraft("");
   };
 
@@ -922,6 +940,7 @@ function ReportsTab() {
     setPreviewPeriodOpen(false);
     setPreviewShowCal(false);
     setAddingNoteKey(null);
+    setEditingNoteId(null);
     setNoteDraft("");
   };
 
@@ -939,9 +958,22 @@ function ReportsTab() {
   const handleAddNote = () => {
     const text = noteDraft.trim();
     if (!text) return;
-    setPreview(p => ({ ...p, extraNotes: [...p.extraNotes, { date: toDateKey(APP_TODAY), note: text, photos: [] }] }));
+    const id = `note_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    setPreview(p => ({ ...p, extraNotes: [...p.extraNotes, { id, date: toDateKey(APP_TODAY), note: text, photos: [], isManual: true }] }));
     setNoteDraft("");
     setAddingNoteKey(null);
+  };
+
+  const handleSaveEditNote = (id) => {
+    const text = noteDraft.trim();
+    if (!text) return;
+    setPreview(p => ({ ...p, extraNotes: p.extraNotes.map(n => n.id === id ? { ...n, note: text } : n) }));
+    setNoteDraft("");
+    setEditingNoteId(null);
+  };
+
+  const handleDeleteNote = (id) => {
+    setPreview(p => ({ ...p, extraNotes: p.extraNotes.filter(n => n.id !== id) }));
   };
 
   // Rendered under every entry's photo list (and once for the empty-period
@@ -991,6 +1023,72 @@ function ReportsTab() {
       </button>
     )
   );
+
+  // Auto-generated entries render as plain text; manually-added notes stay
+  // editable (and deletable) right up until the report is saved.
+  const renderNoteText = (e) => {
+    if (!e.isManual) {
+      return <p style={{ fontSize: 14, color: "#303742", lineHeight: "1.6", margin: 0 }}>{e.note}</p>;
+    }
+    if (editingNoteId === e.id) {
+      return (
+        <div style={{ position: "relative" }}>
+          <input
+            autoFocus
+            type="text"
+            value={noteDraft}
+            onChange={ev => setNoteDraft(ev.target.value)}
+            onKeyDown={ev => {
+              if (ev.key === "Enter") handleSaveEditNote(e.id);
+              if (ev.key === "Escape") { setEditingNoteId(null); setNoteDraft(""); }
+            }}
+            style={{ width: "100%", height: 36, padding: "0 76px 0 12px", border: "1px solid var(--tt-grey03)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", color: "var(--tt-text-2)", outline: "none", boxSizing: "border-box" }}
+          />
+          <div style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)", display: "flex", gap: 4 }}>
+            <button
+              onClick={() => { setEditingNoteId(null); setNoteDraft(""); }}
+              onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
+              onMouseLeave={ev => ev.currentTarget.style.background = "none"}
+              style={{ width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", borderRadius: 6, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s" }}
+            >
+              <X size={13} strokeWidth={SW} />
+            </button>
+            <button
+              onClick={() => handleSaveEditNote(e.id)}
+              onMouseEnter={ev => ev.currentTarget.style.opacity = "0.85"}
+              onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
+              style={{ width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", background: "#000", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", transition: "opacity 0.15s" }}
+            >
+              <Check size={13} strokeWidth={2} />
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 4 }}>
+        <p style={{ fontSize: 14, color: "#303742", lineHeight: "1.6", margin: 0, flex: 1 }}>{e.note}</p>
+        <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+          <button
+            onClick={() => { setEditingNoteId(e.id); setNoteDraft(e.note); }}
+            onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
+            onMouseLeave={ev => ev.currentTarget.style.background = "none"}
+            style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", borderRadius: 6, color: "var(--tt-grey05)", cursor: "pointer", transition: "background 0.15s" }}
+          >
+            <Pencil size={12} strokeWidth={SW} />
+          </button>
+          <button
+            onClick={() => handleDeleteNote(e.id)}
+            onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
+            onMouseLeave={ev => ev.currentTarget.style.background = "none"}
+            style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", borderRadius: 6, color: "var(--tt-grey05)", cursor: "pointer", transition: "background 0.15s" }}
+          >
+            <Trash2 size={12} strokeWidth={SW} />
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   const handlePreviewSave = () => {
     pushReport({ reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period, data: previewData });
@@ -1385,7 +1483,7 @@ function ReportsTab() {
                       const entryKey = `${g.key}_${i}`;
                       return (
                         <div key={entryKey} style={{ marginBottom: 20 }}>
-                          <p style={{ fontSize: 14, color: "#303742", lineHeight: "1.6", margin: 0 }}>{e.note}</p>
+                          {renderNoteText(e)}
                           {e.photos.length > 0 && (
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 10 }}>
                               {e.photos.map((k, pi) => (
