@@ -778,14 +778,15 @@ const buildReportHTML = (report) => {
         )
       ).join("");
 
-  const css = "*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;background:#f7f8fa;min-height:100vh;padding:32px 24px}.card{background:white;border-radius:16px;border:1px solid #e8e8e6;overflow:hidden;max-width:660px;margin:0 auto}";
+  const css = "*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;background:#f7f8fa;min-height:100vh;padding:32px 24px}.card{background:white;border:1px solid #e8e8e6;overflow:hidden;max-width:660px;margin:0 auto}";
 
   const headerContent =
     selfClose("img", { src: toAbsoluteUrl(IMG_MAP_LOGO), alt: "tasktag", style: "height:24px;display:block;" }) +
     h("span", { style: "font-size:10px;font-weight:600;letter-spacing:.04em;color:#16a97d;text-transform:uppercase;border:1px solid #16a97d;border-radius:20px;padding:3px 10px;" }, rType === "photo" ? "Photo Update" : "Progress Report");
 
-  // Dark grey divider (grey03 was too light to read) -- doubles as the header's own bottom border.
-  const header = h("div", { style: "display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #303742;" }, headerContent);
+  const header = h("div", { style: "display:flex;align-items:center;justify-content:space-between;padding:14px 20px;" }, headerContent);
+  // Inset divider (not edge-to-edge) between header and body.
+  const divider = h("div", { style: "height:1px;background:#e8e8e6;margin:0 20px;" }, "");
 
   // TODO(BE): replace with the project's actual name and address from the API
   const meta =
@@ -794,7 +795,7 @@ const buildReportHTML = (report) => {
     h("p", { style: "font-size:12px;color:#828282;margin-bottom:24px;" }, "11 North Raintree Hollow Court, Sienna Plantation, Missouri City");
 
   const body = h("div", { style: "padding:20px;" }, meta + progressHTML + entriesHTML);
-  const card = h("div", { class: "card" }, header + body);
+  const card = h("div", { class: "card" }, header + divider + body);
 
   const title = rType === "photo" ? "Photo Update" : "Progress Report";
   return "<!DOCTYPE html>" +
