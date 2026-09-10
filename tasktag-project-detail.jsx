@@ -1409,11 +1409,8 @@ function ReportsTab() {
 
             {/* Modal chrome */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid var(--tt-grey03)", flexShrink: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <p style={{ fontSize: 15, fontWeight: 600, color: "var(--tt-text-1)" }}>Draft {preview.reportType === "photo" ? "Photo Update" : "Progress Report"}</p>
-
-                {/* Circle-dot separator between title and period dropdown */}
-                <span style={{ width: 4, height: 4, borderRadius: "50%", background: "var(--tt-grey04)", flexShrink: 0 }} />
 
                 {/* Borderless period dropdown, font size matching the title */}
                 <div style={{ position: "relative" }} ref={previewPeriodRef}>
