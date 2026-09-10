@@ -1,5 +1,4 @@
 import { useState, useRef, useLayoutEffect, useEffect } from "react";
-import { jsPDF } from "jspdf";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -688,83 +687,40 @@ const IMG_MAP = {
   img9: img9Src,
 };
 
-// Loads an image and center-crops it to the given aspect ratio (like CSS
-// object-fit:cover) via canvas, so source photos of any size/aspect never
-// end up stretched when placed into a fixed-size PDF photo cell.
-const loadImageCover = (url, aspectW, aspectH, outW = 640) => new Promise((resolve, reject) => {
-  const img = new Image();
-  img.onload = () => {
-    const outH = Math.round(outW * aspectH / aspectW);
-    const canvas = document.createElement("canvas");
-    canvas.width = outW; canvas.height = outH;
-    const ctx = canvas.getContext("2d");
-    const srcAspect = img.width / img.height;
-    const targetAspect = aspectW / aspectH;
-    let sx, sy, sw, sh;
-    if (srcAspect > targetAspect) {
-      sh = img.height; sw = sh * targetAspect; sx = (img.width - sw) / 2; sy = 0;
-    } else {
-      sw = img.width; sh = sw / targetAspect; sx = 0; sy = (img.height - sh) / 2;
-    }
-    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outW, outH);
-    resolve(canvas.toDataURL("image/jpeg", 0.85));
-  };
-  img.onerror = reject;
-  img.src = url;
-});
+// Resolves an asset path (a Vite-imported URL) against the current page so
+// a downloaded, standalone HTML file still loads its images correctly no
+// matter where it's opened from.
+const toAbsoluteUrl = (src) => {
+  try { return new URL(src, window.location.href).href; } catch (e) { return src; }
+};
 
-// Loads an image at its native pixel size via canvas (round-tripping through
-// canvas avoids artifacts some PDF viewers show for a raw fetched PNG) and
-// keeps transparency, returning both the data URL and its true dimensions.
-const loadImageAsPNG = (url) => new Promise((resolve, reject) => {
-  const img = new Image();
-  img.onload = () => {
-    const canvas = document.createElement("canvas");
-    canvas.width = img.naturalWidth;
-    canvas.height = img.naturalHeight;
-    canvas.getContext("2d").drawImage(img, 0, 0);
-    resolve({ dataUrl: canvas.toDataURL("image/png"), width: img.naturalWidth, height: img.naturalHeight });
-  };
-  img.onerror = reject;
-  img.src = url;
-});
-
-// \u2500\u2500 PDF report generator \u2500\u2500
-// Draws the same content as the in-app report (header, meta, schedule status,
-// task rollup, grouped notes + photos) directly onto a jsPDF document, with
-// pagination once a page fills up.
-const buildReportPDF = async (report) => {
+// ── HTML report generator ──
+// Builds the same report content (header, meta, schedule status, task
+// rollup, grouped notes + photos) as a standalone HTML string, shared by
+// both the "Download" button and the copy-link shared view.
+const buildReportHTML = (report) => {
   const { groups, grouping, completed, total, pct, reportType: rType } =
     report.data || buildReportData(report.reportType, "custom", report.period, null);
 
-  // Pre-resolve every image this report needs (logo + unique photos) before
-  // drawing, since jsPDF.addImage needs actual pixel data, not a URL.
-  const logo = await loadImageAsPNG(IMG_MAP_LOGO);
-  const uniquePhotoKeys = [...new Set(groups.flatMap(g => g.entries.flatMap(e => e.photos)))];
-  const photoDataCache = {};
-  await Promise.all(uniquePhotoKeys.map(async k => {
-    if (IMG_MAP[k]) photoDataCache[k] = await loadImageCover(IMG_MAP[k], 4, 3);
-  }));
+  const h = (tag, attrs, ...children) => {
+    const attrStr = Object.entries(attrs || {}).map(([k, v]) => ` ${k}="${v}"`).join("");
+    return `<${tag}${attrStr}>${children.join("")}</${tag}>`;
+  };
+  const selfClose = (tag, attrs) => {
+    const attrStr = Object.entries(attrs || {}).map(([k, v]) => ` ${k}="${v}"`).join("");
+    return `<${tag}${attrStr}/>`;
+  };
 
-  const doc = new jsPDF({ unit: "px", format: "a4", hotfixes: ["px_scaling"] });
-  const PAGE_W = doc.internal.pageSize.getWidth();
-  const PAGE_H = doc.internal.pageSize.getHeight();
-  const CARD_W = 660;
-  const PAD = 20;
-  const CONTENT_X = (PAGE_W - CARD_W) / 2 + PAD;
-  const CONTENT_W = CARD_W - PAD * 2;
-  const MARGIN_TOP = 40;
-  const MARGIN_BOTTOM = 40;
-
-  const TEXT_1 = "#0a1629", TEXT_2 = "#303742", GREY05 = "#828282",
-        GREY03 = "#e8e8e6", SECONDARY = "#16a97d", BRAND = "#00c97a";
-
-  const checkPageBreak = (y, neededH) => {
-    if (y + neededH > PAGE_H - MARGIN_BOTTOM) {
-      doc.addPage();
-      return MARGIN_TOP;
-    }
-    return y;
+  // Fixed 4-column grid -- cell size never changes with row count.
+  const renderPhotos = (photos) => {
+    if (!photos || photos.length === 0) return "";
+    const cells = photos.map(k => {
+      const src = IMG_MAP[k];
+      return src
+        ? selfClose("img", { src: toAbsoluteUrl(src), style: "width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px;display:block;" })
+        : "";
+    });
+    return h("div", { style: "display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;" }, ...cells);
   };
 
   const groupLabel = (g) => {
@@ -785,140 +741,65 @@ const buildReportPDF = async (report) => {
     return new Date(y, m - 1, d).toLocaleDateString("en-US", { day: "numeric", month: "short" }).toUpperCase();
   };
 
-  // Draws a photo clipped to an 8px-rounded rect; falls back to a square
-  // corner if the PDF engine can't clip, rather than failing the report.
-  const drawRoundedImage = (dataUrl, x, y, w, h, r = 8) => {
-    try {
-      doc.saveGraphicsState();
-      doc.roundedRect(x, y, w, h, r, r, null);
-      doc.clip();
-      doc.discardPath();
-      doc.addImage(dataUrl, "JPEG", x, y, w, h, undefined, "FAST");
-    } catch (e) {
-      try { doc.addImage(dataUrl, "JPEG", x, y, w, h, undefined, "FAST"); } catch (e2) {}
-    } finally {
-      try { doc.restoreGraphicsState(); } catch (e3) {}
-    }
-  };
+  const progressHTML = rType === "progress"
+    ? h("div", { style: "margin-bottom:24px;" },
+        h("div", { style: "display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:13px;font-weight:600;" },
+          h("span", { style: "color:#0a1629;" }, `${completed} of ${total} tasks complete`),
+          h("span", { style: "color:#16a97d;" }, `${pct}%`)
+        ),
+        h("div", { style: "height:6px;background:#e8e8e6;border-radius:99px;overflow:hidden;" },
+          h("div", { style: `width:${pct}%;height:100%;background:#16a97d;border-radius:99px;` }, "")
+        )
+      )
+    : "";
 
-  // Fixed 4-column photo grid \u2014 cell size never changes with row count.
-  const renderPhotosPDF = (photos, yStart) => {
-    if (!photos || photos.length === 0) return yStart;
-    let y = yStart;
-    const cols = 4, colGap = 8, rowGap = 12;
-    const cellW = (CONTENT_W - colGap * (cols - 1)) / cols;
-    const cellH = cellW * 3 / 4;
-    for (let i = 0; i < photos.length; i += cols) {
-      y = checkPageBreak(y, cellH);
-      photos.slice(i, i + cols).forEach((k, ci) => {
-        const src = photoDataCache[k];
-        if (!src) return;
-        const x = CONTENT_X + ci * (cellW + colGap);
-        drawRoundedImage(src, x, y, cellW, cellH, 8);
-      });
-      y += cellH + rowGap;
-    }
-    return y;
-  };
+  // Each entry keeps its own note directly above its own photos, regardless
+  // of whether the section groups by day, week, or month -- otherwise a
+  // week/month section would stack every note together and dump all of its
+  // photos into one grid with no way to tell which belongs to which.
+  const entryHTML = (e) =>
+    h("div", { style: "margin-bottom:20px;" },
+      h("p", { style: "font-size:14px;color:#303742;line-height:1.6;margin:0;" }, e.note),
+      renderPhotos(e.photos)
+    );
 
-  let y = MARGIN_TOP;
+  const entriesHTML = groups.length === 0
+    ? h("p", { style: "font-size:13px;color:#828282;text-align:center;padding:32px 0;" }, "No activity entries for this period.")
+    : groups.map(g =>
+        h("div", { style: "margin-bottom:32px;" },
+          h("p", { style: "font-size:11px;font-weight:600;color:#828282;letter-spacing:.06em;text-transform:uppercase;margin:0 0 4px;" }, groupLabel(g).toUpperCase()),
+          ...g.entries.map(entryHTML)
+        )
+      ).join("");
 
-  // Header
-  const logoH = 24;
-  const logoW = logoH * (logo.width / logo.height);
-  doc.addImage(logo.dataUrl, "PNG", CONTENT_X, y, logoW, logoH, undefined, "NONE");
+  const css = "*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;background:#f7f8fa;min-height:100vh;padding:32px 24px}.card{background:white;border-radius:16px;border:1px solid #e8e8e6;overflow:hidden;max-width:660px;margin:0 auto}";
 
-  const badgeLabel = rType === "photo" ? "PHOTO UPDATE" : "PROGRESS REPORT";
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(SECONDARY);
-  const badgeW = doc.getTextWidth(badgeLabel) + 20;
-  const badgeY = y + (logoH - 20) / 2;
-  doc.setDrawColor(SECONDARY);
-  doc.roundedRect(CONTENT_X + CONTENT_W - badgeW, badgeY, badgeW, 20, 10, 10, "S");
-  doc.text(badgeLabel, CONTENT_X + CONTENT_W - badgeW + 10, badgeY + 14);
+  const headerContent =
+    selfClose("img", { src: toAbsoluteUrl(IMG_MAP_LOGO), alt: "tasktag", style: "height:24px;display:block;" }) +
+    h("span", { style: "font-size:10px;font-weight:600;letter-spacing:.04em;color:#16a97d;text-transform:uppercase;border:1px solid #16a97d;border-radius:20px;padding:3px 10px;" }, rType === "photo" ? "Photo Update" : "Progress Report");
 
-  y += logoH + 14;
-  doc.setDrawColor(TEXT_2); // dark grey divider — grey03 is too light to read in the PDF
-  doc.setLineWidth(1);
-  doc.line(CONTENT_X, y, CONTENT_X + CONTENT_W, y);
-  y += 30;
-
-  // Meta
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(GREY05);
-  doc.text(`PERIOD: ${report.period.toUpperCase()}`, CONTENT_X, y);
-  y += 24;
+  // Dark grey divider (grey03 was too light to read) -- doubles as the header's own bottom border.
+  const header = h("div", { style: "display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #303742;" }, headerContent);
 
   // TODO(BE): replace with the project's actual name and address from the API
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(22);
-  doc.setTextColor(TEXT_1);
-  doc.text("Raintree Hollow Residence Renovation", CONTENT_X, y);
-  y += 18;
+  const meta =
+    h("p", { style: "font-size:11px;color:#828282;margin-bottom:24px;text-transform:uppercase;" }, `Period: ${report.period}`) +
+    h("h2", { style: "font-size:28px;font-weight:700;color:#0a1629;margin-bottom:4px;line-height:1.15;" }, "Raintree Hollow Residence Renovation") +
+    h("p", { style: "font-size:12px;color:#828282;margin-bottom:24px;" }, "11 North Raintree Hollow Court, Sienna Plantation, Missouri City");
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.setTextColor(GREY05);
-  const addressText = "11 North Raintree Hollow Court, Sienna Plantation, Missouri City";
-  const addressLines = doc.splitTextToSize(addressText, CONTENT_W);
-  addressLines.forEach((line, i) => doc.text(line, CONTENT_X, y + i * 13));
-  y += (addressLines.length - 1) * 13 + 24;
+  const body = h("div", { style: "padding:20px;" }, meta + progressHTML + entriesHTML);
+  const card = h("div", { class: "card" }, header + body);
 
-  // Task rollup \u2014 progress report only
-  if (rType === "progress") {
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.setTextColor(TEXT_1);
-    doc.text(`${completed} of ${total} tasks complete`, CONTENT_X, y);
-    doc.setTextColor(SECONDARY);
-    doc.text(`${pct}%`, CONTENT_X + CONTENT_W, y, { align: "right" });
-    y += 10;
-    doc.setFillColor(GREY03);
-    doc.roundedRect(CONTENT_X, y, CONTENT_W, 6, 3, 3, "F");
-    doc.setFillColor(SECONDARY);
-    doc.roundedRect(CONTENT_X, y, Math.max(6, CONTENT_W * pct / 100), 6, 3, 3, "F");
-    y += 6 + 24; // bar height + gap to section 1
-  }
-
-  // Grouped entries (notes + photos)
-  if (groups.length === 0) {
-    y = checkPageBreak(y, 20);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(11);
-    doc.setTextColor(GREY05);
-    doc.text("No activity entries for this period.", CONTENT_X + CONTENT_W / 2, y, { align: "center" });
-  }
-
-  groups.forEach(g => {
-    y = checkPageBreak(y, 20);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(GREY05);
-    doc.text(groupLabel(g).toUpperCase(), CONTENT_X, y);
-    y += 9 + 4; // label line height + gap to task note
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(11);
-    doc.setTextColor(TEXT_2);
-
-    // Each entry keeps its own note directly above its own photos, regardless
-    // of whether the section groups by day, week, or month — otherwise a
-    // week/month section would stack every note together and dump all of
-    // its photos into one grid with no way to tell which belongs to which.
-    g.entries.forEach(e => {
-      const lines = doc.splitTextToSize(e.note, CONTENT_W);
-      y = checkPageBreak(y, lines.length * 14);
-      lines.forEach((line, i) => doc.text(line, CONTENT_X, y + i * 14));
-      y += lines.length * 14 + 8;
-      y = renderPhotosPDF(e.photos, y);
-      y += 20; // gap between entries within the same section
-    });
-    y += 24; // extra gap between sections (date/week groups), on top of the last entry's own 20px
-  });
-
-  return doc;
+  const title = rType === "photo" ? "Photo Update" : "Progress Report";
+  return "<!DOCTYPE html>" +
+    h("html", {},
+      h("head", {},
+        selfClose("meta", { charset: "UTF-8" }),
+        h("title", {}, `${title} – ${report.period}`),
+        h("style", {}, css)
+      ),
+      h("body", {}, card)
+    );
 };
 
 // ── Reports Tab ──
@@ -993,10 +874,18 @@ function ReportsTab() {
     return () => window.removeEventListener("resize", handler);
   }, []);
 
-  const handleDownload = async (report) => {
-    const fileName = report.reportType + "_" + report.period.replace(/[\s]/g, "_").replace(/–/g, "-") + ".pdf";
-    const doc = await buildReportPDF(report);
-    doc.save(fileName);
+  const handleDownload = (report) => {
+    const html = buildReportHTML(report);
+    const fileName = report.reportType + "_" + report.period.replace(/[\s]/g, "_").replace(/–/g, "-") + ".html";
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
     const handleCopy = async (rect, report) => {
@@ -1242,7 +1131,7 @@ function ReportsTab() {
                       </span>
                     ) : (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                        <FixedTooltipBtn label="Download PDF file" onAction={() => handleDownload(r)}><Download size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
+                        <FixedTooltipBtn label="Download HTML file" onAction={() => handleDownload(r)}><Download size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
                         <FixedTooltipBtn label="Copy link" onAction={(rect) => handleCopy(rect, r)}><Link size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
                       </span>
                     )}
@@ -1274,33 +1163,12 @@ function ReportsTab() {
 // dateRange, period) — rebuilt on the fly rather than fetched from storage,
 // so a shared link works on any device/browser and can never 404.
 function ReportPage({ reportType, dateRange, period }) {
-  const [pdfUrl, setPdfUrl] = useState(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    let objectUrl = null;
-    (async () => {
-      const data = buildReportData(reportType, dateRange, period, null);
-      const doc = await buildReportPDF({ reportType, period, data });
-      if (cancelled) return;
-      objectUrl = doc.output("bloburl");
-      setPdfUrl(objectUrl);
-    })();
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [reportType, dateRange, period]);
-
-  if (!pdfUrl) return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#f7f8fa" }}>
-      <span style={{ fontSize: 14, color: "#828282" }}>Generating report…</span>
-    </div>
-  );
+  const data = buildReportData(reportType, dateRange, period, null);
+  const html = buildReportHTML({ reportType, period, data });
 
   return (
     <iframe
-      src={pdfUrl}
+      srcDoc={html}
       title="Report"
       style={{ border: "none", width: "100%", height: "100vh", display: "block" }}
     />
