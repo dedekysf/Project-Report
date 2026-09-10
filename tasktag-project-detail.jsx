@@ -832,7 +832,7 @@ function ReportsTab() {
   const [previewPeriodOpen, setPreviewPeriodOpen] = useState(false);
   const [previewShowCal,   setPreviewShowCal]   = useState(false);
   const [noteDraft,        setNoteDraft]        = useState("");
-  const [addingNote,       setAddingNote]       = useState(false);
+  const [addingNoteKey,    setAddingNoteKey]     = useState(null); // key of the entry the open "add note" form is under
   const previewPrevDateRangeRef = useRef("this_week");
   const previewPeriodRef = useRef(null);
 
@@ -895,7 +895,7 @@ function ReportsTab() {
     });
     setPreviewPeriodOpen(false);
     setPreviewShowCal(false);
-    setAddingNote(false);
+    setAddingNoteKey(null);
     setNoteDraft("");
   };
 
@@ -903,7 +903,7 @@ function ReportsTab() {
     setPreview(null);
     setPreviewPeriodOpen(false);
     setPreviewShowCal(false);
-    setAddingNote(false);
+    setAddingNoteKey(null);
     setNoteDraft("");
   };
 
@@ -923,8 +923,36 @@ function ReportsTab() {
     if (!text) return;
     setPreview(p => ({ ...p, extraNotes: [...p.extraNotes, { date: toDateKey(APP_TODAY), note: text, photos: [] }] }));
     setNoteDraft("");
-    setAddingNote(false);
+    setAddingNoteKey(null);
   };
+
+  // Rendered under every entry's photo list (and once for the empty-period
+  // state), so a note can be added at any point in the preview.
+  const renderAddNoteCTA = (key) => (
+    addingNoteKey === key ? (
+      <div style={{ border: "1px solid var(--tt-grey03)", borderRadius: 8, padding: 12, marginTop: 10 }}>
+        <textarea
+          autoFocus
+          value={noteDraft}
+          onChange={e => setNoteDraft(e.target.value)}
+          placeholder="Add a note for today..."
+          rows={3}
+          style={{ width: "100%", border: "none", outline: "none", fontSize: 14, fontFamily: "inherit", resize: "vertical", color: "var(--tt-text-2)" }}
+        />
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
+          <button onClick={() => { setAddingNoteKey(null); setNoteDraft(""); }} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer" }}>Cancel</button>
+          <button onClick={handleAddNote} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#000", fontSize: 13, fontWeight: 500, color: "#fff", cursor: "pointer" }}>Add</button>
+        </div>
+      </div>
+    ) : (
+      <button
+        onClick={() => { setAddingNoteKey(key); setNoteDraft(""); }}
+        style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "1px dashed var(--tt-grey03)", borderRadius: 8, padding: "6px 12px", marginTop: 10, cursor: "pointer", fontSize: 12, fontWeight: 500, color: "var(--tt-text-2)" }}
+      >
+        <Plus size={12} strokeWidth={SW} /> Add note
+      </button>
+    )
+  );
 
   const handlePreviewSave = () => {
     pushReport({ reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period, data: previewData });
@@ -1219,7 +1247,7 @@ function ReportsTab() {
 
             {/* Modal chrome */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid var(--tt-grey03)", flexShrink: 0 }}>
-              <p style={{ fontSize: 15, fontWeight: 600, color: "var(--tt-text-1)" }}>Report preview</p>
+              <p style={{ fontSize: 15, fontWeight: 600, color: "var(--tt-text-1)" }}>Draft {preview.reportType === "photo" ? "Photo Update" : "Progress Report"}</p>
               <button onClick={closePreview} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, display: "flex", color: "var(--tt-text-2)" }}>
                 <X size={18} strokeWidth={SW} />
               </button>
@@ -1227,15 +1255,6 @@ function ReportsTab() {
 
             {/* Scrollable body */}
             <div style={{ overflowY: "auto", flex: 1 }}>
-              {/* Report header */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px" }}>
-                <img src={IMG_MAP_LOGO} alt="tasktag" style={{ height: 24, display: "block" }} />
-                <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.04em", color: "#16a97d", textTransform: "uppercase", border: "1px solid #16a97d", borderRadius: 20, padding: "3px 10px" }}>
-                  {preview.reportType === "photo" ? "Photo Update" : "Progress Report"}
-                </span>
-              </div>
-              <div style={{ height: 1, background: "#e8e8e6", margin: "0 20px" }} />
-
               <div style={{ padding: 20 }}>
                 {/* Editable period */}
                 <div style={{ position: "relative", marginBottom: 24, display: "inline-block" }} ref={previewPeriodRef}>
@@ -1294,72 +1313,54 @@ function ReportsTab() {
                 )}
 
                 {previewData && previewData.groups.length === 0 && (
-                  <p style={{ fontSize: 13, color: "#828282", textAlign: "center", padding: "32px 0" }}>No activity entries for this period.</p>
+                  <>
+                    <p style={{ fontSize: 13, color: "#828282", textAlign: "center", padding: "32px 0 8px" }}>No activity entries for this period.</p>
+                    {renderAddNoteCTA("empty")}
+                  </>
                 )}
                 {previewData && previewData.groups.map(g => (
                   <div key={g.key} style={{ marginBottom: 32 }}>
                     <p style={{ fontSize: 11, fontWeight: 600, color: "#828282", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>
                       {formatGroupLabel(g, previewData.grouping).toUpperCase()}
                     </p>
-                    {g.entries.map((e, i) => (
-                      <div key={i} style={{ marginBottom: 20 }}>
-                        <p style={{ fontSize: 14, color: "#303742", lineHeight: "1.6", margin: 0 }}>{e.note}</p>
-                        {e.photos.length > 0 && (
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 10 }}>
-                            {e.photos.map((k, pi) => (
-                              <img key={pi} src={IMG_MAP[k]} alt="" style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: 8, display: "block" }} />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                    {g.entries.map((e, i) => {
+                      const entryKey = `${g.key}_${i}`;
+                      return (
+                        <div key={entryKey} style={{ marginBottom: 20 }}>
+                          <p style={{ fontSize: 14, color: "#303742", lineHeight: "1.6", margin: 0 }}>{e.note}</p>
+                          {e.photos.length > 0 && (
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 10 }}>
+                              {e.photos.map((k, pi) => (
+                                <img key={pi} src={IMG_MAP[k]} alt="" style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: 8, display: "block" }} />
+                              ))}
+                            </div>
+                          )}
+                          {renderAddNoteCTA(entryKey)}
+                        </div>
+                      );
+                    })}
                   </div>
                 ))}
-
-                {/* Add note CTA — after the entries/photos list */}
-                {!addingNote ? (
-                  <button
-                    onClick={() => setAddingNote(true)}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "1px dashed var(--tt-grey03)", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)" }}
-                  >
-                    <Plus size={14} strokeWidth={SW} /> Add note
-                  </button>
-                ) : (
-                  <div style={{ border: "1px solid var(--tt-grey03)", borderRadius: 8, padding: 12 }}>
-                    <textarea
-                      autoFocus
-                      value={noteDraft}
-                      onChange={e => setNoteDraft(e.target.value)}
-                      placeholder="Add a note for today..."
-                      rows={3}
-                      style={{ width: "100%", border: "none", outline: "none", fontSize: 14, fontFamily: "inherit", resize: "vertical", color: "var(--tt-text-2)" }}
-                    />
-                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
-                      <button onClick={() => { setAddingNote(false); setNoteDraft(""); }} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer" }}>Cancel</button>
-                      <button onClick={handleAddNote} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#000", fontSize: 13, fontWeight: 500, color: "#fff", cursor: "pointer" }}>Add</button>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 
-            {/* Footer CTAs */}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "16px 20px", borderTop: "1px solid var(--tt-grey03)", flexShrink: 0 }}>
+            {/* Footer CTAs — Download 25% / Copy link 25% / Save report 50% */}
+            <div style={{ display: "flex", gap: 8, padding: "16px 20px", borderTop: "1px solid var(--tt-grey03)", flexShrink: 0 }}>
               <button
                 onClick={() => handleDownload({ reportType: preview.reportType, period: preview.period, data: previewData })}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer" }}
+                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer" }}
               >
                 <Download size={14} strokeWidth={SW} /> Download
               </button>
               <button
                 onClick={(e) => handleCopy(e.currentTarget.getBoundingClientRect(), { reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period })}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer" }}
+                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer" }}
               >
                 <Link size={14} strokeWidth={SW} /> Copy link
               </button>
               <button
                 onClick={handlePreviewSave}
-                style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "var(--tt-text-1)", fontSize: 13, fontWeight: 500, color: "white", cursor: "pointer" }}
+                style={{ flex: 2, padding: "8px 16px", borderRadius: 8, border: "none", background: "var(--tt-text-1)", fontSize: 13, fontWeight: 500, color: "white", cursor: "pointer" }}
               >
                 Save report
               </button>
