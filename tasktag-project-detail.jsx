@@ -1575,7 +1575,7 @@ function ReportsTab() {
           <div
             ref={previewPanelRef}
             style={{
-            position: "absolute", top: 0, right: 0, height: "100%", width: 440,
+            position: "absolute", top: 0, right: 0, height: "100%", width: 580,
             background: "white", borderLeft: "1px solid var(--tt-grey03)",
             // Negative spread pulls the shadow rect in vertically so the blur
             // reads as a left-edge-only shadow instead of wrapping top/bottom.
