@@ -8,7 +8,7 @@ import {
   LayoutGrid, MapPin, Hash, FileText, FileImage,
   Activity, Users, BarChart2, SlidersHorizontal,
   ArrowUpDown, Calendar, AlignJustify, Clock,
-  UserPlus, Link2, ChevronUp, ChevronDown,
+  UserPlus, Link2, ChevronUp, ChevronDown, X,
 } from "lucide-react";
 
 import logoImg from "./src/Img/tasktag-logo.13f1babda8fdbb1b7251572a0fe11f9e.png";
@@ -154,6 +154,9 @@ const SW = 1.2;
 // The app's fixed "today" — all mock data (DUMMY_ENTRIES, this_week/last_week
 // ranges) is anchored to this date rather than the real device clock.
 const APP_TODAY = new Date(2026, 8, 10); // Sep 10, 2026
+
+const toDateKey = (date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 
 // ── Date Range Calendar ──
 function DateRangeCalendar({ anchorRef, onClose, onApply }) {
@@ -632,21 +635,24 @@ function groupEntries(entries, start, end, grouping) {
   return Object.values(groups).sort((a, b) => b.key.localeCompare(a.key));
 }
 
-function formatGroupLabel(key, grouping) {
-  if (grouping === "day") {
-    const [y, m, d] = key.split("-").map(Number);
-    return new Date(y, m - 1, d).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
-  }
+// Shared by the download/copy-link HTML output and the generate preview
+// modal, so both show identical section labels.
+function formatGroupLabel(g, grouping) {
   if (grouping === "week") {
-    const [y, m, d] = key.split("-").map(Number);
+    const [y, m, d] = g.key.split("-").map(Number);
     const mon = new Date(y, m - 1, d);
-    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-    const fmt = (dt) => dt.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    return `${fmt(mon)} – ${fmt(sun)}`;
+    const fmt = dt => dt.toLocaleDateString("en-US", { month: "short", day: "numeric" }).toLowerCase();
+    const tp = g.entries.reduce((s, e) => s + e.photos.length, 0);
+    return `week of ${fmt(mon)} \xB7 ${tp} photo${tp !== 1 ? "s" : ""}`;
   }
-  // month
-  const [y, m] = key.split("-").map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  if (grouping === "month") {
+    const [y, m] = g.key.split("-").map(Number);
+    const label = new Date(y, m - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" }).toLowerCase();
+    const tp = g.entries.reduce((s, e) => s + e.photos.length, 0);
+    return `${label} \xB7 ${tp} photo${tp !== 1 ? "s" : ""}`;
+  }
+  const [y, m, d] = g.key.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", { day: "numeric", month: "short" }).toUpperCase();
 }
 
 function applyPhotoCap(groups, maxPhotos = 45) {
@@ -676,10 +682,10 @@ function applyPhotoCap(groups, maxPhotos = 45) {
   }));
 }
 
-function buildReportData(reportType, dateRange, periodStr, customRange) {
+function buildReportData(reportType, dateRange, periodStr, customRange, extraEntries = []) {
   const { start, end } = parsePeriodDates(periodStr, dateRange, customRange);
   const grouping = getGrouping(start, end);
-  let groups = groupEntries(DUMMY_ENTRIES, start, end, grouping);
+  let groups = groupEntries([...DUMMY_ENTRIES, ...extraEntries], start, end, grouping);
   groups = applyPhotoCap(groups);
 
   const completed = DUMMY_TASKS.filter(t => t.done).length;
@@ -740,23 +746,7 @@ const buildReportHTML = (report) => {
     return h("div", { style: "display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;" }, ...cells);
   };
 
-  const groupLabel = (g) => {
-    if (grouping === "week") {
-      const [y, m, d] = g.key.split("-").map(Number);
-      const mon = new Date(y, m - 1, d);
-      const fmt = dt => dt.toLocaleDateString("en-US", { month: "short", day: "numeric" }).toLowerCase();
-      const tp = g.entries.reduce((s, e) => s + e.photos.length, 0);
-      return `week of ${fmt(mon)} \xB7 ${tp} photo${tp !== 1 ? "s" : ""}`;
-    }
-    if (grouping === "month") {
-      const [y, m] = g.key.split("-").map(Number);
-      const label = new Date(y, m - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" }).toLowerCase();
-      const tp = g.entries.reduce((s, e) => s + e.photos.length, 0);
-      return `${label} \xB7 ${tp} photo${tp !== 1 ? "s" : ""}`;
-    }
-    const [y, m, d] = g.key.split("-").map(Number);
-    return new Date(y, m - 1, d).toLocaleDateString("en-US", { day: "numeric", month: "short" }).toUpperCase();
-  };
+  const groupLabel = (g) => formatGroupLabel(g, grouping);
 
   const progressHTML = rType === "progress"
     ? h("div", { style: "margin-bottom:24px;" },
@@ -836,6 +826,16 @@ function ReportsTab() {
   const periodRef     = useRef(null);
   const chipRef       = useRef(null);
 
+  // ── Generate preview modal ──
+  // { reportType, dateRange, period, customRange, extraNotes } | null
+  const [preview,          setPreview]          = useState(null);
+  const [previewPeriodOpen, setPreviewPeriodOpen] = useState(false);
+  const [previewShowCal,   setPreviewShowCal]   = useState(false);
+  const [noteDraft,        setNoteDraft]        = useState("");
+  const [addingNote,       setAddingNote]       = useState(false);
+  const previewPrevDateRangeRef = useRef("this_week");
+  const previewPeriodRef = useRef(null);
+
   useEffect(() => {
     if (!openType) return;
     const handler = (e) => { if (reportTypeRef.current && !reportTypeRef.current.contains(e.target)) setOpenType(false); };
@@ -865,24 +865,71 @@ function ReportsTab() {
     setShowCal(id === "custom");
   };
 
-  const handleGenerate = () => {
+  // Adds a report to the results list (called only once the user confirms
+  // via "Save report" in the preview modal — Generate no longer does this
+  // directly).
+  const pushReport = ({ reportType, dateRange, period, data }) => {
     const id = Date.now();
-    const periodDisplay = getPeriodRange(dateRange);
-    const reportData = buildReportData(reportType, dateRange, periodDisplay, customRange);
     const newReport = {
       id,
       date: new Date().toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true }),
-      period: periodDisplay,
+      period,
       dateRange,
       status: "in_progress",
       reportType,
-      data: reportData,
+      data,
     };
     setReports(prev => [newReport, ...prev]);
-    setDateRange("since_last");
     setTimeout(() => {
       setReports(prev => prev.map(r => r.id === id ? { ...r, status: "done" } : r));
     }, 3000);
+  };
+
+  const handleGenerate = () => {
+    setPreview({
+      reportType,
+      dateRange,
+      period: getPeriodRange(dateRange),
+      customRange,
+      extraNotes: [],
+    });
+    setPreviewPeriodOpen(false);
+    setPreviewShowCal(false);
+    setAddingNote(false);
+    setNoteDraft("");
+  };
+
+  const closePreview = () => {
+    setPreview(null);
+    setPreviewPeriodOpen(false);
+    setPreviewShowCal(false);
+    setAddingNote(false);
+    setNoteDraft("");
+  };
+
+  useEffect(() => {
+    if (!preview) return;
+    const handler = (e) => { if (e.key === "Escape") closePreview(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [preview]);
+
+  const previewData = preview
+    ? buildReportData(preview.reportType, preview.dateRange, preview.period, preview.customRange, preview.extraNotes)
+    : null;
+
+  const handleAddNote = () => {
+    const text = noteDraft.trim();
+    if (!text) return;
+    setPreview(p => ({ ...p, extraNotes: [...p.extraNotes, { date: toDateKey(APP_TODAY), note: text, photos: [] }] }));
+    setNoteDraft("");
+    setAddingNote(false);
+  };
+
+  const handlePreviewSave = () => {
+    pushReport({ reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period, data: previewData });
+    setDateRange("since_last");
+    closePreview();
   };
 
   const [isWide, setIsWide] = useState(window.innerWidth > 1280);
@@ -936,15 +983,15 @@ function ReportsTab() {
     ? [{ id: "since_last", label: "Since last report" }, ...PERIOD_OPTIONS_BASE]
     : PERIOD_OPTIONS_BASE;
 
-  const getPeriodLabel = (id) => {
+  const getPeriodLabel = (id, cr = customRange) => {
     if (id === "since_last") return `Since last report · ${sinceLastDate}`;
-    if (id === "custom" && customRange) return `${customRange.start} – ${customRange.end}`;
+    if (id === "custom" && cr) return `${cr.start} – ${cr.end}`;
     return PERIOD_LABELS[id];
   };
 
-  const getPeriodRange = (id) => {
+  const getPeriodRange = (id, cr = customRange) => {
     if (id === "since_last") return `${sinceLastDate} – ${fmtDate(new Date())}`;
-    if (id === "custom" && customRange) return `${customRange.start} – ${customRange.end}`;
+    if (id === "custom" && cr) return `${cr.start} – ${cr.end}`;
     return PERIOD_RANGE[id];
   };
 
@@ -1159,6 +1206,189 @@ function ReportsTab() {
             </tbody>
           </table>
           </div>
+        </div>
+      )}
+
+      {/* ── Generate preview modal ── */}
+      {preview && (
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget) closePreview(); }}
+          style={{ position: "fixed", inset: 0, background: "rgba(10,22,41,0.5)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+        >
+          <div style={{ background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 16, maxWidth: 660, width: "100%", maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+
+            {/* Modal chrome */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid var(--tt-grey03)", flexShrink: 0 }}>
+              <p style={{ fontSize: 15, fontWeight: 600, color: "var(--tt-text-1)" }}>Report preview</p>
+              <button onClick={closePreview} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, display: "flex", color: "var(--tt-text-2)" }}>
+                <X size={18} strokeWidth={SW} />
+              </button>
+            </div>
+
+            {/* Scrollable body */}
+            <div style={{ overflowY: "auto", flex: 1 }}>
+              {/* Report header */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px" }}>
+                <img src={IMG_MAP_LOGO} alt="tasktag" style={{ height: 24, display: "block" }} />
+                <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.04em", color: "#16a97d", textTransform: "uppercase", border: "1px solid #16a97d", borderRadius: 20, padding: "3px 10px" }}>
+                  {preview.reportType === "photo" ? "Photo Update" : "Progress Report"}
+                </span>
+              </div>
+              <div style={{ height: 1, background: "#e8e8e6", margin: "0 20px" }} />
+
+              <div style={{ padding: 20 }}>
+                {/* Editable period */}
+                <div style={{ position: "relative", marginBottom: 24, display: "inline-block" }} ref={previewPeriodRef}>
+                  <button
+                    onClick={() => setPreviewPeriodOpen(o => !o)}
+                    style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 11, fontFamily: "inherit", color: "#828282", textTransform: "uppercase" }}
+                  >
+                    Period: {preview.period}
+                    <ChevronDown size={12} strokeWidth={SW} style={{ transform: `rotate(${previewPeriodOpen ? "180deg" : "0deg"})`, transition: "transform 0.15s" }} />
+                  </button>
+                  {previewPeriodOpen && (
+                    <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 200, minWidth: 220, background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, overflow: "hidden", textTransform: "none" }}>
+                      {PERIOD_OPTIONS.map(({ id }, i) => (
+                        <div key={id}>
+                          <div
+                            onClick={() => {
+                              if (id === "custom") previewPrevDateRangeRef.current = preview.dateRange;
+                              setPreview(p => ({ ...p, dateRange: id, period: getPeriodRange(id, p.customRange) }));
+                              setPreviewShowCal(id === "custom");
+                              setPreviewPeriodOpen(false);
+                            }}
+                            style={{
+                              padding: "10px 12px", cursor: "pointer",
+                              background: preview.dateRange === id ? "var(--tt-grey02)" : "white",
+                              display: "flex", alignItems: "center", justifyContent: "space-between",
+                              transition: "background 0.1s",
+                            }}
+                            onMouseEnter={e => { if (preview.dateRange !== id) e.currentTarget.style.background = "var(--tt-grey02)"; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = preview.dateRange === id ? "var(--tt-grey02)" : "white"; }}
+                          >
+                            <span style={{ fontSize: 13, fontWeight: 500, color: "var(--tt-text-1)" }}>
+                              {getPeriodLabel(id, preview.customRange)}
+                            </span>
+                            {preview.dateRange === id && <Check size={14} color="var(--tt-secondary)" strokeWidth={2} />}
+                          </div>
+                          {i < PERIOD_OPTIONS.length - 1 && <div style={{ height: 1, background: "var(--tt-grey03)", margin: "0 12px" }} />}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <h2 style={{ fontSize: 28, fontWeight: 700, color: "#0a1629", marginBottom: 4, lineHeight: 1.15 }}>Raintree Hollow Residence Renovation</h2>
+                <p style={{ fontSize: 12, color: "#828282", marginBottom: 24 }}>11 North Raintree Hollow Court, Sienna Plantation, Missouri City</p>
+
+                {preview.reportType === "progress" && previewData && (
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, fontSize: 13, fontWeight: 600 }}>
+                      <span style={{ color: "#0a1629" }}>{previewData.completed} of {previewData.total} tasks complete</span>
+                      <span style={{ color: "#16a97d" }}>{previewData.pct}%</span>
+                    </div>
+                    <div style={{ height: 6, background: "#e8e8e6", borderRadius: 99, overflow: "hidden" }}>
+                      <div style={{ width: `${previewData.pct}%`, height: "100%", background: "#16a97d", borderRadius: 99 }} />
+                    </div>
+                  </div>
+                )}
+
+                {previewData && previewData.groups.length === 0 && (
+                  <p style={{ fontSize: 13, color: "#828282", textAlign: "center", padding: "32px 0" }}>No activity entries for this period.</p>
+                )}
+                {previewData && previewData.groups.map(g => (
+                  <div key={g.key} style={{ marginBottom: 32 }}>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: "#828282", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>
+                      {formatGroupLabel(g, previewData.grouping).toUpperCase()}
+                    </p>
+                    {g.entries.map((e, i) => (
+                      <div key={i} style={{ marginBottom: 20 }}>
+                        <p style={{ fontSize: 14, color: "#303742", lineHeight: "1.6", margin: 0 }}>{e.note}</p>
+                        {e.photos.length > 0 && (
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 10 }}>
+                            {e.photos.map((k, pi) => (
+                              <img key={pi} src={IMG_MAP[k]} alt="" style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: 8, display: "block" }} />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+
+                {/* Add note CTA — after the entries/photos list */}
+                {!addingNote ? (
+                  <button
+                    onClick={() => setAddingNote(true)}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "1px dashed var(--tt-grey03)", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)" }}
+                  >
+                    <Plus size={14} strokeWidth={SW} /> Add note
+                  </button>
+                ) : (
+                  <div style={{ border: "1px solid var(--tt-grey03)", borderRadius: 8, padding: 12 }}>
+                    <textarea
+                      autoFocus
+                      value={noteDraft}
+                      onChange={e => setNoteDraft(e.target.value)}
+                      placeholder="Add a note for today..."
+                      rows={3}
+                      style={{ width: "100%", border: "none", outline: "none", fontSize: 14, fontFamily: "inherit", resize: "vertical", color: "var(--tt-text-2)" }}
+                    />
+                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
+                      <button onClick={() => { setAddingNote(false); setNoteDraft(""); }} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer" }}>Cancel</button>
+                      <button onClick={handleAddNote} style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#000", fontSize: 13, fontWeight: 500, color: "#fff", cursor: "pointer" }}>Add</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer CTAs */}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "16px 20px", borderTop: "1px solid var(--tt-grey03)", flexShrink: 0 }}>
+              <button
+                onClick={() => handleDownload({ reportType: preview.reportType, period: preview.period, data: previewData })}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer" }}
+              >
+                <Download size={14} strokeWidth={SW} /> Download
+              </button>
+              <button
+                onClick={(e) => handleCopy(e.currentTarget.getBoundingClientRect(), { reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period })}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer" }}
+              >
+                <Link size={14} strokeWidth={SW} /> Copy link
+              </button>
+              <button
+                onClick={handlePreviewSave}
+                style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "var(--tt-text-1)", fontSize: 13, fontWeight: 500, color: "white", cursor: "pointer" }}
+              >
+                Save report
+              </button>
+            </div>
+          </div>
+
+          {/* Custom date calendar for editing the period inside the modal */}
+          {previewShowCal && (
+            <DateRangeCalendar
+              anchorRef={previewPeriodRef}
+              onClose={() => {
+                if (!preview.customRange) setPreview(p => ({ ...p, dateRange: previewPrevDateRangeRef.current, period: getPeriodRange(previewPrevDateRangeRef.current, p.customRange) }));
+                setPreviewShowCal(false);
+              }}
+              onApply={(start, end) => {
+                if (start && end) {
+                  const fmt = (s) => {
+                    const [y, m, d] = s.split("-");
+                    return new Date(y, m-1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                  };
+                  const cr = { start: fmt(start), end: fmt(end) };
+                  setPreview(p => ({ ...p, customRange: cr, period: getPeriodRange("custom", cr) }));
+                } else if (!preview.customRange) {
+                  setPreview(p => ({ ...p, dateRange: previewPrevDateRangeRef.current, period: getPeriodRange(previewPrevDateRangeRef.current, p.customRange) }));
+                }
+                setPreviewShowCal(false);
+              }}
+            />
+          )}
         </div>
       )}
 
