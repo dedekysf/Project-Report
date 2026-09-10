@@ -553,7 +553,13 @@ function PhotoThumb({ src }) {
 // only then starts loading) the rest.
 function PhotoGrid({ photos }) {
   const [expanded, setExpanded] = useState(false);
-  if (!photos || photos.length === 0) return null;
+  if (!photos || photos.length === 0) {
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 10 }}>
+        <PhotoThumb src={null} />
+      </div>
+    );
+  }
 
   const remaining = photos.length - 4;
   const visible = expanded || remaining <= 0 ? photos : photos.slice(0, 4);
@@ -873,13 +879,18 @@ const buildReportHTML = (report) => {
   };
 
   // Fixed 4-column grid -- cell size never changes with row count.
+  const noImageCell = h("div", { style: "width:100%;aspect-ratio:4/3;border-radius:8px;background:#f7f8fa;display:flex;align-items:center;justify-content:center;" },
+    h("span", { style: "font-size:12px;font-weight:500;color:#e8e8e6;" }, "No Image")
+  );
   const renderPhotos = (photos) => {
-    if (!photos || photos.length === 0) return "";
+    if (!photos || photos.length === 0) {
+      return h("div", { style: "display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;" }, noImageCell);
+    }
     const cells = photos.map(k => {
       const src = IMG_MAP[k];
       return src
         ? selfClose("img", { src: toAbsoluteUrl(src), style: "width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px;display:block;" })
-        : "";
+        : noImageCell;
     });
     return h("div", { style: "display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;" }, ...cells);
   };
