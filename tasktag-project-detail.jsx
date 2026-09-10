@@ -151,9 +151,13 @@ document.head.appendChild(style);
 
 const SW = 1.2;
 
+// The app's fixed "today" — all mock data (DUMMY_ENTRIES, this_week/last_week
+// ranges) is anchored to this date rather than the real device clock.
+const APP_TODAY = new Date(2026, 8, 10); // Sep 10, 2026
+
 // ── Date Range Calendar ──
 function DateRangeCalendar({ anchorRef, onClose, onApply }) {
-  const today = new Date();
+  const today = APP_TODAY;
   const [viewYear,   setViewYear]   = useState(today.getFullYear());
   const [viewMonth,  setViewMonth]  = useState(today.getMonth());
   const [rangeStart, setRangeStart] = useState(null);
@@ -231,6 +235,7 @@ function DateRangeCalendar({ anchorRef, onClose, onApply }) {
 
   const handleDay = (d) => {
     const key = toKey(viewYear, viewMonth, d);
+    if (key > todayKey) return; // dates after today can't be selected
     if (!rangeStart || rangeEnd) {
       setRangeStart(key); setRangeEnd(null);
     } else {
@@ -294,6 +299,7 @@ function DateRangeCalendar({ anchorRef, onClose, onApply }) {
 
           const key      = toKey(viewYear, viewMonth, d);
           const isToday  = key === todayKey;
+          const isFuture = key > todayKey;
           const start    = key === rangeStart;
           const end      = key === rangeEnd;
           const selected = start || end;
@@ -315,14 +321,14 @@ function DateRangeCalendar({ anchorRef, onClose, onApply }) {
           return (
             <div
               key={key}
-              onMouseEnter={() => setHovering(key)}
+              onMouseEnter={() => !isFuture && setHovering(key)}
               onMouseLeave={() => setHovering(null)}
-              onClick={() => handleDay(d)}
+              onClick={() => !isFuture && handleDay(d)}
               style={{
                 position: "relative",
                 height: CELL, width: CELL,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                cursor: "pointer",
+                cursor: isFuture ? "not-allowed" : "pointer",
                 // seamless band background
                 background: inBand ? "var(--tt-grey03)" : "transparent",
                 borderRadius: bandRadius,
@@ -335,7 +341,7 @@ function DateRangeCalendar({ anchorRef, onClose, onApply }) {
                 borderRadius: "50%",
                 background: selected ? "#000" : "transparent",
                 border: isToday && !selected ? "1.5px solid #000" : "none",
-                color: selected ? "#fff" : isToday ? "#000" : "var(--tt-text-2)",
+                color: isFuture ? "var(--tt-grey04)" : selected ? "#fff" : isToday ? "#000" : "var(--tt-text-2)",
                 fontSize: 13,
                 fontWeight: selected || isToday ? 600 : 400,
                 zIndex: 1,
@@ -550,7 +556,7 @@ function parseDate(str) {
 }
 
 function parsePeriodDates(periodStr, dateRange, customRange) {
-  const now = new Date(2026, 8, 10); // Sep 10 2026
+  const now = APP_TODAY;
 
   if (dateRange === "this_week") {
     const day = now.getDay();
