@@ -1169,10 +1169,18 @@ function ReportsTab() {
     ? [{ id: "since_last", label: "Since last report" }, ...PERIOD_OPTIONS_BASE]
     : PERIOD_OPTIONS_BASE;
 
-  const getPeriodLabel = (id, cr = customRange) => {
-    if (id === "since_last") return `Since last report · ${sinceLastDate}`;
-    if (id === "custom" && cr) return `${cr.start} – ${cr.end}`;
-    return PERIOD_LABELS[id];
+  // Renders "Label · date range" with the date portion de-emphasized
+  // (grey05, regular weight) — used for both the trigger and list items.
+  const renderPeriodLabel = (id, cr = customRange) => {
+    if (id === "custom" && cr) {
+      return <span style={{ color: "var(--tt-grey05)", fontWeight: 400 }}>{cr.start} – {cr.end}</span>;
+    }
+    if (id === "custom") return "Custom date";
+    if (id === "since_last") {
+      return <>Since last report <span style={{ color: "var(--tt-grey05)", fontWeight: 400 }}>· {sinceLastDate}</span></>;
+    }
+    const [label, date] = PERIOD_LABELS[id].split(" · ");
+    return <>{label} <span style={{ color: "var(--tt-grey05)", fontWeight: 400 }}>· {date}</span></>;
   };
 
   const getPeriodRange = (id, cr = customRange) => {
@@ -1262,7 +1270,7 @@ function ReportsTab() {
                 userSelect: "none", transition: "border-color 0.15s, background 0.15s",
               }}
             >
-              <span>{getPeriodLabel(dateRange)}</span>
+              <span>{renderPeriodLabel(dateRange)}</span>
               <ChevronDown size={14} strokeWidth={SW} color="var(--tt-grey05)"
                 style={{ flexShrink: 0, transform: `rotate(${openPeriod ? "180deg" : "0deg"})`, transition: "transform 0.15s" }} />
             </div>
@@ -1290,9 +1298,7 @@ function ReportsTab() {
                       onMouseLeave={e => { e.currentTarget.style.background = dateRange === id ? "var(--tt-grey02)" : "white"; }}
                     >
                       <span style={{ fontSize: 13, fontWeight: 500, color: "var(--tt-text-1)" }}>
-                        {id === "custom" && customRange
-                          ? `${customRange.start} – ${customRange.end}`
-                          : getPeriodLabel(id)}
+                        {renderPeriodLabel(id)}
                       </span>
                       {dateRange === id && <Check size={14} color="var(--tt-secondary)" strokeWidth={2} />}
                     </div>
@@ -1458,7 +1464,7 @@ function ReportsTab() {
                             onMouseLeave={e => { e.currentTarget.style.background = preview.dateRange === id ? "var(--tt-grey02)" : "white"; }}
                           >
                             <span style={{ fontSize: 13, fontWeight: 500, color: "var(--tt-text-1)" }}>
-                              {getPeriodLabel(id, preview.customRange)}
+                              {renderPeriodLabel(id, preview.customRange)}
                             </span>
                             {preview.dateRange === id && <Check size={14} color="var(--tt-secondary)" strokeWidth={2} />}
                           </div>
