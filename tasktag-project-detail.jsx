@@ -117,6 +117,16 @@ style.textContent = `
     to   { transform: rotate(360deg); }
   }
 
+  @keyframes tt-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+  }
+  .tt-skeleton {
+    background: var(--tt-grey03);
+    border-radius: 6px;
+    animation: tt-pulse 1.2s ease-in-out infinite;
+  }
+
   /* CTA button — icon + text */
   .tt-cta-btn {
     display: inline-flex; align-items: center; gap: 6px;
@@ -883,6 +893,7 @@ function ReportsTab() {
   const [previewShowCal,   setPreviewShowCal]   = useState(false);
   const [noteDraft,        setNoteDraft]        = useState("");
   const [activeNoteFormKey, setActiveNoteFormKey] = useState(null); // entryKey whose add/edit note form is open
+  const [previewLoading,   setPreviewLoading]    = useState(false);
   const previewPrevDateRangeRef = useRef("this_week");
   const previewPeriodRef = useRef(null);
 
@@ -963,6 +974,15 @@ function ReportsTab() {
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [preview]);
+
+  // Show a loading skeleton whenever the previewed data would change —
+  // both on first open and whenever the period is edited.
+  useEffect(() => {
+    if (!preview) return;
+    setPreviewLoading(true);
+    const t = setTimeout(() => setPreviewLoading(false), 500);
+    return () => clearTimeout(t);
+  }, [preview?.period]);
 
   const previewData = preview
     ? buildReportData(preview.reportType, preview.dateRange, preview.period, preview.customRange)
@@ -1432,76 +1452,108 @@ function ReportsTab() {
                   )}
                 </div>
 
-                <h2 style={{ fontSize: 28, fontWeight: 700, color: "#0a1629", marginBottom: 4, lineHeight: 1.15 }}>Raintree Hollow Residence Renovation</h2>
-                <p style={{ fontSize: 12, color: "#828282", marginBottom: 24 }}>11 North Raintree Hollow Court, Sienna Plantation, Missouri City</p>
-
-                {preview.reportType === "progress" && previewData && (
-                  <div style={{ marginBottom: 24 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, fontSize: 13, fontWeight: 600 }}>
-                      <span style={{ color: "#0a1629" }}>{previewData.completed} of {previewData.total} tasks complete</span>
-                      <span style={{ color: "#16a97d" }}>{previewData.pct}%</span>
-                    </div>
-                    <div style={{ height: 6, background: "#e8e8e6", borderRadius: 99, overflow: "hidden" }}>
-                      <div style={{ width: `${previewData.pct}%`, height: "100%", background: "#16a97d", borderRadius: 99 }} />
-                    </div>
-                  </div>
-                )}
-
-                {previewData && previewData.groups.length === 0 && (
+                {previewLoading ? (
                   <>
-                    <p style={{ fontSize: 13, color: "#828282", textAlign: "center", padding: "32px 0 8px" }}>No activity entries for this period.</p>
-                    {renderNoteSlot("empty")}
+                    <div className="tt-skeleton" style={{ width: "70%", height: 28, marginBottom: 8 }} />
+                    <div className="tt-skeleton" style={{ width: "50%", height: 14, marginBottom: 24 }} />
+                    {preview.reportType === "progress" && (
+                      <div style={{ marginBottom: 24 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                          <div className="tt-skeleton" style={{ width: 140, height: 13 }} />
+                          <div className="tt-skeleton" style={{ width: 30, height: 13 }} />
+                        </div>
+                        <div className="tt-skeleton" style={{ width: "100%", height: 6, borderRadius: 99 }} />
+                      </div>
+                    )}
+                    {[0, 1].map(gi => (
+                      <div key={gi} style={{ marginBottom: 32 }}>
+                        <div className="tt-skeleton" style={{ width: 90, height: 11, marginBottom: 10 }} />
+                        <div className="tt-skeleton" style={{ width: "85%", height: 14, marginBottom: 10 }} />
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
+                          {[0, 1, 2, 3].map(pi => (
+                            <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "4/3" }} />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  <>
+                    <h2 style={{ fontSize: 28, fontWeight: 700, color: "#0a1629", marginBottom: 4, lineHeight: 1.15 }}>Raintree Hollow Residence Renovation</h2>
+                    <p style={{ fontSize: 12, color: "#828282", marginBottom: 24 }}>11 North Raintree Hollow Court, Sienna Plantation, Missouri City</p>
+
+                    {preview.reportType === "progress" && previewData && (
+                      <div style={{ marginBottom: 24 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, fontSize: 13, fontWeight: 600 }}>
+                          <span style={{ color: "#0a1629" }}>{previewData.completed} of {previewData.total} tasks complete</span>
+                          <span style={{ color: "#16a97d" }}>{previewData.pct}%</span>
+                        </div>
+                        <div style={{ height: 6, background: "#e8e8e6", borderRadius: 99, overflow: "hidden" }}>
+                          <div style={{ width: `${previewData.pct}%`, height: "100%", background: "#16a97d", borderRadius: 99 }} />
+                        </div>
+                      </div>
+                    )}
+
+                    {previewData && previewData.groups.length === 0 && (
+                      <>
+                        <p style={{ fontSize: 13, color: "#828282", textAlign: "center", padding: "32px 0 8px" }}>No activity entries for this period.</p>
+                        {renderNoteSlot("empty")}
+                      </>
+                    )}
+                    {previewData && previewData.groups.map(g => (
+                      <div key={g.key} style={{ marginBottom: 32 }}>
+                        <p style={{ fontSize: 11, fontWeight: 600, color: "#828282", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>
+                          {formatGroupLabel(g, previewData.grouping).toUpperCase()}
+                        </p>
+                        {g.entries.map((e, i) => {
+                          const entryKey = `${g.key}_${i}`;
+                          return (
+                            <div key={entryKey} style={{ marginBottom: 20 }}>
+                              <p style={{ fontSize: 14, color: "#303742", lineHeight: "1.6", margin: 0 }}>{e.note}</p>
+                              {e.photos.length > 0 && (
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 10 }}>
+                                  {e.photos.map((k, pi) => (
+                                    <img key={pi} src={IMG_MAP[k]} alt="" style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: 8, display: "block" }} />
+                                  ))}
+                                </div>
+                              )}
+                              {renderNoteSlot(entryKey)}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
                   </>
                 )}
-                {previewData && previewData.groups.map(g => (
-                  <div key={g.key} style={{ marginBottom: 32 }}>
-                    <p style={{ fontSize: 11, fontWeight: 600, color: "#828282", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>
-                      {formatGroupLabel(g, previewData.grouping).toUpperCase()}
-                    </p>
-                    {g.entries.map((e, i) => {
-                      const entryKey = `${g.key}_${i}`;
-                      return (
-                        <div key={entryKey} style={{ marginBottom: 20 }}>
-                          <p style={{ fontSize: 14, color: "#303742", lineHeight: "1.6", margin: 0 }}>{e.note}</p>
-                          {e.photos.length > 0 && (
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 10 }}>
-                              {e.photos.map((k, pi) => (
-                                <img key={pi} src={IMG_MAP[k]} alt="" style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: 8, display: "block" }} />
-                              ))}
-                            </div>
-                          )}
-                          {renderNoteSlot(entryKey)}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
               </div>
             </div>
 
             {/* Footer CTAs — Download 25% / Copy link 25% / Save report 50% */}
             <div style={{ display: "flex", gap: 8, padding: "16px 20px", borderTop: "1px solid var(--tt-grey03)", flexShrink: 0 }}>
               <button
+                disabled={previewLoading}
                 onClick={() => handleDownload({ reportType: preview.reportType, period: preview.period, data: { ...previewData, groups: previewFinalGroups } })}
-                onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+                onMouseEnter={e => !previewLoading && (e.currentTarget.style.background = "var(--tt-grey02)")}
                 onMouseLeave={e => e.currentTarget.style.background = "white"}
-                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s" }}
+                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "background 0.15s" }}
               >
                 <Download size={14} strokeWidth={SW} /> Download
               </button>
               <button
+                disabled={previewLoading}
                 onClick={(e) => handleCopy(e.currentTarget.getBoundingClientRect(), { reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period })}
-                onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+                onMouseEnter={e => !previewLoading && (e.currentTarget.style.background = "var(--tt-grey02)")}
                 onMouseLeave={e => e.currentTarget.style.background = "white"}
-                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s" }}
+                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "background 0.15s" }}
               >
                 <Link size={14} strokeWidth={SW} /> Copy link
               </button>
               <button
+                disabled={previewLoading}
                 onClick={handlePreviewSave}
-                onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
-                onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-                style={{ flex: 2, padding: "8px 16px", borderRadius: 8, border: "none", background: "var(--tt-text-1)", fontSize: 13, fontWeight: 500, color: "white", cursor: "pointer", transition: "opacity 0.15s" }}
+                onMouseEnter={e => !previewLoading && (e.currentTarget.style.opacity = "0.85")}
+                onMouseLeave={e => e.currentTarget.style.opacity = previewLoading ? 0.5 : 1}
+                style={{ flex: 2, padding: "8px 16px", borderRadius: 8, border: "none", background: "var(--tt-text-1)", fontSize: 13, fontWeight: 500, color: "white", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "opacity 0.15s" }}
               >
                 Save report
               </button>
