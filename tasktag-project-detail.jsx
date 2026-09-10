@@ -967,6 +967,7 @@ function ReportsTab() {
   const [visibleCount,     setVisibleCount]      = useState(10); // infinite scroll — entries revealed so far
   const [loadingMore,      setLoadingMore]       = useState(false);
   const previewPeriodRef = useRef(null);
+  const previewPanelRef = useRef(null);
 
   useEffect(() => {
     if (!openType) return;
@@ -1064,6 +1065,19 @@ function ReportsTab() {
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [preview]);
+
+  // Click outside the side panel closes it — there's no backdrop to catch
+  // this anymore. Suspended while the custom-date calendar is open, since
+  // that popup renders as a sibling (not nested inside the panel) and has
+  // its own outside-click handling.
+  useEffect(() => {
+    if (!preview || previewShowCal) return;
+    const handler = (e) => {
+      if (previewPanelRef.current && !previewPanelRef.current.contains(e.target)) closePreview();
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [preview, previewShowCal]);
 
   // Show a loading skeleton whenever the previewed data would change —
   // both on first open and whenever the period is edited. Once it resolves,
@@ -1542,7 +1556,9 @@ function ReportsTab() {
       {preview && (
         <div style={{ position: "fixed", inset: 0, zIndex: 2000, pointerEvents: "none" }}>
           <div style={{ maxWidth: 1114, height: "100%", margin: "0 auto", position: "relative" }}>
-          <div style={{
+          <div
+            ref={previewPanelRef}
+            style={{
             position: "absolute", top: 0, right: 0, height: "100%", width: 440,
             background: "white", borderLeft: "1px solid var(--tt-grey03)",
             boxShadow: "-12px 0 32px rgba(10, 22, 41, 0.12)",
