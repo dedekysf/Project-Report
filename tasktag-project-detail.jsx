@@ -1571,7 +1571,7 @@ function ReportsTab() {
           right:0 inside a same-width invisible container. */}
       {(preview || panelClosing) && (
         <div style={{ position: "fixed", inset: 0, zIndex: 2000, pointerEvents: "none" }}>
-          <div style={{ maxWidth: 1114, height: "100%", margin: "0 auto", position: "relative" }}>
+          <div style={{ maxWidth: 1114, height: "100%", margin: "0 auto", position: "relative", overflow: "hidden" }}>
           <div
             ref={previewPanelRef}
             style={{
@@ -1751,7 +1751,7 @@ function ReportsTab() {
                     onClick={handlePreviewDownload}
                     onMouseEnter={e => !previewLoading && (e.currentTarget.style.background = "var(--tt-grey02)")}
                     onMouseLeave={e => e.currentTarget.style.background = "white"}
-                    style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "background 0.15s" }}
+                    style={{ flex: 1, height: 40, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "0 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "background 0.15s" }}
                   >
                     <Download size={14} strokeWidth={SW} /> Download
                   </button>
@@ -1760,7 +1760,7 @@ function ReportsTab() {
                     onClick={handlePreviewCopy}
                     onMouseEnter={e => !previewLoading && (e.currentTarget.style.background = "var(--tt-grey02)")}
                     onMouseLeave={e => e.currentTarget.style.background = "white"}
-                    style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "background 0.15s" }}
+                    style={{ flex: 1, height: 40, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "0 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "background 0.15s" }}
                   >
                     {previewCopied
                       ? <><Check size={14} strokeWidth={SW} /> Link copied</>
@@ -1773,7 +1773,7 @@ function ReportsTab() {
                   onClick={handlePreviewSave}
                   onMouseEnter={e => !previewLoading && (e.currentTarget.style.opacity = "0.85")}
                   onMouseLeave={e => e.currentTarget.style.opacity = previewLoading ? 0.5 : 1}
-                  style={{ flex: 1, padding: "8px 16px", borderRadius: 8, border: "none", background: "var(--tt-text-1)", fontSize: 13, fontWeight: 500, color: "white", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "opacity 0.15s" }}
+                  style={{ flex: 1, height: 40, padding: "0 16px", borderRadius: 8, border: "none", background: "var(--tt-text-1)", fontSize: 13, fontWeight: 500, color: "white", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "opacity 0.15s" }}
                 >
                   Save report
                 </button>
