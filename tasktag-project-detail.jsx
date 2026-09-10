@@ -1527,12 +1527,8 @@ function ReportsTab() {
                       </div>
                     )}
 
-                    {previewData && previewData.groups.length === 0 && (
-                      <>
-                        <p style={{ fontSize: 13, color: "#828282", textAlign: "center", padding: "32px 0 8px" }}>No activity entries for this period.</p>
-                        {renderNoteSlot("empty")}
-                      </>
-                    )}
+                    {/* No inline "no data" message here — the proactive toast already covers it */}
+                    {previewData && previewData.groups.length === 0 && renderNoteSlot("empty")}
                     {previewData && previewData.groups.map(g => (
                       <div key={g.key} style={{ marginBottom: 32 }}>
                         <p style={{ fontSize: 11, fontWeight: 600, color: "#828282", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 2 }}>
