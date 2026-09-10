@@ -526,10 +526,10 @@ function PhotoThumb({ src }) {
       <div
         style={{
           width: "100%", aspectRatio: "4/3", borderRadius: 8,
-          background: "var(--tt-grey02)", display: "flex", alignItems: "center", justifyContent: "center",
+          background: "var(--tt-grey03)", display: "flex", alignItems: "center", justifyContent: "center",
         }}
       >
-        <span style={{ fontSize: 12, fontWeight: 500, color: "var(--tt-grey03)" }}>No Image</span>
+        <span style={{ fontSize: 12, fontWeight: 500, color: "var(--tt-grey05)" }}>No Image</span>
       </div>
     );
   }
@@ -879,8 +879,8 @@ const buildReportHTML = (report) => {
   };
 
   // Fixed 4-column grid -- cell size never changes with row count.
-  const noImageCell = h("div", { style: "width:100%;aspect-ratio:4/3;border-radius:8px;background:#f7f8fa;display:flex;align-items:center;justify-content:center;" },
-    h("span", { style: "font-size:12px;font-weight:500;color:#e8e8e6;" }, "No Image")
+  const noImageCell = h("div", { style: "width:100%;aspect-ratio:4/3;border-radius:8px;background:#e8e8e6;display:flex;align-items:center;justify-content:center;" },
+    h("span", { style: "font-size:12px;font-weight:500;color:#828282;" }, "No Image")
   );
   const renderPhotos = (photos) => {
     if (!photos || photos.length === 0) {
