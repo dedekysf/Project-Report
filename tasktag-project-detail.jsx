@@ -1303,19 +1303,28 @@ function ReportsTab() {
             {/* Scrollable body */}
             <div style={{ overflowY: "auto", flex: 1 }}>
               <div style={{ padding: 20 }}>
-                {/* Editable period */}
-                <div style={{ position: "relative", marginBottom: 24, display: "inline-block" }} ref={previewPeriodRef}>
-                  <button
+                {/* Editable period — same select-box style as the main card's Period dropdown */}
+                <div style={{ position: "relative", marginBottom: 24, maxWidth: 280 }} ref={previewPeriodRef}>
+                  <Label style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)", marginBottom: 6, display: "block" }}>Period</Label>
+                  <div
                     onClick={() => setPreviewPeriodOpen(o => !o)}
-                    onMouseEnter={e => e.currentTarget.style.color = "var(--tt-text-1)"}
-                    onMouseLeave={e => e.currentTarget.style.color = "#828282"}
-                    style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 11, fontFamily: "inherit", color: "#828282", textTransform: "uppercase", transition: "color 0.15s" }}
+                    onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "white"}
+                    style={{
+                      width: "100%", height: 40, padding: "0 12px",
+                      background: "white", border: `1px solid ${previewPeriodOpen ? "#000" : "var(--tt-grey03)"}`,
+                      borderRadius: 8, fontSize: 13, fontWeight: 500,
+                      color: "var(--tt-text-1)", cursor: "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      userSelect: "none", transition: "border-color 0.15s, background 0.15s",
+                    }}
                   >
-                    Period: {preview.period}
-                    <ChevronDown size={12} strokeWidth={SW} style={{ transform: `rotate(${previewPeriodOpen ? "180deg" : "0deg"})`, transition: "transform 0.15s" }} />
-                  </button>
+                    <span>{preview.period}</span>
+                    <ChevronDown size={14} strokeWidth={SW} color="var(--tt-grey05)"
+                      style={{ flexShrink: 0, transform: `rotate(${previewPeriodOpen ? "180deg" : "0deg"})`, transition: "transform 0.15s" }} />
+                  </div>
                   {previewPeriodOpen && (
-                    <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 200, minWidth: 220, background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, overflow: "hidden", textTransform: "none" }}>
+                    <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 200, background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, overflow: "hidden" }}>
                       {PERIOD_OPTIONS.map(({ id }, i) => (
                         <div key={id}>
                           <div
