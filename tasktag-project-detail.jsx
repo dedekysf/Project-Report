@@ -1055,7 +1055,9 @@ function ReportsTab() {
     // since Download/Copy link now act on the saved snapshot.
     if (previewSaved) {
       if (!savedNote) return null;
-      return <p style={{ fontSize: 12, color: "var(--tt-text-2)", lineHeight: "1.5", margin: "10px 0 0" }}>{savedNote}</p>;
+      return (
+        <p style={{ fontSize: 12, fontStyle: "italic", color: "var(--tt-text-2)", lineHeight: "1.5", margin: "10px 0 0", background: "var(--tt-grey02)", padding: 8, borderRadius: 4 }}>{savedNote}</p>
+      );
     }
 
     if (activeNoteFormKey === key) {
@@ -1097,8 +1099,8 @@ function ReportsTab() {
 
     if (savedNote) {
       return (
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 4, marginTop: 10 }}>
-          <p style={{ fontSize: 12, color: "var(--tt-text-2)", lineHeight: "1.5", margin: 0, flex: 1 }}>{savedNote}</p>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 4, marginTop: 10, background: "var(--tt-grey02)", padding: 8, borderRadius: 4 }}>
+          <p style={{ fontSize: 12, fontStyle: "italic", color: "var(--tt-text-2)", lineHeight: "1.5", margin: 0, flex: 1 }}>{savedNote}</p>
           <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
             <button
               onClick={() => { setActiveNoteFormKey(key); setNoteDraft(savedNote); }}
