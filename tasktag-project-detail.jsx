@@ -133,6 +133,11 @@ style.textContent = `
     to   { transform: scaleX(1); }
   }
 
+  @keyframes tt-panel-slide-in {
+    from { transform: translateX(24px); opacity: 0; }
+    to   { transform: translateX(0); opacity: 1; }
+  }
+
   /* CTA button — icon + text */
   .tt-cta-btn {
     display: inline-flex; align-items: center; gap: 6px;
@@ -291,6 +296,7 @@ function DateRangeCalendar({ anchorRef, onClose, onApply }) {
         top: pos.top,
         left: pos.left,
         zIndex: 9999,
+        pointerEvents: "auto", // guard against an ancestor (e.g. the side panel wrapper) turning this off
         width: 308,
         padding: "16px 12px 12px",
         border: "1.5px solid var(--tt-grey03)",
@@ -1528,13 +1534,22 @@ function ReportsTab() {
         </div>
       )}
 
-      {/* ── Generate preview modal ── */}
+      {/* ── Generate preview side panel ── */}
+      {/* No backdrop — the page stays interactive. The panel is positioned
+          flush against the right edge of the centered maxWidth:1114 content
+          wrapper (not the browser viewport), via an absolute-positioned
+          element inside a same-width invisible container. */}
       {preview && (
-        <div
-          onClick={(e) => { if (e.target === e.currentTarget) closePreview(); }}
-          style={{ position: "fixed", inset: 0, background: "rgba(10,22,41,0.5)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
-        >
-          <div style={{ background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 16, maxWidth: 660, width: "100%", maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ position: "fixed", inset: 0, zIndex: 2000, pointerEvents: "none" }}>
+          <div style={{ maxWidth: 1114, height: "100%", margin: "0 auto", position: "relative" }}>
+          <div style={{
+            position: "absolute", top: 0, left: "100%", height: "100%", width: 440,
+            background: "white", borderLeft: "1px solid var(--tt-grey03)",
+            boxShadow: "-12px 0 32px rgba(10, 22, 41, 0.12)",
+            display: "flex", flexDirection: "column", overflow: "hidden",
+            pointerEvents: "auto",
+            animation: "tt-panel-slide-in 0.25s ease-out",
+          }}>
 
             {/* Modal chrome */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid var(--tt-grey03)", flexShrink: 0 }}>
@@ -1729,6 +1744,7 @@ function ReportsTab() {
                 </button>
               )}
             </div>
+          </div>
           </div>
 
           {/* Custom date calendar for editing the period inside the modal.
