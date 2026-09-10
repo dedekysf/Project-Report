@@ -246,12 +246,24 @@ function DateRangeCalendar({ anchorRef, onClose, onApply }) {
 
   const firstDay    = new Date(viewYear, viewMonth, 1).getDay();
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const prevMonthDays = new Date(viewYear, viewMonth, 0).getDate();
+  const prevMonthDate = new Date(viewYear, viewMonth - 1, 1);
+  const nextMonthDate = new Date(viewYear, viewMonth + 1, 1);
 
+  // Always exactly 6 rows (42 cells) so the calendar doesn't resize between
+  // months, with muted, non-selectable preview days from the prev/next month
+  // filling the leading/trailing gaps — like a standard date picker.
   const cells = [];
-  for (let i = 0; i < firstDay; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-  // pad to complete last row
-  while (cells.length % 7 !== 0) cells.push(null);
+  for (let i = firstDay - 1; i >= 0; i--) {
+    cells.push({ day: prevMonthDays - i, month: prevMonthDate.getMonth(), year: prevMonthDate.getFullYear(), otherMonth: true });
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push({ day: d, month: viewMonth, year: viewYear, otherMonth: false });
+  }
+  let nextDay = 1;
+  while (cells.length < 42) {
+    cells.push({ day: nextDay++, month: nextMonthDate.getMonth(), year: nextMonthDate.getFullYear(), otherMonth: true });
+  }
 
   const CELL = 40; // px per cell
 
@@ -294,12 +306,12 @@ function DateRangeCalendar({ anchorRef, onClose, onApply }) {
 
       {/* Day grid */}
       <div style={{ display: "grid", gridTemplateColumns: `repeat(7, ${CELL}px)` }}>
-        {cells.map((d, i) => {
-          if (!d) return <div key={`e-${i}`} style={{ height: CELL }} />;
-
-          const key      = toKey(viewYear, viewMonth, d);
+        {cells.map((cell, i) => {
+          const { day: d, month: cMonth, year: cYear, otherMonth } = cell;
+          const key      = toKey(cYear, cMonth, d);
           const isToday  = key === todayKey;
           const isFuture = key > todayKey;
+          const disabled = otherMonth || isFuture; // preview days from adjacent months aren't selectable
           const start    = key === rangeStart;
           const end      = key === rangeEnd;
           const selected = start || end;
@@ -311,8 +323,8 @@ function DateRangeCalendar({ anchorRef, onClose, onApply }) {
           const inBand = lo && hi && key >= lo && key <= hi;
 
           // band left/right caps for rounded ends
-          const isLeft  = start || col === 0 || d === 1;
-          const isRight = end   || col === 6 || d === daysInMonth;
+          const isLeft  = start || col === 0 || key === lo;
+          const isRight = end   || col === 6 || key === hi;
 
           const bandRadius = inBand
             ? `${isLeft ? "50%" : "0"} ${isRight ? "50%" : "0"} ${isRight ? "50%" : "0"} ${isLeft ? "50%" : "0"}`
@@ -321,14 +333,14 @@ function DateRangeCalendar({ anchorRef, onClose, onApply }) {
           return (
             <div
               key={key}
-              onMouseEnter={() => !isFuture && setHovering(key)}
+              onMouseEnter={() => !disabled && setHovering(key)}
               onMouseLeave={() => setHovering(null)}
-              onClick={() => !isFuture && handleDay(d)}
+              onClick={() => !disabled && handleDay(d)}
               style={{
                 position: "relative",
                 height: CELL, width: CELL,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                cursor: isFuture ? "not-allowed" : "pointer",
+                cursor: disabled ? (otherMonth ? "default" : "not-allowed") : "pointer",
                 // seamless band background
                 background: inBand ? "var(--tt-grey03)" : "transparent",
                 borderRadius: bandRadius,
@@ -341,7 +353,7 @@ function DateRangeCalendar({ anchorRef, onClose, onApply }) {
                 borderRadius: "50%",
                 background: selected ? "#000" : "transparent",
                 border: isToday && !selected ? "1.5px solid #000" : "none",
-                color: isFuture ? "var(--tt-grey04)" : selected ? "#fff" : isToday ? "#000" : "var(--tt-text-2)",
+                color: otherMonth ? "var(--tt-grey03)" : isFuture ? "var(--tt-grey04)" : selected ? "#fff" : isToday ? "#000" : "var(--tt-text-2)",
                 fontSize: 13,
                 fontWeight: selected || isToday ? 600 : 400,
                 zIndex: 1,
