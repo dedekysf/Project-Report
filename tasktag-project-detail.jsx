@@ -38,6 +38,7 @@ style.textContent = `
     --tt-grey05:     #828282;
     --tt-grey06:     #303742;
     --tt-mint:       #dcf2ec;
+    --tt-red:        #e5484d;
     --radius: 0.5rem;
   }
 
@@ -881,8 +882,7 @@ function ReportsTab() {
   const [reports,     setReports]     = useState([]);
   const [openType,    setOpenType]    = useState(false);
   const [openPeriod,  setOpenPeriod]  = useState(false);
-  const [copied,      setCopied]      = useState(false);
-  const [copiedPos,   setCopiedPos]   = useState({ top: 0, left: 0 });
+  const [toast,       setToast]       = useState(null); // { type: "success" | "error", message }
   const reportTypeRef = useRef(null);
   const periodRef     = useRef(null);
   const chipRef       = useRef(null);
@@ -927,6 +927,16 @@ function ReportsTab() {
     setDateRange(id);
     setShowCal(id === "custom");
   };
+
+  const showToast = (type, message) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 2500);
+  };
+
+  // A group with zero entries means there's genuinely nothing to export —
+  // used to block Download/Copy link/Save report and surface an error toast
+  // instead of producing an empty report.
+  const hasGroupData = (groups) => groups.some(g => g.entries.length > 0);
 
   // Adds a report to the results list (called only once the user confirms
   // via "Save report" in the preview modal — Generate no longer does this
@@ -1091,10 +1101,24 @@ function ReportsTab() {
     );
   };
 
+  const handlePreviewDownload = () => {
+    if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to export"); return; }
+    handleDownload({ reportType: preview.reportType, period: preview.period, data: { ...previewData, groups: previewFinalGroups } });
+    showToast("success", "Downloaded");
+  };
+
+  const handlePreviewCopy = async () => {
+    if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to export"); return; }
+    await handleCopy({ reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period });
+    showToast("success", "Link copied");
+  };
+
   const handlePreviewSave = () => {
+    if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to save"); return; }
     pushReport({ reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period, data: { ...previewData, groups: previewFinalGroups } });
     setDateRange("since_last");
     closePreview();
+    showToast("success", "Report saved");
   };
 
   const [isWide, setIsWide] = useState(window.innerWidth > 1280);
@@ -1118,7 +1142,7 @@ function ReportsTab() {
     URL.revokeObjectURL(url);
   };
 
-    const handleCopy = async (rect, report) => {
+    const handleCopy = async (report) => {
     // Report content is fully reproducible from these params, so the link
     // needs no server/storage round-trip — it can never fail to resolve.
     const params = new URLSearchParams({
@@ -1133,9 +1157,6 @@ function ReportsTab() {
       el.value = url; el.style.cssText = "position:fixed;opacity:0";
       document.body.appendChild(el); el.select(); document.execCommand("copy"); document.body.removeChild(el);
     }
-    setCopied(true);
-    setCopiedPos({ top: rect.bottom + 8, left: rect.right });
-    setTimeout(() => setCopied(false), 2000);
   };
 
   // Dynamic period options — add "Since last report" if a report exists
@@ -1365,8 +1386,8 @@ function ReportsTab() {
                       </span>
                     ) : (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                        <FixedTooltipBtn label="Download HTML file" onAction={() => handleDownload(r)}><Download size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
-                        <FixedTooltipBtn label="Copy link" onAction={(rect) => handleCopy(rect, r)}><Link size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
+                        <FixedTooltipBtn label="Download HTML file" onAction={() => { handleDownload(r); showToast("success", "Downloaded"); }}><Download size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
+                        <FixedTooltipBtn label="Copy link" onAction={async () => { await handleCopy(r); showToast("success", "Link copied"); }}><Link size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
                       </span>
                     )}
                   </td>
@@ -1534,7 +1555,7 @@ function ReportsTab() {
             <div style={{ display: "flex", gap: 8, padding: "16px 20px", borderTop: "1px solid var(--tt-grey03)", flexShrink: 0 }}>
               <button
                 disabled={previewLoading}
-                onClick={() => handleDownload({ reportType: preview.reportType, period: preview.period, data: { ...previewData, groups: previewFinalGroups } })}
+                onClick={handlePreviewDownload}
                 onMouseEnter={e => !previewLoading && (e.currentTarget.style.background = "var(--tt-grey02)")}
                 onMouseLeave={e => e.currentTarget.style.background = "white"}
                 style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "background 0.15s" }}
@@ -1543,7 +1564,7 @@ function ReportsTab() {
               </button>
               <button
                 disabled={previewLoading}
-                onClick={(e) => handleCopy(e.currentTarget.getBoundingClientRect(), { reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period })}
+                onClick={handlePreviewCopy}
                 onMouseEnter={e => !previewLoading && (e.currentTarget.style.background = "var(--tt-grey02)")}
                 onMouseLeave={e => e.currentTarget.style.background = "white"}
                 style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "background 0.15s" }}
@@ -1588,13 +1609,20 @@ function ReportsTab() {
         </div>
       )}
 
-      {/* Fixed "Link copied!" tooltip */}
-      {copied && (
-        <div style={{ position: "fixed", zIndex: 9999, top: copiedPos.top, left: copiedPos.left, transform: "translateX(-100%)", background: "white", color: "var(--tt-text-1)", fontSize: 11, fontWeight: 500, whiteSpace: "nowrap", padding: "4px 8px", borderRadius: 4, display: "flex", alignItems: "center", gap: 6, border: "1px solid var(--tt-grey03)", pointerEvents: "none" }}>
-          <span style={{ width: 13, height: 13, borderRadius: "50%", border: "1.5px solid var(--tt-secondary)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <Check size={8} strokeWidth={2.5} color="var(--tt-secondary)" />
-          </span>
-          Link copied!
+      {/* Toast — success (secondary green accent + check) / error (red accent + cross) */}
+      {toast && (
+        <div style={{
+          position: "fixed", bottom: 32, left: "50%", transform: "translateX(-50%)",
+          zIndex: 3000, background: "#000", borderRadius: 12, overflow: "hidden",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.25)", pointerEvents: "none",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 24px" }}>
+            {toast.type === "success"
+              ? <Check size={18} color="white" strokeWidth={2.5} />
+              : <X size={18} color="white" strokeWidth={2.5} />}
+            <span style={{ color: "white", fontSize: 16, fontWeight: 700, whiteSpace: "nowrap" }}>{toast.message}</span>
+          </div>
+          <div style={{ height: 4, background: toast.type === "success" ? "var(--tt-secondary)" : "var(--tt-red)" }} />
         </div>
       )}
     </div>
