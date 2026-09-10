@@ -1419,42 +1419,29 @@ function ReportsTab() {
 
             {/* Modal chrome */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid var(--tt-grey03)", flexShrink: 0 }}>
-              <p style={{ fontSize: 15, fontWeight: 600, color: "var(--tt-text-1)" }}>Draft {preview.reportType === "photo" ? "Photo Update" : "Progress Report"}</p>
-              <button
-                onClick={closePreview}
-                onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
-                onMouseLeave={e => e.currentTarget.style.background = "none"}
-                style={{ background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 4, display: "flex", color: "var(--tt-text-2)", transition: "background 0.15s" }}
-              >
-                <X size={18} strokeWidth={SW} />
-              </button>
-            </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <p style={{ fontSize: 15, fontWeight: 600, color: "var(--tt-text-1)" }}>Draft {preview.reportType === "photo" ? "Photo Update" : "Progress Report"}</p>
 
-            {/* Scrollable body */}
-            <div style={{ overflowY: "auto", flex: 1 }}>
-              <div style={{ padding: 20 }}>
-                {/* Editable period — same select-box style as the main card's Period dropdown */}
-                <div style={{ position: "relative", marginBottom: 24, maxWidth: 280 }} ref={previewPeriodRef}>
-                  <Label style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)", marginBottom: 6, display: "block" }}>Period</Label>
-                  <div
+                {/* Borderless period dropdown, next to the title */}
+                <div style={{ position: "relative" }} ref={previewPeriodRef}>
+                  <button
                     onClick={() => setPreviewPeriodOpen(o => !o)}
                     onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
-                    onMouseLeave={e => e.currentTarget.style.background = "white"}
+                    onMouseLeave={e => e.currentTarget.style.background = "none"}
                     style={{
-                      width: "100%", height: 40, padding: "0 12px",
-                      background: "white", border: `1px solid ${previewPeriodOpen ? "#000" : "var(--tt-grey03)"}`,
-                      borderRadius: 8, fontSize: 13, fontWeight: 500,
-                      color: "var(--tt-text-1)", cursor: "pointer",
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      userSelect: "none", transition: "border-color 0.15s, background 0.15s",
+                      display: "flex", alignItems: "center", gap: 4,
+                      background: "none", border: "none", borderRadius: 6,
+                      padding: "4px 8px", cursor: "pointer",
+                      fontSize: 12, fontWeight: 500, color: "var(--tt-grey05)",
+                      transition: "background 0.15s",
                     }}
                   >
-                    <span>{preview.period}</span>
-                    <ChevronDown size={14} strokeWidth={SW} color="var(--tt-grey05)"
+                    {preview.period}
+                    <ChevronDown size={12} strokeWidth={SW}
                       style={{ flexShrink: 0, transform: `rotate(${previewPeriodOpen ? "180deg" : "0deg"})`, transition: "transform 0.15s" }} />
-                  </div>
+                  </button>
                   {previewPeriodOpen && (
-                    <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 200, background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, overflow: "hidden" }}>
+                    <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 200, minWidth: 220, background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, overflow: "hidden" }}>
                       {PERIOD_OPTIONS.map(({ id }, i) => (
                         <div key={id}>
                           <div
@@ -1484,11 +1471,22 @@ function ReportsTab() {
                     </div>
                   )}
                 </div>
+              </div>
+              <button
+                onClick={closePreview}
+                onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+                onMouseLeave={e => e.currentTarget.style.background = "none"}
+                style={{ background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 4, display: "flex", color: "var(--tt-text-2)", transition: "background 0.15s" }}
+              >
+                <X size={18} strokeWidth={SW} />
+              </button>
+            </div>
 
+            {/* Scrollable body */}
+            <div style={{ overflowY: "auto", flex: 1 }}>
+              <div style={{ padding: 20 }}>
                 {previewLoading ? (
                   <>
-                    <div className="tt-skeleton" style={{ width: "70%", height: 28, marginBottom: 8 }} />
-                    <div className="tt-skeleton" style={{ width: "50%", height: 14, marginBottom: 24 }} />
                     {preview.reportType === "progress" && (
                       <div style={{ marginBottom: 24 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
@@ -1514,9 +1512,6 @@ function ReportsTab() {
                   </>
                 ) : (
                   <>
-                    <h2 style={{ fontSize: 28, fontWeight: 700, color: "#0a1629", marginBottom: 4, lineHeight: 1.15 }}>Raintree Hollow Residence Renovation</h2>
-                    <p style={{ fontSize: 12, color: "#828282", marginBottom: 24 }}>11 North Raintree Hollow Court, Sienna Plantation, Missouri City</p>
-
                     {preview.reportType === "progress" && previewData && (
                       <div style={{ marginBottom: 24 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, fontSize: 13, fontWeight: 600 }}>
