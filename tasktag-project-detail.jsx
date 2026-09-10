@@ -1124,9 +1124,9 @@ function ReportsTab() {
     return (
       <button
         onClick={() => { setActiveNoteFormKey(key); setNoteDraft(""); }}
-        onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
-        onMouseLeave={e => e.currentTarget.style.background = "none"}
-        style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "1px dashed var(--tt-grey03)", borderRadius: 8, padding: "6px 12px", marginTop: 10, cursor: "pointer", fontSize: 12, fontWeight: 500, color: "var(--tt-text-2)", transition: "background 0.15s" }}
+        onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
+        onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
+        style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", padding: 0, marginTop: 10, cursor: "pointer", fontSize: 12, fontWeight: 500, color: "var(--tt-text-2)" }}
       >
         <Plus size={12} strokeWidth={SW} /> Add note
       </button>
