@@ -376,9 +376,9 @@ function DateRangeCalendar({ anchorRef, onClose, onApply }) {
                 width: 34, height: 34,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 borderRadius: "50%",
-                background: selected ? "#000" : "transparent",
-                border: isToday && !selected ? "1.5px solid #000" : "none",
-                color: selected ? "#fff" : inBand ? "#000" : isFuture ? "var(--tt-grey04)" : otherMonth ? "var(--tt-grey03)" : isToday ? "#000" : "var(--tt-text-2)",
+                background: selected ? "var(--tt-text-1)" : "transparent",
+                border: isToday && !selected ? "1.5px solid var(--tt-text-1)" : "none",
+                color: selected ? "#fff" : inBand ? "var(--tt-text-1)" : isFuture ? "var(--tt-grey04)" : otherMonth ? "var(--tt-grey03)" : isToday ? "var(--tt-text-1)" : "var(--tt-text-2)",
                 fontSize: 13,
                 fontWeight: selected || isToday ? 600 : 400,
                 zIndex: 1,
@@ -409,7 +409,7 @@ function DateRangeCalendar({ anchorRef, onClose, onApply }) {
           onMouseLeave={e => e.currentTarget.style.opacity = "1"}
           style={{
             padding: "6px 16px", borderRadius: 8,
-            border: "none", background: "#000",
+            border: "none", background: "var(--tt-text-1)",
             fontSize: 13, fontWeight: 500, color: "#fff", cursor: "pointer", transition: "opacity 0.15s",
           }}>Apply</button>
       </div>
@@ -1068,7 +1068,7 @@ function ReportsTab() {
               onClick={() => handleSaveNote(key)}
               onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
               onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-              style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", background: "#000", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", transition: "opacity 0.15s" }}
+              style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--tt-text-1)", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", transition: "opacity 0.15s" }}
             >
               <Check size={14} strokeWidth={2} />
             </button>
@@ -1229,7 +1229,7 @@ function ReportsTab() {
               onMouseLeave={e => e.currentTarget.style.background = "white"}
               style={{
                 width: "100%", height: 40, padding: "0 12px",
-                background: "white", border: `1px solid ${openType ? "#000" : "var(--tt-grey03)"}`,
+                background: "white", border: `1px solid ${openType ? "var(--tt-text-1)" : "var(--tt-grey03)"}`,
                 borderRadius: 8, fontSize: 13, fontWeight: 500,
                 color: "var(--tt-text-1)", cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -1282,7 +1282,7 @@ function ReportsTab() {
               onMouseLeave={e => e.currentTarget.style.background = "white"}
               style={{
                 width: "100%", height: 40, padding: "0 12px",
-                background: "white", border: `1px solid ${openPeriod ? "#000" : "var(--tt-grey03)"}`,
+                background: "white", border: `1px solid ${openPeriod ? "var(--tt-text-1)" : "var(--tt-grey03)"}`,
                 borderRadius: 8, fontSize: 13, fontWeight: 500,
                 color: "var(--tt-text-1)", cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -1542,11 +1542,11 @@ function ReportsTab() {
                     {preview.reportType === "progress" && previewData && (
                       <div style={{ marginBottom: 24 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, fontSize: 13, fontWeight: 600 }}>
-                          <span style={{ color: "#0a1629" }}>{previewData.completed} of {previewData.total} tasks complete</span>
-                          <span style={{ color: "#16a97d" }}>{previewData.pct}%</span>
+                          <span style={{ color: "var(--tt-text-1)" }}>{previewData.completed} of {previewData.total} tasks complete</span>
+                          <span style={{ color: "var(--tt-secondary)" }}>{previewData.pct}%</span>
                         </div>
-                        <div style={{ height: 6, background: "#e8e8e6", borderRadius: 99, overflow: "hidden" }}>
-                          <div style={{ width: `${previewData.pct}%`, height: "100%", background: "#16a97d", borderRadius: 99 }} />
+                        <div style={{ height: 6, background: "var(--tt-grey03)", borderRadius: 99, overflow: "hidden" }}>
+                          <div style={{ width: `${previewData.pct}%`, height: "100%", background: "var(--tt-secondary)", borderRadius: 99 }} />
                         </div>
                       </div>
                     )}
@@ -1555,14 +1555,14 @@ function ReportsTab() {
                     {previewData && previewData.groups.length === 0 && renderNoteSlot("empty")}
                     {previewData && previewData.groups.map(g => (
                       <div key={g.key} style={{ marginBottom: 32 }}>
-                        <p style={{ fontSize: 11, fontWeight: 600, color: "#828282", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 2 }}>
+                        <p style={{ fontSize: 11, fontWeight: 600, color: "var(--tt-grey05)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 2 }}>
                           {formatGroupLabel(g, previewData.grouping).toUpperCase()}
                         </p>
                         {g.entries.map((e, i) => {
                           const entryKey = `${g.key}_${i}`;
                           return (
                             <div key={entryKey} style={{ marginBottom: 20 }}>
-                              <p style={{ fontSize: 16, fontWeight: 600, color: "#0a1629", lineHeight: "1.5", margin: 0 }}>{e.note}</p>
+                              <p style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.5", margin: 0 }}>{e.note}</p>
                               {e.photos.length > 0 && (
                                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 10 }}>
                                   {e.photos.map((k, pi) => (
@@ -1649,7 +1649,7 @@ function ReportsTab() {
       {toast && (
         <div style={{
           position: "fixed", bottom: 32, left: "50%", transform: "translateX(-50%)",
-          zIndex: 3000, background: "#000", borderRadius: 12, overflow: "hidden",
+          zIndex: 3000, background: "var(--tt-text-1)", borderRadius: 12, overflow: "hidden",
           boxShadow: "0 8px 24px rgba(0,0,0,0.25)", pointerEvents: "none",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 24px" }}>
