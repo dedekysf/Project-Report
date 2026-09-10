@@ -304,7 +304,7 @@ function DateRangeCalendar({ anchorRef, onClose, onApply }) {
       </div>
 
       {/* Day grid */}
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(7, ${CELL}px)` }}>
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(7, ${CELL}px)`, rowGap: 4 }}>
         {cells.map((cell, i) => {
           const { day: d, month: cMonth, year: cYear, otherMonth } = cell;
           const key      = toKey(cYear, cMonth, d);
