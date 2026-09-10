@@ -519,6 +519,21 @@ function FixedTooltipBtn({ children, label, onAction }) {
 // own shimmer placeholder up until it has genuinely finished loading.
 function PhotoThumb({ src }) {
   const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  if (!src || failed) {
+    return (
+      <div
+        style={{
+          width: "100%", aspectRatio: "4/3", borderRadius: 8,
+          background: "var(--tt-grey02)", display: "flex", alignItems: "center", justifyContent: "center",
+        }}
+      >
+        <span style={{ fontSize: 12, fontWeight: 500, color: "var(--tt-grey03)" }}>No Image</span>
+      </div>
+    );
+  }
+
   return (
     <div style={{ position: "relative", width: "100%", aspectRatio: "4/3", borderRadius: 8, overflow: "hidden" }}>
       {!loaded && <div className="tt-skeleton" style={{ position: "absolute", inset: 0, borderRadius: 0 }} />}
@@ -526,6 +541,7 @@ function PhotoThumb({ src }) {
         src={src}
         alt=""
         onLoad={() => setLoaded(true)}
+        onError={() => setFailed(true)}
         style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: loaded ? 1 : 0, transition: "opacity 0.2s" }}
       />
     </div>
