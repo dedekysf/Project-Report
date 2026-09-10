@@ -948,28 +948,36 @@ function ReportsTab() {
   // state), so a note can be added at any point in the preview.
   const renderAddNoteCTA = (key) => (
     addingNoteKey === key ? (
-      <div style={{ border: "1px solid var(--tt-grey03)", borderRadius: 8, padding: 12, marginTop: 10 }}>
-        <textarea
+      <div style={{ position: "relative", marginTop: 10 }}>
+        <input
           autoFocus
+          type="text"
           value={noteDraft}
           onChange={e => setNoteDraft(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === "Enter") handleAddNote();
+            if (e.key === "Escape") { setAddingNoteKey(null); setNoteDraft(""); }
+          }}
           placeholder="Add a note for today..."
-          rows={3}
-          style={{ width: "100%", border: "none", outline: "none", fontSize: 14, fontFamily: "inherit", resize: "vertical", color: "var(--tt-text-2)" }}
+          style={{ width: "100%", height: 40, padding: "0 76px 0 12px", border: "1px solid var(--tt-grey03)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", color: "var(--tt-text-2)", outline: "none", boxSizing: "border-box" }}
         />
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
+        <div style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)", display: "flex", gap: 4 }}>
           <button
             onClick={() => { setAddingNoteKey(null); setNoteDraft(""); }}
             onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
-            onMouseLeave={e => e.currentTarget.style.background = "white"}
-            style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s" }}
-          >Cancel</button>
+            onMouseLeave={e => e.currentTarget.style.background = "none"}
+            style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", borderRadius: 6, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s" }}
+          >
+            <X size={14} strokeWidth={SW} />
+          </button>
           <button
             onClick={handleAddNote}
             onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
             onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-            style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#000", fontSize: 13, fontWeight: 500, color: "#fff", cursor: "pointer", transition: "opacity 0.15s" }}
-          >Add</button>
+            style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", background: "#000", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", transition: "opacity 0.15s" }}
+          >
+            <Check size={14} strokeWidth={2} />
+          </button>
         </div>
       </div>
     ) : (
