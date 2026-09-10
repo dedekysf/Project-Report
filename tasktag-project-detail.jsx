@@ -1498,17 +1498,19 @@ function ReportsTab() {
                         <div className="tt-skeleton" style={{ width: "100%", height: 6, borderRadius: 99 }} />
                       </div>
                     )}
-                    {[0, 1].map(gi => (
-                      <div key={gi} style={{ marginBottom: 32 }}>
-                        <div className="tt-skeleton" style={{ width: 90, height: 11, marginBottom: 10 }} />
-                        <div className="tt-skeleton" style={{ width: "85%", height: 14, marginBottom: 10 }} />
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
-                          {[0, 1, 2, 3].map(pi => (
-                            <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "4/3" }} />
-                          ))}
+                    <div style={{ marginBottom: 32 }}>
+                      <div className="tt-skeleton" style={{ width: 90, height: 11, marginBottom: 10 }} />
+                      {[0, 1].map(ti => (
+                        <div key={ti} style={{ marginBottom: 20 }}>
+                          <div className="tt-skeleton" style={{ width: "85%", height: 16, marginBottom: 10 }} />
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
+                            {[0, 1, 2].map(pi => (
+                              <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "4/3" }} />
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </>
                 ) : (
                   <>
