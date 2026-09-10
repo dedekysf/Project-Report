@@ -1430,10 +1430,10 @@ function ReportsTab() {
 
             {/* Modal chrome */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid var(--tt-grey03)", flexShrink: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
                 <p style={{ fontSize: 15, fontWeight: 600, color: "var(--tt-text-1)" }}>Draft {preview.reportType === "photo" ? "Photo Update" : "Progress Report"}</p>
 
-                {/* Borderless period dropdown, font size matching the title —
+                {/* Borderless period dropdown, stacked below the title —
                     locked once the report is saved, so it can't drift out of
                     sync with what was actually saved */}
                 <div style={{ position: "relative" }} ref={previewPeriodRef}>
@@ -1445,8 +1445,8 @@ function ReportsTab() {
                     style={{
                       display: "flex", alignItems: "center", gap: 4,
                       background: "none", border: "none", borderRadius: 6,
-                      padding: "4px 8px", cursor: previewSaved ? "default" : "pointer",
-                      fontSize: 15, fontWeight: 500, color: "var(--tt-grey05)",
+                      margin: "0 0 0 -8px", padding: "2px 8px", cursor: previewSaved ? "default" : "pointer",
+                      fontSize: 14, fontWeight: 400, color: "var(--tt-grey05)",
                       transition: "background 0.15s",
                     }}
                   >
