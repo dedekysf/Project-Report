@@ -1402,7 +1402,7 @@ function ReportsTab() {
               {reports.map((r, i) => (
                 <tr key={r.id} style={{ background: "white", borderTop: i > 0 ? `1px solid var(--tt-grey03)` : "none" }}>
                   <td style={{ padding: "0 16px", fontSize: 13, color: "var(--tt-text-2)", whiteSpace: "nowrap", height: 52, verticalAlign: "middle" }}>{r.date}</td>
-                  <td style={{ padding: "0 16px", fontSize: 13, color: "var(--tt-text-2)", height: 52, verticalAlign: "middle" }}>{r.period}</td>
+                  <td style={{ padding: "0 16px", fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", height: 52, verticalAlign: "middle" }}>{r.period}</td>
                   <td style={{ padding: "0 14px 0 16px", textAlign: "right", height: 52, verticalAlign: "middle", width: 120 }}>
                     {r.status === "in_progress" ? (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--tt-text-2)" }}>
