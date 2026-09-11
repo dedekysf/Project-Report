@@ -1228,6 +1228,7 @@ function ReportsTab({ demoCase }) {
   const [openPeriod,  setOpenPeriod]  = useState(false);
   const [toast,       setToast]       = useState(null); // { type: "success" | "error", message }
   const [deleteTarget, setDeleteTarget] = useState(null); // report pending delete confirmation
+  const [confirmDeletePhotos, setConfirmDeletePhotos] = useState(false); // whether the selected-photos delete confirmation is open
   const [lightbox, setLightbox] = useState(null); // { photos, index, caption } | null — full-screen photo viewer
   const [selectedPhotos, setSelectedPhotos] = useState({}); // { [entryKey_photoIndex]: photoKey } — in-progress checkbox selection, not yet deleted
   const reportTypeRef = useRef(null);
@@ -1395,24 +1396,25 @@ function ReportsTab({ demoCase }) {
   }, [preview, panelClosing]);
 
   useEffect(() => {
-    if (!preview || lightbox) return;
+    if (!preview || lightbox || confirmDeletePhotos || deleteTarget) return;
     const handler = (e) => { if (e.key === "Escape") closePreview(); };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [preview, lightbox]);
+  }, [preview, lightbox, confirmDeletePhotos, deleteTarget]);
 
   // Click outside the side panel closes it — there's no backdrop to catch
-  // this anymore. Suspended while the custom-date calendar or the photo
-  // lightbox is open, since both render as siblings (not nested inside the
-  // panel) and would otherwise register every click inside them as "outside".
+  // this anymore. Suspended while the custom-date calendar, the photo
+  // lightbox, or a confirmation modal is open, since all of them render as
+  // siblings (not nested inside the panel) and would otherwise register
+  // every click inside them as "outside".
   useEffect(() => {
-    if (!preview || previewShowCal || lightbox) return;
+    if (!preview || previewShowCal || lightbox || confirmDeletePhotos || deleteTarget) return;
     const handler = (e) => {
       if (previewPanelRef.current && !previewPanelRef.current.contains(e.target)) closePreview();
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [preview, previewShowCal, lightbox]);
+  }, [preview, previewShowCal, lightbox, confirmDeletePhotos, deleteTarget]);
 
   // Show a loading skeleton whenever the previewed data would change —
   // both on first open and whenever the period is edited. Once it resolves,
@@ -1505,6 +1507,7 @@ function ReportsTab({ demoCase }) {
   const handleDeleteSelectedPhotos = () => {
     setPreview(p => ({ ...p, excludedPhotos: { ...p.excludedPhotos, ...Object.fromEntries(Object.keys(selectedPhotos).map(k => [k, true])) } }));
     setSelectedPhotos({});
+    setConfirmDeletePhotos(false);
   };
 
   const handleDownloadSelectedPhotos = () => {
@@ -2156,7 +2159,7 @@ function ReportsTab({ demoCase }) {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
                   <button
-                    onClick={handleDeleteSelectedPhotos}
+                    onClick={() => setConfirmDeletePhotos(true)}
                     onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.12)"}
                     onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                     style={{ background: "none", border: "none", color: "white", cursor: "pointer", padding: 8, borderRadius: 8, display: "flex", transition: "background 0.15s" }}
@@ -2298,6 +2301,46 @@ function ReportsTab({ demoCase }) {
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button
                 onClick={handleDeleteReport}
+                style={{ height: 40, padding: "0 20px", borderRadius: 8, border: "none", background: "var(--tt-text-1)", color: "white", fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "opacity 0.15s" }}
+                onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
+                onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete selected photos confirmation */}
+      {confirmDeletePhotos && (
+        <div
+          style={{ position: "fixed", inset: 0, zIndex: 4000, background: "rgba(10,22,41,0.45)", display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setConfirmDeletePhotos(false)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ width: 420, maxWidth: "calc(100vw - 32px)", background: "white", borderRadius: 16, padding: 24, boxShadow: "0 16px 48px rgba(10,22,41,0.25)" }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <p style={{ fontSize: 20, fontWeight: 700, color: "var(--tt-text-1)", margin: 0 }}>
+                Delete photo{Object.keys(selectedPhotos).length > 1 ? "s" : ""}
+              </p>
+              <button
+                onClick={() => setConfirmDeletePhotos(false)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--tt-text-1)", padding: 4, display: "flex", borderRadius: 6, transition: "background 0.15s" }}
+                onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              >
+                <X size={20} strokeWidth={SW} />
+              </button>
+            </div>
+            <p style={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, margin: "0 0 24px" }}>
+              {Object.keys(selectedPhotos).length} item{Object.keys(selectedPhotos).length > 1 ? "s" : ""} will be removed from this draft — the original photo won't be deleted. This can't be undone.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                onClick={handleDeleteSelectedPhotos}
                 style={{ height: 40, padding: "0 20px", borderRadius: 8, border: "none", background: "var(--tt-text-1)", color: "white", fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "opacity 0.15s" }}
                 onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
                 onMouseLeave={e => e.currentTarget.style.opacity = "1"}
