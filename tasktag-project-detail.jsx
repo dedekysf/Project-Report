@@ -9,6 +9,7 @@ import {
   Activity, Users, BarChart2, SlidersHorizontal,
   ArrowUpDown, Calendar, AlignJustify, Clock,
   UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, Crown, AlertTriangle,
+  Forward, RotateCw, ZoomIn, ZoomOut, Folder,
 } from "lucide-react";
 
 import logoImg from "./src/Img/tasktag-logo.13f1babda8fdbb1b7251572a0fe11f9e.png";
@@ -594,7 +595,12 @@ function PhotoGrid({ photos, onOpen }) {
 // panel. Dark chrome built from the design system's darkest token
 // (--tt-text-1) rather than a plain black, with a filmstrip of the same
 // entry's other photos along the bottom for quick navigation.
-function PhotoLightbox({ photos, index, caption, onIndexChange, onClose }) {
+function PhotoLightbox({ photos, index, entryDate, reportType, onIndexChange, onClose }) {
+  const [rotation, setRotation] = useState(0);
+  const [zoom, setZoom] = useState(100);
+
+  useEffect(() => { setRotation(0); setZoom(100); }, [index]);
+
   useEffect(() => {
     const handler = (e) => {
       if (e.key === "Escape") onClose();
@@ -612,33 +618,105 @@ function PhotoLightbox({ photos, index, caption, onIndexChange, onClose }) {
   const onIconEnter = e => e.currentTarget.style.background = "rgba(255,255,255,0.12)";
   const onIconLeave = e => e.currentTarget.style.background = "transparent";
 
+  const uploadedAt = entryDate
+    ? parseDate(entryDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : "";
+  const fileName = entryDate ? `${entryDate.replace(/-/g, "")}-${String(index + 1).padStart(2, "0")}.jpg` : `photo-${index + 1}.jpg`;
+
+  const handleDownloadPhoto = () => {
+    const a = document.createElement("a");
+    a.href = IMG_MAP[photos[index]];
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 5000, background: "var(--tt-text-1)", display: "flex", flexDirection: "column" }}>
       {/* Top bar */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-          <button onClick={onClose} style={iconBtnStyle} onMouseEnter={onIconEnter} onMouseLeave={onIconLeave}>
-            <ChevronLeft size={20} strokeWidth={SW} />
-          </button>
-          <span style={{ fontSize: 13, fontWeight: 600, color: "white", whiteSpace: "nowrap" }}>{caption}</span>
-          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", whiteSpace: "nowrap" }}>{index + 1} of {photos.length}</span>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 20px", flexShrink: 0, flexWrap: "wrap", rowGap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: "50%", background: "var(--tt-secondary)",
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "white" }}>TT</span>
+          </div>
+          <div style={{ lineHeight: 1.3 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: "white", margin: 0 }}>You</p>
+            <p style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", margin: 0 }}>{uploadedAt}</p>
+          </div>
         </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+          <span style={{ fontSize: 13, fontWeight: 500, color: "white", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{fileName}</span>
+          <Pencil size={13} strokeWidth={SW} color="rgba(255,255,255,0.45)" />
+        </div>
+
         <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
-          <button style={iconBtnStyle} onMouseEnter={onIconEnter} onMouseLeave={onIconLeave}>
+          <button onClick={handleDownloadPhoto} style={iconBtnStyle} onMouseEnter={onIconEnter} onMouseLeave={onIconLeave}>
             <Download size={16} strokeWidth={SW} />
+          </button>
+          <button style={iconBtnStyle} onMouseEnter={onIconEnter} onMouseLeave={onIconLeave}>
+            <Forward size={16} strokeWidth={SW} />
           </button>
           <button style={iconBtnStyle} onMouseEnter={onIconEnter} onMouseLeave={onIconLeave}>
             <Link size={16} strokeWidth={SW} />
           </button>
+          <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.15)", margin: "0 6px" }} />
+          <button onClick={() => setRotation(r => (r + 90) % 360)} style={iconBtnStyle} onMouseEnter={onIconEnter} onMouseLeave={onIconLeave}>
+            <RotateCw size={16} strokeWidth={SW} />
+          </button>
+          <button onClick={() => setZoom(z => Math.max(50, z - 25))} style={iconBtnStyle} onMouseEnter={onIconEnter} onMouseLeave={onIconLeave}>
+            <ZoomOut size={16} strokeWidth={SW} />
+          </button>
+          <span style={{ fontSize: 12, fontWeight: 500, color: "white", width: 40, textAlign: "center" }}>{zoom}%</span>
+          <button onClick={() => setZoom(z => Math.min(200, z + 25))} style={iconBtnStyle} onMouseEnter={onIconEnter} onMouseLeave={onIconLeave}>
+            <ZoomIn size={16} strokeWidth={SW} />
+          </button>
           <button onClick={onClose} style={iconBtnStyle} onMouseEnter={onIconEnter} onMouseLeave={onIconLeave}>
-            <X size={18} strokeWidth={SW} />
+            <MoreVertical size={16} strokeWidth={SW} />
           </button>
         </div>
       </div>
 
+      {/* Tag chips */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "2px 16px 14px", flexShrink: 0 }}>
+        <span style={{
+          display: "inline-flex", alignItems: "center", gap: 6, height: 26, padding: "0 12px",
+          borderRadius: 99, background: "var(--tt-secondary)", color: "white", fontSize: 12, fontWeight: 600,
+        }}>
+          <Folder size={12} strokeWidth={2} /> Raintree Hollow Residence Renovation
+        </span>
+        <span style={{
+          display: "inline-flex", alignItems: "center", gap: 4, height: 26, padding: "0 12px",
+          borderRadius: 99, background: "var(--tt-grey06)", color: "white", fontSize: 12, fontWeight: 600,
+        }}>
+          <Hash size={12} strokeWidth={2} /> {reportType === "photo" ? "Photo Update" : "Progress Report"}
+        </span>
+      </div>
+
       {/* Image */}
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0, padding: "0 24px" }}>
-        <img src={IMG_MAP[photos[index]]} alt="" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 4 }} />
+      <div style={{ position: "relative", flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0, padding: "0 24px", overflow: "hidden" }}>
+        <button
+          onClick={onClose}
+          style={{
+            position: "absolute", left: 24, top: "50%", transform: "translateY(-50%)",
+            width: 40, height: 40, borderRadius: "50%", border: "1.5px solid rgba(255,255,255,0.6)",
+            background: "rgba(10,22,41,0.4)", color: "white", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s",
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}
+          onMouseLeave={e => e.currentTarget.style.background = "rgba(10,22,41,0.4)"}
+        >
+          <ChevronLeft size={20} strokeWidth={SW} />
+        </button>
+        <img
+          src={IMG_MAP[photos[index]]}
+          alt=""
+          style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 4, transform: `rotate(${rotation}deg) scale(${zoom / 100})`, transition: "transform 0.15s" }}
+        />
       </div>
 
       {/* Filmstrip */}
@@ -649,12 +727,16 @@ function PhotoLightbox({ photos, index, caption, onIndexChange, onClose }) {
               key={i}
               onClick={() => onIndexChange(i)}
               style={{
-                width: 64, height: 48, borderRadius: 6, overflow: "hidden", flexShrink: 0,
+                position: "relative", width: 64, height: 48, borderRadius: 6, overflow: "hidden", flexShrink: 0,
                 border: i === index ? "2px solid white" : "2px solid transparent",
                 padding: 0, cursor: "pointer", opacity: i === index ? 1 : 0.55, transition: "opacity 0.15s",
               }}
             >
               <img src={IMG_MAP[p]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+              <span style={{
+                position: "absolute", top: 4, right: 4, width: 14, height: 14, borderRadius: "50%",
+                border: "1.5px solid white", background: i === index ? "white" : "rgba(10,22,41,0.35)",
+              }} />
             </button>
           ))}
         </div>
@@ -1842,7 +1924,7 @@ function ReportsTab({ demoCase }) {
                           return (
                             <div key={entryKey} style={{ marginBottom: 20 }}>
                               <p style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.5", margin: 0 }}>{e.note}</p>
-                              <PhotoGrid photos={e.photos} onOpen={(photos, idx) => setLightbox({ photos, index: idx, caption: e.note })} />
+                              <PhotoGrid photos={e.photos} onOpen={(photos, idx) => setLightbox({ photos, index: idx, entryDate: e.date, reportType: preview.reportType })} />
                               {renderNoteSlot(entryKey)}
                             </div>
                           );
@@ -1996,7 +2078,8 @@ function ReportsTab({ demoCase }) {
         <PhotoLightbox
           photos={lightbox.photos}
           index={lightbox.index}
-          caption={lightbox.caption}
+          entryDate={lightbox.entryDate}
+          reportType={lightbox.reportType}
           onIndexChange={i => setLightbox(lb => ({ ...lb, index: i }))}
           onClose={() => setLightbox(null)}
         />
