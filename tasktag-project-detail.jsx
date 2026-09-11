@@ -1901,8 +1901,11 @@ function ReportsTab({ demoCase }) {
                 <X size={20} strokeWidth={SW} />
               </button>
             </div>
+            <p style={{ fontSize: 14, color: "var(--tt-grey05)", lineHeight: 1.6, margin: "0 0 4px" }}>
+              Report period: <strong style={{ color: "var(--tt-text-1)" }}>{deleteTarget.period}</strong>
+            </p>
             <p style={{ fontSize: 14, color: "var(--tt-grey05)", lineHeight: 1.6, margin: "0 0 24px" }}>
-              The <strong style={{ color: "var(--tt-text-1)" }}>{deleteTarget.period}</strong> report generated on <strong style={{ color: "var(--tt-text-1)" }}>{deleteTarget.date}</strong> will be deleted. This can't be undone.
+              This report will be deleted. This can't be undone
             </p>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button
