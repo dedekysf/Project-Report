@@ -1604,7 +1604,7 @@ function ReportsTab({ demoCase }) {
                       </span>
                     ) : (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                        <FixedTooltipBtn label="Download HTML file" onAction={() => { handleDownload(r); showToast("success", "Downloaded"); }}><Download size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
+                        <FixedTooltipBtn label="Download" onAction={() => { handleDownload(r); showToast("success", "Downloaded"); }}><Download size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
                         <FixedTooltipBtn label="Copy link" onAction={async () => { await handleCopy(r); showToast("success", "Link copied"); }}><Link size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
                         <FixedTooltipBtn label="Delete report" onAction={() => setDeleteTarget(r)}><Trash2 size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
                       </span>
