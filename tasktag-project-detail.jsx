@@ -523,6 +523,7 @@ function FixedTooltipBtn({ children, label, onAction }) {
 function PhotoThumb({ src, onClick }) {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
+  const overlayRef = useRef(null);
 
   if (!src || failed) {
     return (
@@ -540,6 +541,8 @@ function PhotoThumb({ src, onClick }) {
   return (
     <div
       onClick={onClick}
+      onMouseEnter={() => { if (overlayRef.current) overlayRef.current.style.opacity = "1"; }}
+      onMouseLeave={() => { if (overlayRef.current) overlayRef.current.style.opacity = "0"; }}
       style={{ position: "relative", width: "100%", aspectRatio: "4/3", borderRadius: 8, overflow: "hidden", cursor: onClick ? "pointer" : "default" }}
     >
       {!loaded && <div className="tt-skeleton" style={{ position: "absolute", inset: 0, borderRadius: 0 }} />}
@@ -550,6 +553,9 @@ function PhotoThumb({ src, onClick }) {
         onError={() => setFailed(true)}
         style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: loaded ? 1 : 0, transition: "opacity 0.2s" }}
       />
+      {onClick && (
+        <div ref={overlayRef} style={{ position: "absolute", inset: 0, background: "rgba(10,22,41,0.25)", opacity: 0, transition: "opacity 0.15s", pointerEvents: "none" }} />
+      )}
     </div>
   );
 }
