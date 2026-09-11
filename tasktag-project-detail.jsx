@@ -657,8 +657,30 @@ function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onCl
   const [zoom, setZoom] = useState(100);
   const [showFileDetails, setShowFileDetails] = useState(false);
   const [imgDims, setImgDims] = useState(null);
+  const [selectedFilmstrip, setSelectedFilmstrip] = useState({}); // { [photoIndex]: photoKey } — filmstrip checkbox selection
 
   useEffect(() => { setRotation(0); setZoom(100); setShowFileDetails(false); setImgDims(null); }, [index]);
+
+  const toggleFilmstripSelect = (i, photoKey) => {
+    setSelectedFilmstrip(prev => {
+      const next = { ...prev };
+      if (next[i] !== undefined) delete next[i]; else next[i] = photoKey;
+      return next;
+    });
+  };
+
+  const handleDownloadSelectedFilmstrip = () => {
+    Object.values(selectedFilmstrip).forEach(photoKey => {
+      const src = IMG_MAP[photoKey];
+      if (!src) return;
+      const a = document.createElement("a");
+      a.href = src;
+      a.download = `${photoKey}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    });
+  };
 
   useEffect(() => {
     const handler = (e) => {
@@ -811,30 +833,71 @@ function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onCl
             <ArrowRight size={18} strokeWidth={SW} />
           </button>
         )}
+
+        {Object.keys(selectedFilmstrip).length > 0 && (
+          <div style={{ position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 10 }}>
+            <button
+              onClick={handleDownloadSelectedFilmstrip}
+              style={{
+                display: "flex", alignItems: "center", gap: 8, background: "rgba(10,22,41,0.75)",
+                border: "1px solid rgba(255,255,255,0.2)", borderRadius: 999, padding: "10px 16px",
+                color: "white", fontSize: 14, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
+              }}
+            >
+              <Download size={16} strokeWidth={SW} /> Download
+              <span style={{
+                background: "var(--tt-secondary)", color: "white", borderRadius: "50%",
+                width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 11, fontWeight: 700, flexShrink: 0,
+              }}>
+                {Object.keys(selectedFilmstrip).length}
+              </span>
+            </button>
+            <button
+              onClick={() => setSelectedFilmstrip({})}
+              style={{
+                width: 44, height: 44, borderRadius: "50%", background: "rgba(10,22,41,0.75)",
+                border: "1px solid rgba(255,255,255,0.2)", color: "white", display: "flex",
+                alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0,
+              }}
+            >
+              <X size={18} strokeWidth={SW} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Filmstrip */}
       {photos.length > 1 && (
         <div style={{ display: "flex", justifyContent: "center", gap: 10, padding: "14px 16px", flexShrink: 0, overflowX: "auto", background: "var(--tt-grey06)" }}>
-          {photos.map((p, i) => (
-            <button
-              key={i}
-              onClick={() => onIndexChange(i)}
-              onMouseEnter={e => { if (i !== index) e.currentTarget.style.opacity = "0.85"; }}
-              onMouseLeave={e => { if (i !== index) e.currentTarget.style.opacity = "0.55"; }}
-              style={{
-                position: "relative", width: 160, height: 122, borderRadius: 8, overflow: "hidden", flexShrink: 0,
-                border: i === index ? "2px solid white" : "2px solid transparent",
-                padding: 0, cursor: "pointer", opacity: i === index ? 1 : 0.55, transition: "opacity 0.15s",
-              }}
-            >
-              <img src={IMG_MAP[p]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-              <span style={{
-                position: "absolute", top: 6, right: 6, width: 20, height: 20, borderRadius: "50%",
-                border: "1.5px solid white", background: i === index ? "white" : "rgba(10,22,41,0.35)",
-              }} />
-            </button>
-          ))}
+          {photos.map((p, i) => {
+            const isSelected = selectedFilmstrip[i] !== undefined;
+            return (
+              <div
+                key={i}
+                onClick={() => onIndexChange(i)}
+                onMouseEnter={e => { if (i !== index) e.currentTarget.style.opacity = "0.85"; }}
+                onMouseLeave={e => { if (i !== index) e.currentTarget.style.opacity = "0.55"; }}
+                style={{
+                  position: "relative", width: 160, height: 122, borderRadius: 8, overflow: "hidden", flexShrink: 0,
+                  border: i === index ? "2px solid white" : "2px solid transparent",
+                  cursor: "pointer", opacity: i === index ? 1 : 0.55, transition: "opacity 0.15s",
+                }}
+              >
+                <img src={IMG_MAP[p]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                <button
+                  onClick={e => { e.stopPropagation(); toggleFilmstripSelect(i, p); }}
+                  style={{
+                    position: "absolute", top: 6, right: 6, width: 20, height: 20, borderRadius: "50%",
+                    border: isSelected ? "none" : "1.5px solid white", background: isSelected ? "var(--tt-secondary)" : "rgba(10,22,41,0.35)",
+                    display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: "pointer",
+                  }}
+                >
+                  {isSelected && <Check size={12} color="white" strokeWidth={3} />}
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
 
