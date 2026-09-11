@@ -1877,11 +1877,10 @@ function ReportsTab({ demoCase }) {
 // ── Paywall (demo case: replaces all Reports tab content) ──
 function ReportPaywall() {
   const unlockItems = [
+    "Full report history across project",
     "Progress reports with task completion summary",
     "Photo updates grouped by week or month",
-    "Shareable link or HTML download for any period",
-    "Up to 50 photos per report, spread evenly",
-    "Full report history across all projects",
+    "Shareable link for any period",
   ];
 
   return (
