@@ -8,7 +8,7 @@ import {
   LayoutGrid, MapPin, Hash, FileText, FileImage,
   Activity, Users, BarChart2, SlidersHorizontal,
   ArrowUpDown, Calendar, AlignJustify, Clock,
-  UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, Crown,
+  UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, Crown, AlertTriangle,
 } from "lucide-react";
 
 import logoImg from "./src/Img/tasktag-logo.13f1babda8fdbb1b7251572a0fe11f9e.png";
@@ -1861,7 +1861,7 @@ function ReportsTab({ demoCase }) {
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 24px" }}>
             {toast.type === "success"
               ? <Check size={16} color="white" strokeWidth={2.5} />
-              : <X size={16} color="white" strokeWidth={2.5} />}
+              : <AlertTriangle size={16} color="white" strokeWidth={2.5} />}
             <span style={{ color: "white", fontSize: 16, fontWeight: 700, whiteSpace: "nowrap" }}>{toast.message}</span>
           </div>
           <div style={{
