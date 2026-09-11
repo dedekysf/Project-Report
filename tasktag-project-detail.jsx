@@ -1892,10 +1892,10 @@ function ReportPaywall() {
         <Crown size={26} color="var(--tt-secondary)" strokeWidth={SW} />
       </div>
       <h3 style={{ fontSize: 22, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 10px" }}>
-        Share progress without the back-and-forth
+        Keep clients in the loop — without extra work
       </h3>
       <p style={{ fontSize: 14, color: "var(--tt-grey05)", lineHeight: 1.6, maxWidth: 460, margin: "0 auto 28px" }}>
-        TaskTag generates progress reports and photo updates automatically — grouped by day, week, or month — so you can share with clients in one tap.
+        Generate a ready-to-share report from your activity log in seconds. Photos, progress, and notes — all in one place.
       </p>
 
       <div style={{ background: "var(--tt-grey02)", borderRadius: 12, padding: "20px 24px", textAlign: "left", maxWidth: 440, margin: "0 auto 24px" }}>
