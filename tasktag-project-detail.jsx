@@ -1222,6 +1222,7 @@ function ReportsTab({ demoCase }) {
   const [visibleCount,     setVisibleCount]      = useState(10); // infinite scroll — entries revealed so far
   const [loadingMore,      setLoadingMore]       = useState(false);
   const [generating,       setGenerating]        = useState(false); // Generate button's own disabled/spinner state, before the panel appears
+  const [saving,           setSaving]             = useState(false); // Save report button's own disabled/spinner state, before the toast appears
   const previewPeriodRef = useRef(null);
   const previewPanelRef = useRef(null);
 
@@ -1554,22 +1555,28 @@ function ReportsTab({ demoCase }) {
   };
 
   const handlePreviewSave = () => {
+    if (saving) return;
     if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to save"); return; }
-    // Demo case: "Save report error" always fails to save, regardless of
-    // whether there's valid data to save.
-    if (demoCase === "save_error") {
-      showToast("error", "Save failed. Try again.");
-      return;
-    }
-    pushReport({ reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period, data: { ...previewData, groups: previewFinalGroups }, extraNotes: preview.extraNotes });
-    setDateRange("since_last");
-    // Closing is left to the user — the footer switches to Download/Copy
-    // link so they can act on the just-saved report before dismissing it.
-    setPreviewSaved(true);
-    setActiveNoteFormKey(null);
-    setNoteDraft("");
-    setPreviewPeriodOpen(false);
-    showToast("success", "Report saved");
+    setSaving(true);
+    setTimeout(() => {
+      // Demo case: "Save report error" always fails to save, regardless of
+      // whether there's valid data to save.
+      if (demoCase === "save_error") {
+        setSaving(false);
+        showToast("error", "Save failed. Try again.");
+        return;
+      }
+      pushReport({ reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period, data: { ...previewData, groups: previewFinalGroups }, extraNotes: preview.extraNotes });
+      setDateRange("since_last");
+      // Closing is left to the user — the footer switches to Download/Copy
+      // link so they can act on the just-saved report before dismissing it.
+      setPreviewSaved(true);
+      setActiveNoteFormKey(null);
+      setNoteDraft("");
+      setPreviewPeriodOpen(false);
+      setSaving(false);
+      showToast("success", "Report saved");
+    }, 900);
   };
 
   const [isWide, setIsWide] = useState(window.innerWidth > 1280);
@@ -2074,13 +2081,21 @@ function ReportsTab({ demoCase }) {
                 </>
               ) : (
                 <button
-                  disabled={previewLoading}
+                  disabled={previewLoading || saving}
                   onClick={handlePreviewSave}
-                  onMouseEnter={e => !previewLoading && (e.currentTarget.style.opacity = "0.85")}
-                  onMouseLeave={e => e.currentTarget.style.opacity = previewLoading ? 0.5 : 1}
-                  style={{ flex: 1, height: 40, padding: "0 16px", borderRadius: 8, border: "none", background: "var(--tt-text-1)", fontSize: 13, fontWeight: 500, color: "white", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "opacity 0.15s" }}
+                  onMouseEnter={e => !(previewLoading || saving) && (e.currentTarget.style.opacity = "0.85")}
+                  onMouseLeave={e => e.currentTarget.style.opacity = (previewLoading || saving) ? 0.5 : 1}
+                  style={{
+                    flex: 1, height: 40, padding: "0 16px", borderRadius: 8, border: "none",
+                    background: "var(--tt-text-1)", fontSize: 13, fontWeight: 500, color: "white",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    cursor: (previewLoading || saving) ? "not-allowed" : "pointer",
+                    opacity: (previewLoading || saving) ? 0.5 : 1, transition: "opacity 0.15s",
+                  }}
                 >
-                  Save report
+                  {saving
+                    ? <span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.35)", borderTopColor: "white", display: "inline-block", animation: "tt-spin 0.75s linear infinite" }} />
+                    : "Save report"}
                 </button>
               )}
             </div>
