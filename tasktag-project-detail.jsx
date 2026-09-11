@@ -633,15 +633,15 @@ function PhotoLightbox({ photos, index, entryDate, reportType, onIndexChange, on
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 5000, background: "var(--tt-text-1)", display: "flex", flexDirection: "column" }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 5000, background: "black", display: "flex", flexDirection: "column" }}>
       {/* Top bar */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 20px", flexShrink: 0, flexWrap: "wrap", rowGap: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 20px", flexShrink: 0, flexWrap: "wrap", rowGap: 8, background: "var(--tt-grey06)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
           <div style={{
             width: 32, height: 32, borderRadius: "50%", background: "var(--tt-secondary)",
             display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
           }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: "white" }}>TT</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "white" }}>MJ</span>
           </div>
           <div style={{ lineHeight: 1.3 }}>
             <p style={{ fontSize: 13, fontWeight: 600, color: "white", margin: 0 }}>You</p>
@@ -682,7 +682,7 @@ function PhotoLightbox({ photos, index, entryDate, reportType, onIndexChange, on
       </div>
 
       {/* Tag chips */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "2px 16px 14px", flexShrink: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "2px 16px 14px", flexShrink: 0, background: "var(--tt-grey06)" }}>
         <span style={{
           display: "inline-flex", alignItems: "center", gap: 6, height: 26, padding: "0 12px",
           borderRadius: 99, background: "var(--tt-secondary)", color: "white", fontSize: 12, fontWeight: 600,
@@ -691,14 +691,14 @@ function PhotoLightbox({ photos, index, entryDate, reportType, onIndexChange, on
         </span>
         <span style={{
           display: "inline-flex", alignItems: "center", gap: 4, height: 26, padding: "0 12px",
-          borderRadius: 99, background: "var(--tt-grey06)", color: "white", fontSize: 12, fontWeight: 600,
+          borderRadius: 99, background: "var(--tt-text-1)", color: "white", fontSize: 12, fontWeight: 600,
         }}>
           <Hash size={12} strokeWidth={2} /> {reportType === "photo" ? "Photo Update" : "Progress Report"}
         </span>
       </div>
 
       {/* Image */}
-      <div style={{ position: "relative", flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0, padding: "0 24px", overflow: "hidden" }}>
+      <div style={{ position: "relative", flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0, padding: "0 24px", overflow: "hidden", background: "black" }}>
         <button
           onClick={onClose}
           style={{
@@ -721,7 +721,7 @@ function PhotoLightbox({ photos, index, entryDate, reportType, onIndexChange, on
 
       {/* Filmstrip */}
       {photos.length > 1 && (
-        <div style={{ display: "flex", gap: 8, padding: "14px 16px", flexShrink: 0, overflowX: "auto" }}>
+        <div style={{ display: "flex", gap: 8, padding: "14px 16px", flexShrink: 0, overflowX: "auto", background: "var(--tt-grey06)" }}>
           {photos.map((p, i) => (
             <button
               key={i}
