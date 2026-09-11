@@ -9,7 +9,7 @@ import {
   Activity, Users, BarChart2, SlidersHorizontal,
   ArrowUpDown, Calendar, AlignJustify, Clock,
   UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, Crown, AlertTriangle,
-  Forward, RotateCw, ZoomIn, ZoomOut, Folder,
+  Forward, RotateCw, ZoomIn, ZoomOut, Folder, ArrowLeft, ArrowRight,
 } from "lucide-react";
 
 import logoImg from "./src/Img/tasktag-logo.13f1babda8fdbb1b7251572a0fe11f9e.png";
@@ -172,6 +172,7 @@ const SW = 1.2;
 // The app's fixed "today" — all mock data (DUMMY_ENTRIES, last-N-days
 // ranges) is anchored to this date rather than the real device clock.
 const APP_TODAY = new Date(2026, 8, 10); // Sep 10, 2026
+const PROJECT_NAME = "Raintree Hollow Residence Renovation";
 
 // ── Date Range Calendar ──
 function DateRangeCalendar({ anchorRef, onClose, onApply }) {
@@ -595,7 +596,9 @@ function PhotoGrid({ photos, onOpen }) {
 // panel. Dark chrome built from the design system's darkest token
 // (--tt-text-1) rather than a plain black, with a filmstrip of the same
 // entry's other photos along the bottom for quick navigation.
-function PhotoLightbox({ photos, index, entryDate, reportType, onIndexChange, onClose }) {
+const truncateLabel = (s, n = 20) => (s && s.length > n ? s.slice(0, n) + "..." : s);
+
+function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onClose }) {
   const [rotation, setRotation] = useState(0);
   const [zoom, setZoom] = useState(100);
 
@@ -650,6 +653,9 @@ function PhotoLightbox({ photos, index, entryDate, reportType, onIndexChange, on
         borderBottom: "1px solid rgba(255,255,255,0.12)",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, justifySelf: "start" }}>
+          <button onClick={onClose} style={iconBtnStyle} onMouseEnter={onIconEnter} onMouseLeave={onIconLeave}>
+            <ChevronLeft size={18} strokeWidth={SW} />
+          </button>
           <div style={{
             width: 32, height: 32, borderRadius: "50%", background: "var(--tt-mint)",
             display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
@@ -697,39 +703,56 @@ function PhotoLightbox({ photos, index, entryDate, reportType, onIndexChange, on
       {/* Tag chips */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "2px 16px 14px", flexShrink: 0, background: "var(--tt-grey06)" }}>
         <span style={{
-          display: "inline-flex", alignItems: "center", gap: 6, height: 26, padding: "0 12px",
-          borderRadius: 99, background: "var(--tt-secondary)", color: "white", fontSize: 12, fontWeight: 600,
+          display: "inline-flex", alignItems: "center", gap: 6, height: 22, padding: "0 10px",
+          borderRadius: 4, background: "var(--tt-secondary)", color: "white", fontSize: 10, fontWeight: 600,
         }}>
-          <Folder size={12} strokeWidth={2} /> Raintree Hollow Residence Renovation
+          <Folder size={11} strokeWidth={2} /> {truncateLabel(PROJECT_NAME)}
         </span>
         <span style={{
-          display: "inline-flex", alignItems: "center", gap: 4, height: 26, padding: "0 12px",
-          borderRadius: 99, background: "var(--tt-text-1)", color: "white", fontSize: 12, fontWeight: 600,
+          display: "inline-flex", alignItems: "center", gap: 4, height: 22, padding: "0 10px",
+          borderRadius: 4, background: "var(--tt-text-1)", color: "white", fontSize: 10, fontWeight: 600,
         }}>
-          <Hash size={12} strokeWidth={2} /> {reportType === "photo" ? "Photo Update" : "Progress Report"}
+          <Hash size={11} strokeWidth={2} /> {truncateLabel(taskName)}
         </span>
       </div>
 
       {/* Image */}
       <div style={{ position: "relative", flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0, padding: "0 24px", overflow: "hidden", background: "black" }}>
-        <button
-          onClick={onClose}
-          style={{
-            position: "absolute", left: 24, top: "50%", transform: "translateY(-50%)",
-            width: 40, height: 40, borderRadius: "50%", border: "1.5px solid rgba(255,255,255,0.6)",
-            background: "rgba(10,22,41,0.4)", color: "white", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s",
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}
-          onMouseLeave={e => e.currentTarget.style.background = "rgba(10,22,41,0.4)"}
-        >
-          <ChevronLeft size={20} strokeWidth={SW} />
-        </button>
+        {index > 0 && (
+          <button
+            onClick={() => onIndexChange(index - 1)}
+            style={{
+              position: "absolute", left: 24, top: "50%", transform: "translateY(-50%)",
+              width: 40, height: 40, borderRadius: "50%", border: "1.5px solid rgba(255,255,255,0.6)",
+              background: "rgba(10,22,41,0.4)", color: "white", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s",
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}
+            onMouseLeave={e => e.currentTarget.style.background = "rgba(10,22,41,0.4)"}
+          >
+            <ArrowLeft size={18} strokeWidth={SW} />
+          </button>
+        )}
         <img
           src={IMG_MAP[photos[index]]}
           alt=""
           style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 4, transform: `rotate(${rotation}deg) scale(${zoom / 100})`, transition: "transform 0.15s" }}
         />
+        {index < photos.length - 1 && (
+          <button
+            onClick={() => onIndexChange(index + 1)}
+            style={{
+              position: "absolute", right: 24, top: "50%", transform: "translateY(-50%)",
+              width: 40, height: 40, borderRadius: "50%", border: "1.5px solid rgba(255,255,255,0.6)",
+              background: "rgba(10,22,41,0.4)", color: "white", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s",
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}
+            onMouseLeave={e => e.currentTarget.style.background = "rgba(10,22,41,0.4)"}
+          >
+            <ArrowRight size={18} strokeWidth={SW} />
+          </button>
+        )}
       </div>
 
       {/* Filmstrip */}
@@ -740,14 +763,14 @@ function PhotoLightbox({ photos, index, entryDate, reportType, onIndexChange, on
               key={i}
               onClick={() => onIndexChange(i)}
               style={{
-                position: "relative", width: 160, height: 122, borderRadius: 6, overflow: "hidden", flexShrink: 0,
+                position: "relative", width: 160, height: 122, borderRadius: 8, overflow: "hidden", flexShrink: 0,
                 border: i === index ? "2px solid white" : "2px solid transparent",
                 padding: 0, cursor: "pointer", opacity: i === index ? 1 : 0.55, transition: "opacity 0.15s",
               }}
             >
               <img src={IMG_MAP[p]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
               <span style={{
-                position: "absolute", top: 6, right: 6, width: 14, height: 14, borderRadius: "50%",
+                position: "absolute", top: 6, right: 6, width: 12, height: 12, borderRadius: "50%",
                 border: "1.5px solid white", background: i === index ? "white" : "rgba(10,22,41,0.35)",
               }} />
             </button>
@@ -1937,7 +1960,7 @@ function ReportsTab({ demoCase }) {
                           return (
                             <div key={entryKey} style={{ marginBottom: 20 }}>
                               <p style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.5", margin: 0 }}>{e.note}</p>
-                              <PhotoGrid photos={e.photos} onOpen={(photos, idx) => setLightbox({ photos, index: idx, entryDate: e.date, reportType: preview.reportType })} />
+                              <PhotoGrid photos={e.photos} onOpen={(photos, idx) => setLightbox({ photos, index: idx, entryDate: e.date, taskName: e.note })} />
                               {renderNoteSlot(entryKey)}
                             </div>
                           );
@@ -2092,7 +2115,7 @@ function ReportsTab({ demoCase }) {
           photos={lightbox.photos}
           index={lightbox.index}
           entryDate={lightbox.entryDate}
-          reportType={lightbox.reportType}
+          taskName={lightbox.taskName}
           onIndexChange={i => setLightbox(lb => ({ ...lb, index: i }))}
           onClose={() => setLightbox(null)}
         />
