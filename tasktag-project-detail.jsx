@@ -1052,7 +1052,14 @@ function ReportsTab({ demoCase }) {
 
   const handleDeleteReport = () => {
     if (!deleteTarget) return;
-    setReports(prev => prev.filter(r => r.id !== deleteTarget.id));
+    const remaining = reports.filter(r => r.id !== deleteTarget.id);
+    setReports(remaining);
+    // "Since last report" only makes sense while a report still exists to
+    // measure "since" from — fall back to the default period once the list
+    // is empty, otherwise leave it pointing at the new most recent report.
+    if (remaining.length === 0 && dateRange === "since_last") {
+      setDateRange("last_7");
+    }
     setDeleteTarget(null);
     showToast("success", "Report deleted");
   };
