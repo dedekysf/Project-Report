@@ -1901,10 +1901,10 @@ function ReportsTab({ demoCase }) {
                 <X size={20} strokeWidth={SW} />
               </button>
             </div>
-            <p style={{ fontSize: 14, color: "var(--tt-grey05)", lineHeight: 1.6, margin: "0 0 4px" }}>
+            <p style={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, margin: "0 0 4px" }}>
               Generation date: <strong style={{ color: "var(--tt-text-1)" }}>{deleteTarget.date}</strong>
             </p>
-            <p style={{ fontSize: 14, color: "var(--tt-grey05)", lineHeight: 1.6, margin: "0 0 24px" }}>
+            <p style={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, margin: "0 0 24px" }}>
               This report will be deleted and can't be undone
             </p>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
