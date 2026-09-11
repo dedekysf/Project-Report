@@ -555,10 +555,10 @@ function PhotoThumb({ src, onClick }) {
 }
 
 // Fixed 4-column photo grid. Beyond 4 photos, only the first row renders —
-// the 4th thumbnail gets a "+N more" overlay, and clicking it reveals (and
-// only then starts loading) the rest.
+// the 4th thumbnail gets a "+N more" overlay that opens the full-screen
+// lightbox (starting at the first photo) instead of revealing more
+// thumbnails in place.
 function PhotoGrid({ photos, onOpen }) {
-  const [expanded, setExpanded] = useState(false);
   if (!photos || photos.length === 0) {
     return (
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 10 }}>
@@ -568,16 +568,16 @@ function PhotoGrid({ photos, onOpen }) {
   }
 
   const remaining = photos.length - 4;
-  const visible = expanded || remaining <= 0 ? photos : photos.slice(0, 4);
+  const visible = remaining > 0 ? photos.slice(0, 4) : photos;
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 10 }}>
       {visible.map((k, i) => (
         <div key={i} style={{ position: "relative" }}>
           <PhotoThumb src={IMG_MAP[k]} onClick={IMG_MAP[k] && onOpen ? () => onOpen(photos, i) : undefined} />
-          {!expanded && remaining > 0 && i === 3 && (
+          {remaining > 0 && i === 3 && (
             <button
-              onClick={() => setExpanded(true)}
+              onClick={() => onOpen && onOpen(photos, 0)}
               style={{
                 position: "absolute", inset: 0, background: "rgba(10,22,41,0.55)",
                 border: "none", borderRadius: 8, color: "white",
