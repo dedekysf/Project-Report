@@ -1948,7 +1948,7 @@ function ReportPaywall() {
         <Crown size={26} color="var(--tt-secondary)" strokeWidth={SW} />
       </div>
       <h3 style={{ fontSize: 22, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 10px" }}>
-        Keep Clients in the Loop Without Extra Work
+        Send a Report, Not a Wall of Text
       </h3>
       <p style={{ fontSize: 14, color: "var(--tt-grey05)", lineHeight: 1.6, maxWidth: 460, margin: "0 auto 28px" }}>
         Generate a ready-to-share report from your activity log in seconds. Photos, progress, and notes — all in one place.
