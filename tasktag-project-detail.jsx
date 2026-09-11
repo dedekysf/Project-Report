@@ -2336,7 +2336,7 @@ function ReportsTab({ demoCase }) {
               </button>
             </div>
             <p style={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, margin: "0 0 24px" }}>
-              {Object.keys(selectedPhotos).length} item{Object.keys(selectedPhotos).length > 1 ? "s" : ""} will be removed from this draft — the original photo won't be deleted. This can't be undone.
+              {Object.keys(selectedPhotos).length} item{Object.keys(selectedPhotos).length > 1 ? "s" : ""} will be removed from this draft — the original photo won't be deleted.
             </p>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button
