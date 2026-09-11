@@ -1920,22 +1920,6 @@ function ReportPaywall() {
       >
         Upgrade to Team Plan
       </button>
-
-      <div style={{ borderTop: "1px solid var(--tt-grey03)", marginTop: 28, paddingTop: 20, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-        <div style={{ display: "flex" }}>
-          {[0, 1, 2, 3, 4].map(i => (
-            <div key={i} style={{
-              width: 24, height: 24, borderRadius: "50%", background: "var(--tt-grey02)",
-              border: "2px solid white", marginLeft: i === 0 ? 0 : -8,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 9, fontWeight: 600, color: "var(--tt-grey05)",
-            }}>{String.fromCharCode(65 + i)}</div>
-          ))}
-        </div>
-        <span style={{ fontSize: 12, color: "var(--tt-grey05)" }}>
-          Trusted by teams tracking <strong style={{ color: "var(--tt-text-1)" }}>10,000+</strong> hours / week
-        </span>
-      </div>
     </div>
   );
 }
