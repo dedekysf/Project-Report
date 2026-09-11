@@ -558,7 +558,7 @@ function PhotoThumb({ src, onClick }) {
 // the 4th thumbnail gets a "+N more" overlay that opens the full-screen
 // lightbox (starting at the first photo) instead of revealing more
 // thumbnails in place.
-function PhotoGrid({ photos, onOpen }) {
+function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, onToggleExclude }) {
   if (!photos || photos.length === 0) {
     return (
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 10 }}>
@@ -572,23 +572,40 @@ function PhotoGrid({ photos, onOpen }) {
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 10 }}>
-      {visible.map((k, i) => (
-        <div key={i} style={{ position: "relative" }}>
-          <PhotoThumb src={IMG_MAP[k]} onClick={IMG_MAP[k] && onOpen ? () => onOpen(photos, i) : undefined} />
-          {remaining > 0 && i === 3 && (
-            <button
-              onClick={() => onOpen && onOpen(photos, 0)}
-              style={{
-                position: "absolute", inset: 0, background: "rgba(10,22,41,0.55)",
-                border: "none", borderRadius: 8, color: "white",
-                fontSize: 13, fontWeight: 600, cursor: "pointer",
-              }}
-            >
-              +{remaining} more
-            </button>
-          )}
-        </div>
-      ))}
+      {visible.map((k, i) => {
+        const excluded = !!(excludedPhotos && excludedPhotos[`${entryKey}_${i}`]);
+        return (
+          <div key={i} style={{ position: "relative", opacity: excluded ? 0.4 : 1, transition: "opacity 0.15s" }}>
+            <PhotoThumb src={IMG_MAP[k]} onClick={IMG_MAP[k] && onOpen ? () => onOpen(photos, i) : undefined} />
+            {IMG_MAP[k] && (
+              <button
+                onClick={e => { e.stopPropagation(); onToggleExclude && onToggleExclude(i); }}
+                disabled={!onToggleExclude}
+                style={{
+                  position: "absolute", top: 6, right: 6, width: 20, height: 20, borderRadius: "50%",
+                  border: excluded ? "none" : "1.5px solid white", background: excluded ? "var(--tt-red)" : "rgba(10,22,41,0.35)",
+                  display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+                  cursor: onToggleExclude ? "pointer" : "default", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)",
+                }}
+              >
+                {excluded && <Check size={12} color="white" strokeWidth={3} />}
+              </button>
+            )}
+            {remaining > 0 && i === 3 && (
+              <button
+                onClick={() => onOpen && onOpen(photos, 0)}
+                style={{
+                  position: "absolute", inset: 0, background: "rgba(10,22,41,0.55)",
+                  border: "none", borderRadius: 8, color: "white",
+                  fontSize: 13, fontWeight: 600, cursor: "pointer",
+                }}
+              >
+                +{remaining} more
+              </button>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1029,6 +1046,23 @@ function buildReportData(reportType, dateRange, periodStr, customRange) {
   return { groups, grouping, completed, total, pct, reportType };
 }
 
+// Photos checked off in the side panel are excluded from the final output
+// (download / copy-link / save) but still shown (checked) in the live
+// panel so the exclusion can be undone. Keyed the same way as extraNotes —
+// `${entryKey}_${photoIndex}` — against the *original*, unspliced entries,
+// so it has to run before applyExtraNotesToGroups shifts entry positions.
+function applyPhotoExclusions(groups, excludedPhotos) {
+  if (!excludedPhotos || Object.keys(excludedPhotos).length === 0) return groups;
+  return groups.map(g => ({
+    ...g,
+    entries: g.entries.map((e, i) => {
+      const entryKey = `${g.key}_${i}`;
+      const filtered = e.photos.filter((_, pi) => !excludedPhotos[`${entryKey}_${pi}`]);
+      return filtered.length === e.photos.length ? e : { ...e, photos: filtered };
+    }),
+  }));
+}
+
 // A manually-added note is tied to the specific entry (photo list) it was
 // added under, not to a date — so it's kept out of buildReportData entirely
 // and spliced into the finalized groups only when producing real output
@@ -1263,7 +1297,7 @@ function ReportsTab({ demoCase }) {
   // Adds a report to the results list (called only once the user confirms
   // via "Save report" in the preview modal — Generate no longer does this
   // directly).
-  const pushReport = ({ reportType, dateRange, period, data, extraNotes }) => {
+  const pushReport = ({ reportType, dateRange, period, data, extraNotes, excludedPhotos }) => {
     const id = Date.now();
     const newReport = {
       id,
@@ -1274,6 +1308,7 @@ function ReportsTab({ demoCase }) {
       reportType,
       data,
       extraNotes,
+      excludedPhotos,
     };
     setReports(prev => [newReport, ...prev]);
     setTimeout(() => {
@@ -1319,6 +1354,7 @@ function ReportsTab({ demoCase }) {
         period,
         customRange,
         extraNotes: {},
+        excludedPhotos: {},
       });
       setPanelClosing(false);
       setPanelEntered(false); // starts off-screen; the mount effect below slides it in
@@ -1394,7 +1430,7 @@ function ReportsTab({ demoCase }) {
     const t = setTimeout(() => {
       setPreviewLoading(false);
       const data = buildReportData(preview.reportType, preview.dateRange, preview.period, preview.customRange);
-      const finalGroups = applyExtraNotesToGroups(data.groups, preview.extraNotes);
+      const finalGroups = applyExtraNotesToGroups(applyPhotoExclusions(data.groups, preview.excludedPhotos), preview.extraNotes);
       if (!hasGroupData(finalGroups)) showToast("error", "No data for this period");
     }, 500);
     return () => clearTimeout(t);
@@ -1403,9 +1439,12 @@ function ReportsTab({ demoCase }) {
   const previewData = preview
     ? buildReportData(preview.reportType, preview.dateRange, preview.period, preview.customRange)
     : null;
-  // Final groups with manually-added notes spliced in at their entry —
-  // what actually gets downloaded / copy-linked / saved.
-  const previewFinalGroups = previewData ? applyExtraNotesToGroups(previewData.groups, preview.extraNotes) : [];
+  // Final groups with excluded photos filtered out and manually-added
+  // notes spliced in at their entry — what actually gets downloaded /
+  // copy-linked / saved.
+  const previewFinalGroups = previewData
+    ? applyExtraNotesToGroups(applyPhotoExclusions(previewData.groups, preview.excludedPhotos), preview.extraNotes)
+    : [];
 
   // Infinite scroll over the *displayed* groups (not previewFinalGroups —
   // manual notes are only spliced in for real output, not the live modal).
@@ -1448,6 +1487,17 @@ function ReportsTab({ demoCase }) {
       const next = { ...p.extraNotes };
       delete next[key];
       return { ...p, extraNotes: next };
+    });
+  };
+
+  // Toggles whether a single photo is excluded from the final output.
+  // Keyed `${entryKey}_${photoIndex}` — same addressing as extraNotes.
+  const togglePhotoExcluded = (entryKey, photoIndex) => {
+    setPreview(p => {
+      const key = `${entryKey}_${photoIndex}`;
+      const next = { ...p.excludedPhotos };
+      if (next[key]) delete next[key]; else next[key] = true;
+      return { ...p, excludedPhotos: next };
     });
   };
 
@@ -1549,7 +1599,7 @@ function ReportsTab({ demoCase }) {
 
   const handlePreviewCopy = async () => {
     if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to export"); return; }
-    await handleCopy({ reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period, extraNotes: preview.extraNotes });
+    await handleCopy({ reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos });
     setPreviewCopied(true);
     setTimeout(() => setPreviewCopied(false), 2000);
   };
@@ -1566,7 +1616,7 @@ function ReportsTab({ demoCase }) {
         showToast("error", "Save failed. Try again.");
         return;
       }
-      pushReport({ reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period, data: { ...previewData, groups: previewFinalGroups }, extraNotes: preview.extraNotes });
+      pushReport({ reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period, data: { ...previewData, groups: previewFinalGroups }, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos });
       setDateRange("since_last");
       // Closing is left to the user — the footer switches to Download/Copy
       // link so they can act on the just-saved report before dismissing it.
@@ -1614,6 +1664,13 @@ function ReportsTab({ demoCase }) {
     });
     if (report.extraNotes && Object.keys(report.extraNotes).some(k => report.extraNotes[k]?.trim())) {
       params.set("notes", JSON.stringify(report.extraNotes));
+    }
+    // Same reasoning as notes — excluded photos are only tracked client-side,
+    // so they'd otherwise reappear in the shared link even after being
+    // unchecked from the saved/downloaded report.
+    const excludedKeys = Object.keys(report.excludedPhotos || {}).filter(k => report.excludedPhotos[k]);
+    if (excludedKeys.length > 0) {
+      params.set("excluded", JSON.stringify(excludedKeys));
     }
     const url = `${window.location.href.split("?")[0]}?${params.toString()}`;
     try { await navigator.clipboard.writeText(url); }
@@ -2029,7 +2086,13 @@ function ReportsTab({ demoCase }) {
                           return (
                             <div key={entryKey} style={{ marginBottom: 20 }}>
                               <p style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.5", margin: 0 }}>{e.note}</p>
-                              <PhotoGrid photos={e.photos} onOpen={(photos, idx) => setLightbox({ photos, index: idx, entryDate: e.date, taskName: e.note })} />
+                              <PhotoGrid
+                                photos={e.photos}
+                                onOpen={(photos, idx) => setLightbox({ photos, index: idx, entryDate: e.date, taskName: e.note })}
+                                excludedPhotos={preview.excludedPhotos}
+                                entryKey={entryKey}
+                                onToggleExclude={previewSaved ? undefined : (idx) => togglePhotoExcluded(entryKey, idx)}
+                              />
                               {renderNoteSlot(entryKey)}
                             </div>
                           );
@@ -2253,17 +2316,26 @@ function ReportPaywall() {
 // ── Root ──
 // ── Report Page (shared link view) ──
 // Report content is fully reproducible from its URL params (reportType,
-// dateRange, period, and any manually-added notes) — rebuilt on the fly
-// rather than fetched from storage, so a shared link works on any
-// device/browser and can never 404.
-function ReportPage({ reportType, dateRange, period, notesParam }) {
+// dateRange, period, excluded photos, and any manually-added notes) —
+// rebuilt on the fly rather than fetched from storage, so a shared link
+// works on any device/browser and can never 404.
+function ReportPage({ reportType, dateRange, period, notesParam, excludedParam }) {
   let data = buildReportData(reportType, dateRange, period, null);
+  let groups = data.groups;
+  if (excludedParam) {
+    try {
+      const excludedPhotos = {};
+      JSON.parse(excludedParam).forEach(k => { excludedPhotos[k] = true; });
+      groups = applyPhotoExclusions(groups, excludedPhotos);
+    } catch { /* malformed/tampered param — ignore */ }
+  }
   if (notesParam) {
     try {
       const extraNotes = JSON.parse(notesParam);
-      data = { ...data, groups: applyExtraNotesToGroups(data.groups, extraNotes) };
-    } catch { /* malformed/tampered param — fall back to the base report */ }
+      groups = applyExtraNotesToGroups(groups, extraNotes);
+    } catch { /* malformed/tampered param — ignore */ }
   }
+  data = { ...data, groups };
   const html = buildReportHTML({ reportType, period, data });
 
   return (
@@ -2279,7 +2351,7 @@ function ReportPage({ reportType, dateRange, period, notesParam }) {
 export default function ProjectDetail() {
   const params = new URLSearchParams(window.location.search);
   const sharedReportType = params.get("type");
-  if (sharedReportType) return <ReportPage reportType={sharedReportType} dateRange={params.get("range")} period={params.get("period")} notesParam={params.get("notes")} />;
+  if (sharedReportType) return <ReportPage reportType={sharedReportType} dateRange={params.get("range")} period={params.get("period")} notesParam={params.get("notes")} excludedParam={params.get("excluded")} />;
 
   const [activeTab, setActiveTab] = useState("reports");
   const [demoCase, setDemoCase] = useState("happy");
