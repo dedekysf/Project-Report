@@ -1557,7 +1557,7 @@ function ReportsTab({ demoCase }) {
     // Demo case: "Save report error" always fails to save, regardless of
     // whether there's valid data to save.
     if (demoCase === "save_error") {
-      showToast("error", "Failed to save report. Try again.");
+      showToast("error", "Save failed. Try again.");
       return;
     }
     pushReport({ reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period, data: { ...previewData, groups: previewFinalGroups } });
