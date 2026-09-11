@@ -1421,15 +1421,13 @@ function ReportsTab({ demoCase }) {
             <Label style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)", marginBottom: 6, display: "block" }}>Report type</Label>
             <div
               onClick={() => setOpenType(o => !o)}
-              onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
-              onMouseLeave={e => e.currentTarget.style.background = "white"}
               style={{
                 width: "100%", height: 40, padding: "0 12px",
                 background: "white", border: `1px solid ${openType ? "var(--tt-text-1)" : "var(--tt-grey03)"}`,
                 borderRadius: 8, fontSize: 13, fontWeight: 500,
                 color: "var(--tt-text-1)", cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "space-between",
-                userSelect: "none", transition: "border-color 0.15s, background 0.15s",
+                userSelect: "none", transition: "border-color 0.15s",
               }}
             >
               <span>{reportType === "progress" ? "Progress report" : "Photo update"}</span>
@@ -1474,15 +1472,13 @@ function ReportsTab({ demoCase }) {
             <Label style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)", marginBottom: 6, display: "block" }}>Period</Label>
             <div
               onClick={() => setOpenPeriod(o => !o)}
-              onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
-              onMouseLeave={e => e.currentTarget.style.background = "white"}
               style={{
                 width: "100%", height: 40, padding: "0 12px",
                 background: "white", border: `1px solid ${openPeriod ? "var(--tt-text-1)" : "var(--tt-grey03)"}`,
                 borderRadius: 8, fontSize: 13, fontWeight: 500,
                 color: "var(--tt-text-1)", cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "space-between",
-                userSelect: "none", transition: "border-color 0.15s, background 0.15s",
+                userSelect: "none", transition: "border-color 0.15s",
               }}
             >
               <span>{renderPeriodLabel(dateRange)}</span>
