@@ -1,7 +1,6 @@
 import ProjectDetail from "../tasktag-project-detail.jsx";
+import ProjectDetailV2 from "../tasktag-project-detail-v2.jsx";
 
-// /v1 is this version of the report preview; /v2 (a different version)
-// will get its own branch here once it exists.
 export default function App() {
   const path = window.location.pathname;
 
@@ -12,6 +11,10 @@ export default function App() {
 
   if (path.startsWith("/v1")) {
     return <ProjectDetail />;
+  }
+
+  if (path.startsWith("/v2")) {
+    return <ProjectDetailV2 />;
   }
 
   return (
