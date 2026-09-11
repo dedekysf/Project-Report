@@ -1902,7 +1902,7 @@ function ReportsTab({ demoCase }) {
               </button>
             </div>
             <p style={{ fontSize: 14, color: "var(--tt-grey05)", lineHeight: 1.6, margin: "0 0 4px" }}>
-              Report period: <strong style={{ color: "var(--tt-text-1)" }}>{deleteTarget.period}</strong>
+              Generation date: <strong style={{ color: "var(--tt-text-1)" }}>{deleteTarget.date}</strong>
             </p>
             <p style={{ fontSize: 14, color: "var(--tt-grey05)", lineHeight: 1.6, margin: "0 0 24px" }}>
               This report will be deleted. This can't be undone
