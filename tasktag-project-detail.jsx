@@ -991,6 +991,7 @@ function ReportsTab() {
   const [panelEntered,     setPanelEntered]      = useState(false); // flips true a tick after mount to animate in
   const [visibleCount,     setVisibleCount]      = useState(10); // infinite scroll — entries revealed so far
   const [loadingMore,      setLoadingMore]       = useState(false);
+  const [generating,       setGenerating]        = useState(false); // Generate button's own disabled/spinner state, before the panel appears
   const previewPeriodRef = useRef(null);
   const previewPanelRef = useRef(null);
 
@@ -1049,29 +1050,35 @@ function ReportsTab() {
   };
 
   const handleGenerate = () => {
-    const period = getPeriodRange(dateRange);
-    const data = buildReportData(reportType, dateRange, period, customRange);
-    if (!hasGroupData(data.groups)) {
-      showToast("error", "No data for this period");
-      return; // don't open the modal on an empty period — just the toast
-    }
-    setPreview({
-      reportType,
-      dateRange,
-      period,
-      customRange,
-      extraNotes: {},
-    });
-    setPanelClosing(false);
-    setPanelEntered(false); // starts off-screen; the mount effect below slides it in
-    setPreviewPeriodOpen(false);
-    setPreviewShowCal(false);
-    setActiveNoteFormKey(null);
-    setNoteDraft("");
-    setPreviewSaved(false);
-    setPreviewCopied(false);
-    setVisibleCount(10);
-    setLoadingMore(false);
+    if (generating) return;
+    setGenerating(true);
+    setTimeout(() => {
+      const period = getPeriodRange(dateRange);
+      const data = buildReportData(reportType, dateRange, period, customRange);
+      if (!hasGroupData(data.groups)) {
+        setGenerating(false);
+        showToast("error", "No data for this period");
+        return; // don't open the modal on an empty period — just the toast
+      }
+      setPreview({
+        reportType,
+        dateRange,
+        period,
+        customRange,
+        extraNotes: {},
+      });
+      setPanelClosing(false);
+      setPanelEntered(false); // starts off-screen; the mount effect below slides it in
+      setPreviewPeriodOpen(false);
+      setPreviewShowCal(false);
+      setActiveNoteFormKey(null);
+      setNoteDraft("");
+      setPreviewSaved(false);
+      setPreviewCopied(false);
+      setVisibleCount(10);
+      setLoadingMore(false);
+      setGenerating(false);
+    }, 900);
   };
 
   // Slides the panel back out first; the actual unmount (setPreview(null))
@@ -1500,20 +1507,24 @@ function ReportsTab() {
           {/* Generate button */}
           <div style={{ flexShrink: 0 }}>
             <button
+              disabled={generating}
               style={{
                 height: 40, padding: "0 24px",
                 minWidth: isWide ? 120 : "auto",
                 background: "var(--tt-text-1)", color: "white",
                 border: "none", borderRadius: 8,
-                fontSize: 13, fontWeight: 500, cursor: "pointer",
+                fontSize: 13, fontWeight: 500, cursor: generating ? "not-allowed" : "pointer",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 whiteSpace: "nowrap", transition: "opacity 0.15s",
+                opacity: generating ? 0.7 : 1,
               }}
-              onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
-              onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+              onMouseEnter={e => !generating && (e.currentTarget.style.opacity = "0.85")}
+              onMouseLeave={e => e.currentTarget.style.opacity = generating ? 0.7 : 1}
               onClick={() => { setShowCal(false); handleGenerate(); }}
             >
-              Generate
+              {generating
+                ? <span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.35)", borderTopColor: "white", display: "inline-block", animation: "tt-spin 0.75s linear infinite" }} />
+                : "Generate"}
             </button>
           </div>
         </div>
