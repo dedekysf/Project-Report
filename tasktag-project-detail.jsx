@@ -605,7 +605,6 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
             {canOpen && (
               <div style={{ position: "absolute", inset: 0, borderRadius: 8, background: "rgba(10,22,41,0.25)", opacity: 0, transition: "opacity 0.15s", pointerEvents: "none" }} />
             )}
-            )}
           </div>
         );
       })}
