@@ -1554,6 +1554,12 @@ function ReportsTab({ demoCase }) {
 
   const handlePreviewSave = () => {
     if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to save"); return; }
+    // Demo case: "Save report error" always fails to save, regardless of
+    // whether there's valid data to save.
+    if (demoCase === "save_error") {
+      showToast("error", "Failed to save report. Try again.");
+      return;
+    }
     pushReport({ reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period, data: { ...previewData, groups: previewFinalGroups } });
     setDateRange("since_last");
     // Closing is left to the user — the footer switches to Download/Copy
@@ -2249,9 +2255,10 @@ export default function ProjectDetail() {
   const [demoCase, setDemoCase] = useState("happy");
 
   const demoCases = [
-    { id: "happy",   label: "Happy Flow" },
-    { id: "error",   label: "Error States" },
-    { id: "paywall", label: "Paywall" },
+    { id: "happy",      label: "Happy Flow" },
+    { id: "error",      label: "Generate error" },
+    { id: "save_error", label: "Save report error" },
+    { id: "paywall",    label: "Paywall" },
   ];
 
   const tabs = [
