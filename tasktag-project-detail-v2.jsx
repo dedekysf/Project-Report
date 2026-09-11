@@ -567,7 +567,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
 
   if (items.length === 0) {
     return (
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 8, marginTop: 10 }}>
         <PhotoThumb src={null} />
       </div>
     );
@@ -576,7 +576,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
   const visiblePhotoKeys = items.map(it => it.k);
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 10 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 8, marginTop: 10 }}>
       {items.map(({ k, i }, viewIdx) => {
         const selected = !!(selectedPhotos && selectedPhotos[`${entryKey}_${i}`]);
         const canOpen = !!(IMG_MAP[k] && onOpen);
@@ -2135,23 +2135,39 @@ function ReportsTab({ demoCase }) {
                   </button>
                 </div>
               ) : (
-                <button
-                  disabled={previewLoading || saving}
-                  onClick={handlePreviewSave}
-                  onMouseEnter={e => !(previewLoading || saving) && (e.currentTarget.style.opacity = "0.85")}
-                  onMouseLeave={e => e.currentTarget.style.opacity = (previewLoading || saving) ? 0.5 : 1}
-                  style={{
-                    height: 32, padding: "0 14px", borderRadius: 8, border: "none",
-                    background: "var(--tt-text-1)", fontSize: 13, fontWeight: 500, color: "white",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    cursor: (previewLoading || saving) ? "not-allowed" : "pointer",
-                    opacity: (previewLoading || saving) ? 0.5 : 1, transition: "opacity 0.15s",
-                  }}
-                >
-                  {saving
-                    ? <span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.35)", borderTopColor: "white", display: "inline-block", animation: "tt-spin 0.75s linear infinite" }} />
-                    : "Save report"}
-                </button>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <button
+                    disabled={saving}
+                    onClick={closePreview}
+                    onMouseEnter={e => !saving && (e.currentTarget.style.background = "var(--tt-grey02)")}
+                    onMouseLeave={e => e.currentTarget.style.background = "white"}
+                    style={{
+                      height: 32, padding: "0 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)",
+                      background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)",
+                      display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center",
+                      cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.5 : 1, transition: "background 0.15s",
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    disabled={previewLoading || saving}
+                    onClick={handlePreviewSave}
+                    onMouseEnter={e => !(previewLoading || saving) && (e.currentTarget.style.opacity = "0.85")}
+                    onMouseLeave={e => e.currentTarget.style.opacity = (previewLoading || saving) ? 0.5 : 1}
+                    style={{
+                      height: 32, padding: "0 14px", borderRadius: 8, border: "none",
+                      background: "var(--tt-text-1)", fontSize: 13, fontWeight: 500, color: "white",
+                      display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center",
+                      cursor: (previewLoading || saving) ? "not-allowed" : "pointer",
+                      opacity: (previewLoading || saving) ? 0.5 : 1, transition: "opacity 0.15s",
+                    }}
+                  >
+                    {saving
+                      ? <span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.35)", borderTopColor: "white", display: "inline-block", animation: "tt-spin 0.75s linear infinite" }} />
+                      : "Save report"}
+                  </button>
+                </div>
               )}
             </div>
 
@@ -2174,7 +2190,7 @@ function ReportsTab({ demoCase }) {
                       {[0, 1].map(ti => (
                         <div key={ti} style={{ marginBottom: 20 }}>
                           <div className="tt-skeleton" style={{ width: "85%", height: 16, marginBottom: 10 }} />
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 8 }}>
                             {[0, 1, 2].map(pi => (
                               <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "4/3" }} />
                             ))}
