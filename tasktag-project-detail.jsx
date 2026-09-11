@@ -702,37 +702,6 @@ const PERIOD_RANGE = {
 };
 
 // ── Dummy data ──
-// Cumulative project checklist — separate from the activity log entries
-// below. `date` is when a task was actually completed (matching the entry
-// that logged it, where one exists); tasks without a date haven't happened
-// yet. "Tasks complete" in a report counts how many of these were done by
-// the report's period end, so it's a genuine, varying completion figure
-// instead of a static number or a tautological "entries attached" count.
-const DUMMY_TASKS = [
-  { name: "Site survey",                  date: "2026-07-10" },
-  { name: "Structural assessment",        date: "2026-07-31" },
-  { name: "Scaffolding installation",     date: "2026-07-24" },
-  { name: "Waterproofing",                date: "2026-07-17" },
-  { name: "Brickwork reinforcement",      date: "2026-08-21" },
-  { name: "Wall crack repair",            date: "2026-08-28" },
-  { name: "Paint removal & prep",         date: "2026-08-14" },
-  { name: "Door frame replacement",       date: "2026-08-07" },
-  { name: "Door hardware installation",   date: "2026-09-03" },
-  { name: "Electrical connections",       date: "2026-09-08" },
-  { name: "Ceiling light installation",   date: "2026-09-06" },
-  { name: "Interior repainting",          date: null },
-  { name: "Floor refinishing",            date: null },
-  { name: "Final inspection",             date: null },
-  { name: "Punch list resolution",        date: null },
-  { name: "Client walkthrough",           date: null },
-  { name: "Certificate of occupancy",     date: null },
-  { name: "Landscaping",                  date: null },
-  { name: "Final cleaning",               date: null },
-  { name: "Project closeout documentation", date: null },
-  { name: "Warranty submission",          date: null },
-  { name: "Handover",                     date: null },
-];
-
 const DUMMY_ENTRIES = [
   { date: "2026-09-10", note: "Flooring installation started on the ground floor.", photos: ["img5", "img1", "img6"] },
   { date: "2026-09-09", note: "Exterior siding repairs completed on the south wall.", photos: ["img9", "img2", "img3", "img7", "img4"] },
@@ -883,11 +852,12 @@ function buildReportData(reportType, dateRange, periodStr, customRange) {
   let groups = groupEntries(DUMMY_ENTRIES, start, end, grouping);
   groups = applyPhotoCap(groups);
 
-  // "Tasks complete" is cumulative project progress as of this report's
-  // period end — how many of the project's tasks were done by then — not
-  // a count of entries attached, which would always read as 100%.
-  const completed = DUMMY_TASKS.filter(t => t.date && parseDate(t.date) <= end).length;
-  const total = DUMMY_TASKS.length;
+  // completed = entries actually attached to this report (countable from
+  // what's shown below), total = the whole project's activity log — so the
+  // number is always directly verifiable against the visible entries,
+  // rather than referencing an unrelated, invisible task list.
+  const completed = groups.reduce((s, g) => s + g.entries.length, 0);
+  const total = DUMMY_ENTRIES.length;
   const pct = Math.round(completed / total * 100);
 
   return { groups, grouping, completed, total, pct, reportType };
