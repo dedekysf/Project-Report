@@ -591,10 +591,11 @@ function PhotoGrid({ photos }) {
 // getGrouping() bucket (day <=14, week <=61, month beyond) without needing
 // to touch that logic: 7 days -> day, 30 days -> week, 90 days -> month.
 const PERIOD_OPTIONS_BASE = [
-  { id: "last_7",  label: "Last 7 days" },
-  { id: "last_30", label: "Last 30 days" },
-  { id: "last_90", label: "Last 90 days" },
-  { id: "custom",  label: "Custom date" },
+  { id: "last_7",   label: "Last 7 days" },
+  { id: "last_30",  label: "Last 30 days" },
+  { id: "last_90",  label: "Last 90 days" },
+  { id: "last_180", label: "Last 6 months" },
+  { id: "custom",   label: "Custom date" },
 ];
 
 const fmtDate = (d) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -610,6 +611,7 @@ const PERIOD_LABELS = {
   last_7:     `Last 7 days · ${getLastNDaysRange(7)}`,
   last_30:    `Last 30 days · ${getLastNDaysRange(30)}`,
   last_90:    `Last 90 days · ${getLastNDaysRange(90)}`,
+  last_180:   `Last 6 months · ${getLastNDaysRange(180)}`,
   custom:     "Custom date",
   since_last: "Since last report",
 };
@@ -618,6 +620,7 @@ const PERIOD_RANGE = {
   last_7:     getLastNDaysRange(7),
   last_30:    getLastNDaysRange(30),
   last_90:    getLastNDaysRange(90),
+  last_180:   getLastNDaysRange(180),
   custom:     "Custom date",
   since_last: "Since last report",
 };
@@ -689,8 +692,8 @@ function parseDate(str) {
 function parsePeriodDates(periodStr, dateRange, customRange) {
   const now = APP_TODAY;
 
-  if (dateRange === "last_7" || dateRange === "last_30" || dateRange === "last_90") {
-    const n = dateRange === "last_7" ? 7 : dateRange === "last_30" ? 30 : 90;
+  if (dateRange === "last_7" || dateRange === "last_30" || dateRange === "last_90" || dateRange === "last_180") {
+    const n = dateRange === "last_7" ? 7 : dateRange === "last_30" ? 30 : dateRange === "last_90" ? 90 : 180;
     const start = new Date(now); start.setDate(now.getDate() - (n - 1));
     return { start, end: now };
   }
