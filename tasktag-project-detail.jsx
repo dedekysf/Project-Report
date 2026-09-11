@@ -1001,13 +1001,17 @@ const buildReportHTML = (report) => {
   // of whether the section groups by day, week, or month -- otherwise a
   // week/month section would stack every note together and dump all of its
   // photos into one grid with no way to tell which belongs to which.
-  const entryHTML = (e) =>
-    h("div", { style: "margin-bottom:20px;" },
-      e.isNote
-        ? h("p", { style: "font-size:12px;color:#303742;line-height:1.5;margin:0;" }, e.note)
-        : h("p", { style: "font-size:16px;font-weight:600;color:#0a1629;line-height:1.5;margin:0;" }, e.note),
-      renderPhotos(e.photos)
-    );
+  // Manual notes never carry photos, so skip renderPhotos for them entirely
+  // instead of showing a stray "No Image" box — and style them the same
+  // italic, wrapped way the live side panel does.
+  const entryHTML = (e) => e.isNote
+    ? h("div", { style: "margin-bottom:20px;" },
+        h("p", { style: "font-size:12px;font-style:italic;color:#303742;line-height:1.5;margin:0;background:#f7f8fa;padding:8px;border-radius:8px;" }, e.note)
+      )
+    : h("div", { style: "margin-bottom:20px;" },
+        h("p", { style: "font-size:16px;font-weight:600;color:#0a1629;line-height:1.5;margin:0;" }, e.note),
+        renderPhotos(e.photos)
+      );
 
   const entriesHTML = groups.length === 0
     ? h("p", { style: "font-size:13px;color:#828282;text-align:center;padding:32px 0;" }, "No activity entries for this period.")
