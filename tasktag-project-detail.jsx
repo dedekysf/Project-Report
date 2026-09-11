@@ -618,9 +618,18 @@ function PhotoLightbox({ photos, index, entryDate, reportType, onIndexChange, on
   const onIconEnter = e => e.currentTarget.style.background = "rgba(255,255,255,0.12)";
   const onIconLeave = e => e.currentTarget.style.background = "transparent";
 
-  const uploadedAt = entryDate
-    ? parseDate(entryDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-    : "";
+  // No real upload timestamp in the data model — derive a stable (not
+  // random-on-every-render) time of day from the entry date + photo index.
+  const uploadedAt = entryDate ? (() => {
+    const dateLabel = parseDate(entryDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    let hash = index;
+    for (let i = 0; i < entryDate.length; i++) hash = (hash * 31 + entryDate.charCodeAt(i)) >>> 0;
+    const hour24 = 7 + (hash % 11);
+    const minute = (hash >> 3) % 60;
+    const period = hour24 >= 12 ? "PM" : "AM";
+    const hour12 = ((hour24 + 11) % 12) + 1;
+    return `${dateLabel} at ${hour12}:${String(minute).padStart(2, "0")} ${period}`;
+  })() : "";
   const fileName = entryDate ? `${entryDate.replace(/-/g, "")}-${String(index + 1).padStart(2, "0")}.jpg` : `photo-${index + 1}.jpg`;
 
   const handleDownloadPhoto = () => {
@@ -635,26 +644,30 @@ function PhotoLightbox({ photos, index, entryDate, reportType, onIndexChange, on
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 5000, background: "black", display: "flex", flexDirection: "column" }}>
       {/* Top bar */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 20px", flexShrink: 0, flexWrap: "wrap", rowGap: 8, background: "var(--tt-grey06)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+      <div style={{
+        display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 12,
+        padding: "10px 20px", flexShrink: 0, background: "var(--tt-grey06)",
+        borderBottom: "1px solid rgba(255,255,255,0.12)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, justifySelf: "start" }}>
           <div style={{
-            width: 32, height: 32, borderRadius: "50%", background: "var(--tt-secondary)",
+            width: 32, height: 32, borderRadius: "50%", background: "var(--tt-mint)",
             display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
           }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: "white" }}>MJ</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--tt-secondary)" }}>MJ</span>
           </div>
           <div style={{ lineHeight: 1.3 }}>
             <p style={{ fontSize: 13, fontWeight: 600, color: "white", margin: 0 }}>You</p>
-            <p style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", margin: 0 }}>{uploadedAt}</p>
+            <p style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", margin: 0, whiteSpace: "nowrap" }}>{uploadedAt}</p>
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, justifySelf: "center" }}>
           <span style={{ fontSize: 13, fontWeight: 500, color: "white", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{fileName}</span>
           <Pencil size={13} strokeWidth={SW} color="rgba(255,255,255,0.45)" />
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0, justifySelf: "end" }}>
           <button onClick={handleDownloadPhoto} style={iconBtnStyle} onMouseEnter={onIconEnter} onMouseLeave={onIconLeave}>
             <Download size={16} strokeWidth={SW} />
           </button>
@@ -675,7 +688,7 @@ function PhotoLightbox({ photos, index, entryDate, reportType, onIndexChange, on
           <button onClick={() => setZoom(z => Math.min(200, z + 25))} style={iconBtnStyle} onMouseEnter={onIconEnter} onMouseLeave={onIconLeave}>
             <ZoomIn size={16} strokeWidth={SW} />
           </button>
-          <button onClick={onClose} style={iconBtnStyle} onMouseEnter={onIconEnter} onMouseLeave={onIconLeave}>
+          <button style={iconBtnStyle} onMouseEnter={onIconEnter} onMouseLeave={onIconLeave}>
             <MoreVertical size={16} strokeWidth={SW} />
           </button>
         </div>
@@ -721,20 +734,20 @@ function PhotoLightbox({ photos, index, entryDate, reportType, onIndexChange, on
 
       {/* Filmstrip */}
       {photos.length > 1 && (
-        <div style={{ display: "flex", gap: 8, padding: "14px 16px", flexShrink: 0, overflowX: "auto", background: "var(--tt-grey06)" }}>
+        <div style={{ display: "flex", justifyContent: "center", gap: 10, padding: "14px 16px", flexShrink: 0, overflowX: "auto", background: "var(--tt-grey06)" }}>
           {photos.map((p, i) => (
             <button
               key={i}
               onClick={() => onIndexChange(i)}
               style={{
-                position: "relative", width: 64, height: 48, borderRadius: 6, overflow: "hidden", flexShrink: 0,
+                position: "relative", width: 160, height: 122, borderRadius: 6, overflow: "hidden", flexShrink: 0,
                 border: i === index ? "2px solid white" : "2px solid transparent",
                 padding: 0, cursor: "pointer", opacity: i === index ? 1 : 0.55, transition: "opacity 0.15s",
               }}
             >
               <img src={IMG_MAP[p]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
               <span style={{
-                position: "absolute", top: 4, right: 4, width: 14, height: 14, borderRadius: "50%",
+                position: "absolute", top: 6, right: 6, width: 14, height: 14, borderRadius: "50%",
                 border: "1.5px solid white", background: i === index ? "white" : "rgba(10,22,41,0.35)",
               }} />
             </button>
