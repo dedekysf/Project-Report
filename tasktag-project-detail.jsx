@@ -1374,10 +1374,13 @@ function ReportsTab({ demoCase }) {
     }
   };
 
-  // Dynamic period options — add "Since last report" if a report exists
+  // Dynamic period options — add "Since last report" if a report exists.
+  // Continues from where the last report's *covered period* ended, not
+  // from whenever it happened to be generated — otherwise back-to-back
+  // reports would have a gap (or overlap) between them.
   const lastReport = reports[0];
   const sinceLastDate = lastReport
-    ? lastReport.date.split(",")[0]
+    ? lastReport.period.split(" – ").pop()
     : null;
 
   const PERIOD_OPTIONS = lastReport
