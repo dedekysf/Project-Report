@@ -8,7 +8,7 @@ import {
   LayoutGrid, MapPin, Hash, FileText, FileImage,
   Activity, Users, BarChart2, SlidersHorizontal,
   ArrowUpDown, Calendar, AlignJustify, Clock,
-  UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2,
+  UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, Crown,
 } from "lucide-react";
 
 import logoImg from "./src/Img/tasktag-logo.13f1babda8fdbb1b7251572a0fe11f9e.png";
@@ -962,7 +962,7 @@ const buildReportHTML = (report) => {
 };
 
 // ── Reports Tab ──
-function ReportsTab() {
+function ReportsTab({ demoCase }) {
   const [reportType,  setReportType]  = useState("progress");
   const [dateRange,   setDateRange]   = useState("last_7");
   const [showCal,     setShowCal]     = useState(false);
@@ -1053,6 +1053,13 @@ function ReportsTab() {
     if (generating) return;
     setGenerating(true);
     setTimeout(() => {
+      // Demo case: "Error states" always fails to generate, regardless of
+      // whether the selected period actually has data.
+      if (demoCase === "error") {
+        setGenerating(false);
+        showToast("error", "Something went wrong while generating your report. Please try again.");
+        return;
+      }
       const period = getPeriodRange(dateRange);
       const data = buildReportData(reportType, dateRange, period, customRange);
       if (!hasGroupData(data.groups)) {
@@ -1867,6 +1874,72 @@ function ReportsTab() {
   );
 }
 
+// ── Paywall (demo case: replaces all Reports tab content) ──
+function ReportPaywall() {
+  const unlockItems = [
+    "Progress reports with task completion summary",
+    "Photo updates grouped by week or month",
+    "Shareable link or HTML download for any period",
+    "Up to 50 photos per report, spread evenly",
+    "Full report history across all projects",
+  ];
+
+  return (
+    <div style={{ marginTop: 24, border: "1px solid var(--tt-grey03)", borderRadius: 16, padding: "48px 40px", textAlign: "center" }}>
+      <div style={{
+        width: 56, height: 56, borderRadius: 14, background: "var(--tt-mint)",
+        display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px",
+      }}>
+        <Crown size={26} color="var(--tt-secondary)" strokeWidth={SW} />
+      </div>
+      <h3 style={{ fontSize: 22, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 10px" }}>
+        Share progress without the back-and-forth
+      </h3>
+      <p style={{ fontSize: 14, color: "var(--tt-grey05)", lineHeight: 1.6, maxWidth: 460, margin: "0 auto 28px" }}>
+        TaskTag generates progress reports and photo updates automatically — grouped by day, week, or month — so you can share with clients in one tap.
+      </p>
+
+      <div style={{ background: "var(--tt-grey02)", borderRadius: 12, padding: "20px 24px", textAlign: "left", maxWidth: 440, margin: "0 auto 24px" }}>
+        <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 12px" }}>What you unlock:</p>
+        {unlockItems.map((t, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: i === unlockItems.length - 1 ? 0 : 10 }}>
+            <Check size={16} color="var(--tt-secondary)" strokeWidth={SW} style={{ flexShrink: 0, marginTop: 2 }} />
+            <span style={{ fontSize: 13, color: "var(--tt-text-2)", lineHeight: 1.5 }}>{t}</span>
+          </div>
+        ))}
+      </div>
+
+      <button
+        style={{
+          width: "100%", maxWidth: 440, height: 44, border: "none", borderRadius: 10,
+          background: "var(--tt-text-1)", color: "white", fontSize: 14, fontWeight: 600,
+          cursor: "pointer", transition: "opacity 0.15s",
+        }}
+        onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
+        onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+      >
+        Upgrade to Team Plan
+      </button>
+
+      <div style={{ borderTop: "1px solid var(--tt-grey03)", marginTop: 28, paddingTop: 20, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+        <div style={{ display: "flex" }}>
+          {[0, 1, 2, 3, 4].map(i => (
+            <div key={i} style={{
+              width: 24, height: 24, borderRadius: "50%", background: "var(--tt-grey02)",
+              border: "2px solid white", marginLeft: i === 0 ? 0 : -8,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 9, fontWeight: 600, color: "var(--tt-grey05)",
+            }}>{String.fromCharCode(65 + i)}</div>
+          ))}
+        </div>
+        <span style={{ fontSize: 12, color: "var(--tt-grey05)" }}>
+          Trusted by teams tracking <strong style={{ color: "var(--tt-text-1)" }}>10,000+</strong> hours / week
+        </span>
+      </div>
+    </div>
+  );
+}
+
 // ── Root ──
 // ── Report Page (shared link view) ──
 // Report content is fully reproducible from its URL params (reportType,
@@ -1892,6 +1965,13 @@ export default function ProjectDetail() {
   if (sharedReportType) return <ReportPage reportType={sharedReportType} dateRange={params.get("range")} period={params.get("period")} />;
 
   const [activeTab, setActiveTab] = useState("reports");
+  const [demoCase, setDemoCase] = useState("happy");
+
+  const demoCases = [
+    { id: "happy",   label: "Happy Flow" },
+    { id: "error",   label: "Error States" },
+    { id: "paywall", label: "Paywall" },
+  ];
 
   const tabs = [
     { id: "tasks",     label: "Tasks",         Icon: Hash },
@@ -1904,6 +1984,33 @@ export default function ProjectDetail() {
 
   return (
     <div className="font-sans bg-white text-[var(--tt-text-1)] min-h-screen text-[14px] leading-[1.5]" style={{ background: "var(--tt-grey01)" }}>
+
+      {/* Demo case switcher — not part of the product UI, just for previewing states */}
+      <div style={{ background: "var(--tt-text-1)" }}>
+        <div style={{ maxWidth: 1114, margin: "0 auto", display: "flex", alignItems: "center", gap: 4, padding: "10px 16px" }}>
+          {demoCases.map(({ id, label }) => {
+            const active = demoCase === id;
+            return (
+              <button
+                key={id}
+                onClick={() => setDemoCase(id)}
+                style={{
+                  height: 30, padding: "0 14px", borderRadius: 8, border: "none",
+                  background: active ? "white" : "transparent",
+                  color: active ? "var(--tt-text-1)" : "rgba(255,255,255,0.65)",
+                  fontSize: 13, fontWeight: 500, cursor: "pointer",
+                  transition: "background 0.15s, color 0.15s",
+                }}
+                onMouseEnter={e => { if (!active) e.currentTarget.style.color = "white"; }}
+                onMouseLeave={e => { if (!active) e.currentTarget.style.color = "rgba(255,255,255,0.65)"; }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <div style={{ maxWidth: 1114, margin: "0 auto", background: "white", minHeight: "100vh" }}>
 
       {/* Header */}
@@ -2038,7 +2145,9 @@ export default function ProjectDetail() {
         </TabsList>
 
         <TabsContent value="tasks"     className="mt-0 px-4" style={{ paddingTop: 16 }} />
-        <TabsContent value="reports"   className="mt-0 px-4" style={{ paddingTop: 16 }}><ReportsTab /></TabsContent>
+        <TabsContent value="reports"   className="mt-0 px-4" style={{ paddingTop: 16 }}>
+          {demoCase === "paywall" ? <ReportPaywall /> : <ReportsTab demoCase={demoCase} />}
+        </TabsContent>
         <TabsContent value="checklist" className="mt-0 px-4" style={{ paddingTop: 16 }}></TabsContent>
         <TabsContent value="files"     className="mt-0 px-4" style={{ paddingTop: 16 }} />
         <TabsContent value="activity"  className="mt-0 px-4" style={{ paddingTop: 16 }} />
