@@ -626,31 +626,6 @@ const PERIOD_RANGE = {
 };
 
 // ── Dummy data ──
-const DUMMY_TASKS = [
-  { name: "Site survey", done: true },
-  { name: "Structural assessment", done: true },
-  { name: "Scaffolding installation", done: true },
-  { name: "Waterproofing", done: true },
-  { name: "Brickwork reinforcement", done: true },
-  { name: "Wall crack repair", done: true },
-  { name: "Paint removal & prep", done: true },
-  { name: "Door frame replacement", done: true },
-  { name: "Door hardware installation", done: true },
-  { name: "Electrical connections", done: true },
-  { name: "Ceiling light installation", done: true },
-  { name: "Interior repainting", done: false },
-  { name: "Floor refinishing", done: false },
-  { name: "Final inspection", done: false },
-  { name: "Punch list resolution", done: false },
-  { name: "Client walkthrough", done: false },
-  { name: "Certificate of occupancy", done: false },
-  { name: "Landscaping", done: false },
-  { name: "Final cleaning", done: false },
-  { name: "Project closeout documentation", done: false },
-  { name: "Warranty submission", done: false },
-  { name: "Handover", done: false },
-];
-
 const DUMMY_ENTRIES = [
   { date: "2026-09-10", note: "Flooring installation started on the ground floor.", photos: ["img5", "img1", "img6"] },
   { date: "2026-09-09", note: "Exterior siding repairs completed on the south wall.", photos: ["img9", "img2", "img3", "img7", "img4"] },
@@ -801,8 +776,11 @@ function buildReportData(reportType, dateRange, periodStr, customRange) {
   let groups = groupEntries(DUMMY_ENTRIES, start, end, grouping);
   groups = applyPhotoCap(groups);
 
-  const completed = DUMMY_TASKS.filter(t => t.done).length;
-  const total = DUMMY_TASKS.length;
+  // "Tasks complete" tracks how much of the project's logged activity is
+  // actually covered by this report — entries attached here vs. the full
+  // activity log — rather than an unrelated, period-independent number.
+  const completed = groups.reduce((s, g) => s + g.entries.length, 0);
+  const total = DUMMY_ENTRIES.length;
   const pct = Math.round(completed / total * 100);
 
   return { groups, grouping, completed, total, pct, reportType };
@@ -903,7 +881,7 @@ const buildReportHTML = (report) => {
   const progressHTML = rType === "progress"
     ? h("div", { style: "margin-bottom:24px;" },
         h("div", { style: "display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:13px;font-weight:600;" },
-          h("span", { style: "color:#0a1629;" }, `${completed} of ${total} tasks complete`),
+          h("span", { style: "color:#0a1629;" }, `${completed} of ${total} activities included`),
           h("span", { style: "color:#16a97d;" }, `${pct}%`)
         ),
         h("div", { style: "height:6px;background:#e8e8e6;border-radius:99px;overflow:hidden;" },
@@ -1761,7 +1739,7 @@ function ReportsTab({ demoCase }) {
                     {preview.reportType === "progress" && previewData && (
                       <div style={{ marginBottom: 24 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, fontSize: 13, fontWeight: 600 }}>
-                          <span style={{ color: "var(--tt-text-1)" }}>{previewData.completed} of {previewData.total} tasks complete</span>
+                          <span style={{ color: "var(--tt-text-1)" }}>{previewData.completed} of {previewData.total} activities included</span>
                           <span style={{ color: "var(--tt-secondary)" }}>{previewData.pct}%</span>
                         </div>
                         <div style={{ height: 6, background: "var(--tt-grey03)", borderRadius: 99, overflow: "hidden" }}>
