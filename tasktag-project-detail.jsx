@@ -2176,7 +2176,7 @@ export default function ProjectDetail() {
 
         <TabsContent value="tasks"     className="mt-0 px-4" style={{ paddingTop: 16 }} />
         <TabsContent value="reports"   className="mt-0 px-4" style={{ paddingTop: 16 }}>
-          {demoCase === "paywall" ? <ReportPaywall /> : <ReportsTab demoCase={demoCase} />}
+          {demoCase === "paywall" ? <ReportPaywall /> : <ReportsTab key={demoCase} demoCase={demoCase} />}
         </TabsContent>
         <TabsContent value="checklist" className="mt-0 px-4" style={{ paddingTop: 16 }}></TabsContent>
         <TabsContent value="files"     className="mt-0 px-4" style={{ paddingTop: 16 }} />
