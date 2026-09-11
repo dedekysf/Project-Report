@@ -1381,7 +1381,7 @@ function ReportsTab({ demoCase }) {
   // (grey05, regular weight) — used for both the trigger and list items.
   const renderPeriodLabel = (id, cr = customRange) => {
     if (id === "custom" && cr) {
-      return <span style={{ color: "var(--tt-grey05)", fontWeight: 400 }}>{cr.start} – {cr.end}</span>;
+      return <>Custom date <span style={{ color: "var(--tt-grey05)", fontWeight: 400 }}>· {cr.start} – {cr.end}</span></>;
     }
     if (id === "custom") return "Custom date";
     if (id === "since_last") {
