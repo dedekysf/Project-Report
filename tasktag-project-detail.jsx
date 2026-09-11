@@ -972,6 +972,7 @@ function ReportsTab({ demoCase }) {
   const [openType,    setOpenType]    = useState(false);
   const [openPeriod,  setOpenPeriod]  = useState(false);
   const [toast,       setToast]       = useState(null); // { type: "success" | "error", message }
+  const [deleteTarget, setDeleteTarget] = useState(null); // report pending delete confirmation
   const reportTypeRef = useRef(null);
   const periodRef     = useRef(null);
   const chipRef       = useRef(null);
@@ -1047,6 +1048,13 @@ function ReportsTab({ demoCase }) {
     setTimeout(() => {
       setReports(prev => prev.map(r => r.id === id ? { ...r, status: "done" } : r));
     }, 3000);
+  };
+
+  const handleDeleteReport = () => {
+    if (!deleteTarget) return;
+    setReports(prev => prev.filter(r => r.id !== deleteTarget.id));
+    setDeleteTarget(null);
+    showToast("success", "Report deleted");
   };
 
   const handleGenerate = () => {
@@ -1580,7 +1588,7 @@ function ReportsTab({ demoCase }) {
                 {["Generation date", "Period"].map((h) => (
                   <th key={h} style={{ textAlign: "left", padding: "10px 16px", fontSize: 12, fontWeight: 500, color: "var(--tt-text-1)" }}>{h}</th>
                 ))}
-                <th style={{ padding: "10px 16px", width: 120 }} />
+                <th style={{ padding: "10px 16px", width: 160 }} />
               </tr>
             </thead>
             <tbody>
@@ -1588,7 +1596,7 @@ function ReportsTab({ demoCase }) {
                 <tr key={r.id} style={{ background: "white", borderTop: i > 0 ? `1px solid var(--tt-grey03)` : "none" }}>
                   <td style={{ padding: "0 16px", fontSize: 13, color: "var(--tt-text-2)", whiteSpace: "nowrap", height: 52, verticalAlign: "middle" }}>{r.date}</td>
                   <td style={{ padding: "0 16px", fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", height: 52, verticalAlign: "middle" }}>{r.period}</td>
-                  <td style={{ padding: "0 14px 0 16px", textAlign: "right", height: 52, verticalAlign: "middle", width: 120 }}>
+                  <td style={{ padding: "0 14px 0 16px", textAlign: "right", height: 52, verticalAlign: "middle", width: 160 }}>
                     {r.status === "in_progress" ? (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--tt-text-2)" }}>
                         In progress
@@ -1598,6 +1606,7 @@ function ReportsTab({ demoCase }) {
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                         <FixedTooltipBtn label="Download HTML file" onAction={() => { handleDownload(r); showToast("success", "Downloaded"); }}><Download size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
                         <FixedTooltipBtn label="Copy link" onAction={async () => { await handleCopy(r); showToast("success", "Link copied"); }}><Link size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
+                        <FixedTooltipBtn label="Delete report" onAction={() => setDeleteTarget(r)}><Trash2 size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
                       </span>
                     )}
                   </td>
@@ -1868,6 +1877,44 @@ function ReportsTab({ demoCase }) {
             height: 4, background: toast.type === "success" ? "var(--tt-secondary)" : "var(--tt-red)",
             transformOrigin: "left", animation: "tt-toast-progress 2.5s linear forwards",
           }} />
+        </div>
+      )}
+
+      {/* Delete report confirmation */}
+      {deleteTarget && (
+        <div
+          style={{ position: "fixed", inset: 0, zIndex: 4000, background: "rgba(10,22,41,0.45)", display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setDeleteTarget(null)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ width: 420, maxWidth: "calc(100vw - 32px)", background: "white", borderRadius: 16, padding: 24, boxShadow: "0 16px 48px rgba(10,22,41,0.25)" }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <p style={{ fontSize: 20, fontWeight: 700, color: "var(--tt-text-1)", margin: 0 }}>Delete Report</p>
+              <button
+                onClick={() => setDeleteTarget(null)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--tt-text-1)", padding: 4, display: "flex", borderRadius: 6, transition: "background 0.15s" }}
+                onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              >
+                <X size={20} strokeWidth={SW} />
+              </button>
+            </div>
+            <p style={{ fontSize: 14, color: "var(--tt-grey05)", lineHeight: 1.6, margin: "0 0 24px" }}>
+              This report will be deleted. This can't be undone.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                onClick={handleDeleteReport}
+                style={{ height: 40, padding: "0 20px", borderRadius: 8, border: "none", background: "var(--tt-text-1)", color: "white", fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "opacity 0.15s" }}
+                onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
+                onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
