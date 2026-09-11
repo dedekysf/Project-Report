@@ -1395,7 +1395,9 @@ function ReportsTab({ demoCase }) {
     }
     if (id === "custom") return "Custom date";
     if (id === "since_last") {
-      return <>Since last report <span style={{ color: "var(--tt-grey05)", fontWeight: 400 }}>· {sinceLastDate} – {fmtDate(APP_TODAY)}</span></>;
+      const todayStr = fmtDate(APP_TODAY);
+      const rangeText = sinceLastDate === todayStr ? "Today" : `${sinceLastDate} – ${todayStr}`;
+      return <>Since last report <span style={{ color: "var(--tt-grey05)", fontWeight: 400 }}>· {rangeText}</span></>;
     }
     const [label, date] = PERIOD_LABELS[id].split(" · ");
     return <>{label} <span style={{ color: "var(--tt-grey05)", fontWeight: 400 }}>· {date}</span></>;
