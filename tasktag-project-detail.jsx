@@ -1057,7 +1057,7 @@ function ReportsTab({ demoCase }) {
       // whether the selected period actually has data.
       if (demoCase === "error") {
         setGenerating(false);
-        showToast("error", "Something went wrong while generating your report. Please try again.");
+        showToast("error", "Generation failed. Try again.");
         return;
       }
       const period = getPeriodRange(dateRange);
