@@ -554,12 +554,18 @@ function PhotoThumb({ src, onClick }) {
   );
 }
 
-// Fixed 4-column photo grid. Beyond 4 photos, only the first row renders —
-// the 4th thumbnail gets a "+N more" overlay that opens the full-screen
-// lightbox (starting at the first photo) instead of revealing more
-// thumbnails in place.
-function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, onToggleExclude }) {
-  if (!photos || photos.length === 0) {
+// Full photo grid — every photo is always shown (no "+N more" cap). Each
+// photo carries a select checkbox in its top-right corner; checking one or
+// more surfaces a selection toolbar (rendered by the caller) with Delete/
+// Download actions. Deleted photos are filtered out here by their
+// *original* index (excludedPhotos), so remaining photos keep the same
+// index-based keys even after some are removed.
+function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, onToggleSelect }) {
+  const items = (photos || [])
+    .map((k, i) => ({ k, i }))
+    .filter(({ i }) => !(excludedPhotos && excludedPhotos[`${entryKey}_${i}`]));
+
+  if (items.length === 0) {
     return (
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 10 }}>
         <PhotoThumb src={null} />
@@ -567,40 +573,27 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, onToggleExclude }
     );
   }
 
-  const remaining = photos.length - 4;
-  const visible = remaining > 0 ? photos.slice(0, 4) : photos;
+  const visiblePhotoKeys = items.map(it => it.k);
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 10 }}>
-      {visible.map((k, i) => {
-        const excluded = !!(excludedPhotos && excludedPhotos[`${entryKey}_${i}`]);
+      {items.map(({ k, i }, viewIdx) => {
+        const selected = !!(selectedPhotos && selectedPhotos[`${entryKey}_${i}`]);
         return (
-          <div key={i} style={{ position: "relative", opacity: excluded ? 0.4 : 1, transition: "opacity 0.15s" }}>
-            <PhotoThumb src={IMG_MAP[k]} onClick={IMG_MAP[k] && onOpen ? () => onOpen(photos, i) : undefined} />
+          <div key={i} style={{ position: "relative" }}>
+            <PhotoThumb src={IMG_MAP[k]} onClick={IMG_MAP[k] && onOpen ? () => onOpen(visiblePhotoKeys, viewIdx) : undefined} />
             {IMG_MAP[k] && (
               <button
-                onClick={e => { e.stopPropagation(); onToggleExclude && onToggleExclude(i); }}
-                disabled={!onToggleExclude}
+                onClick={e => { e.stopPropagation(); onToggleSelect && onToggleSelect(i, k); }}
+                disabled={!onToggleSelect}
                 style={{
                   position: "absolute", top: 6, right: 6, width: 20, height: 20, borderRadius: "50%",
-                  border: excluded ? "none" : "1.5px solid white", background: excluded ? "var(--tt-red)" : "rgba(10,22,41,0.35)",
+                  border: selected ? "none" : "1.5px solid white", background: selected ? "var(--tt-secondary)" : "rgba(10,22,41,0.35)",
                   display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
-                  cursor: onToggleExclude ? "pointer" : "default", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)",
+                  cursor: onToggleSelect ? "pointer" : "default", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)",
                 }}
               >
-                {excluded && <Check size={12} color="white" strokeWidth={3} />}
-              </button>
-            )}
-            {remaining > 0 && i === 3 && (
-              <button
-                onClick={() => onOpen && onOpen(photos, 0)}
-                style={{
-                  position: "absolute", inset: 0, background: "rgba(10,22,41,0.55)",
-                  border: "none", borderRadius: 8, color: "white",
-                  fontSize: 13, fontWeight: 600, cursor: "pointer",
-                }}
-              >
-                +{remaining} more
+                {selected && <Check size={12} color="white" strokeWidth={3} />}
               </button>
             )}
           </div>
@@ -1236,6 +1229,7 @@ function ReportsTab({ demoCase }) {
   const [toast,       setToast]       = useState(null); // { type: "success" | "error", message }
   const [deleteTarget, setDeleteTarget] = useState(null); // report pending delete confirmation
   const [lightbox, setLightbox] = useState(null); // { photos, index, caption } | null — full-screen photo viewer
+  const [selectedPhotos, setSelectedPhotos] = useState({}); // { [entryKey_photoIndex]: photoKey } — in-progress checkbox selection, not yet deleted
   const reportTypeRef = useRef(null);
   const periodRef     = useRef(null);
   const chipRef       = useRef(null);
@@ -1367,6 +1361,7 @@ function ReportsTab({ demoCase }) {
       setVisibleCount(10);
       setLoadingMore(false);
       setGenerating(false);
+      setSelectedPhotos({});
     }, 900);
   };
 
@@ -1387,6 +1382,7 @@ function ReportsTab({ demoCase }) {
       setPreviewCopied(false);
       setVisibleCount(10);
       setLoadingMore(false);
+      setSelectedPhotos({});
     }, 260);
   };
 
@@ -1427,6 +1423,7 @@ function ReportsTab({ demoCase }) {
     setPreviewLoading(true);
     setVisibleCount(10); // new period = new dataset, restart infinite scroll from the top
     setLoadingMore(false);
+    setSelectedPhotos({}); // entry/photo indices no longer line up with a different dataset
     const t = setTimeout(() => {
       setPreviewLoading(false);
       const data = buildReportData(preview.reportType, preview.dateRange, preview.period, preview.customRange);
@@ -1490,14 +1487,36 @@ function ReportsTab({ demoCase }) {
     });
   };
 
-  // Toggles whether a single photo is excluded from the final output.
-  // Keyed `${entryKey}_${photoIndex}` — same addressing as extraNotes.
-  const togglePhotoExcluded = (entryKey, photoIndex) => {
-    setPreview(p => {
+  // Checking a photo just marks it selected (green check) — it still shows
+  // in the grid until the selection toolbar's Delete is clicked, at which
+  // point selected keys move into preview.excludedPhotos (permanently
+  // filtered everywhere, including from the live grid).
+  const togglePhotoSelected = (entryKey, photoIndex, photoKey) => {
+    setSelectedPhotos(prev => {
       const key = `${entryKey}_${photoIndex}`;
-      const next = { ...p.excludedPhotos };
-      if (next[key]) delete next[key]; else next[key] = true;
-      return { ...p, excludedPhotos: next };
+      const next = { ...prev };
+      if (next[key]) delete next[key]; else next[key] = photoKey;
+      return next;
+    });
+  };
+
+  const clearPhotoSelection = () => setSelectedPhotos({});
+
+  const handleDeleteSelectedPhotos = () => {
+    setPreview(p => ({ ...p, excludedPhotos: { ...p.excludedPhotos, ...Object.fromEntries(Object.keys(selectedPhotos).map(k => [k, true])) } }));
+    setSelectedPhotos({});
+  };
+
+  const handleDownloadSelectedPhotos = () => {
+    Object.values(selectedPhotos).forEach(photoKey => {
+      const src = IMG_MAP[photoKey];
+      if (!src) return;
+      const a = document.createElement("a");
+      a.href = src;
+      a.download = `${photoKey}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     });
   };
 
@@ -1625,6 +1644,7 @@ function ReportsTab({ demoCase }) {
       setNoteDraft("");
       setPreviewPeriodOpen(false);
       setSaving(false);
+      setSelectedPhotos({});
       showToast("success", "Report saved");
     }, 900);
   };
@@ -2091,7 +2111,8 @@ function ReportsTab({ demoCase }) {
                                 onOpen={(photos, idx) => setLightbox({ photos, index: idx, entryDate: e.date, taskName: e.note })}
                                 excludedPhotos={preview.excludedPhotos}
                                 entryKey={entryKey}
-                                onToggleExclude={previewSaved ? undefined : (idx) => togglePhotoExcluded(entryKey, idx)}
+                                selectedPhotos={selectedPhotos}
+                                onToggleSelect={previewSaved ? undefined : (idx, photoKey) => togglePhotoSelected(entryKey, idx, photoKey)}
                               />
                               {renderNoteSlot(entryKey)}
                             </div>
@@ -2115,6 +2136,44 @@ function ReportsTab({ demoCase }) {
                 )}
               </div>
             </div>
+
+            {/* Selection toolbar — appears above the footer once one or
+                more photos are checked; Delete moves them into
+                excludedPhotos (filtered everywhere), Download saves each
+                selected photo's original file. */}
+            {Object.keys(selectedPhotos).length > 0 && (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", background: "var(--tt-grey06)", flexShrink: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <button
+                    onClick={clearPhotoSelection}
+                    style={{ background: "none", border: "1.5px solid rgba(255,255,255,0.6)", borderRadius: "50%", width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "white", padding: 0, flexShrink: 0 }}
+                  >
+                    <X size={13} strokeWidth={SW} />
+                  </button>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: "white" }}>
+                    {Object.keys(selectedPhotos).length} item{Object.keys(selectedPhotos).length > 1 ? "s" : ""} selected
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+                  <button
+                    onClick={handleDeleteSelectedPhotos}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.12)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                    style={{ background: "none", border: "none", color: "white", cursor: "pointer", padding: 8, borderRadius: 8, display: "flex", transition: "background 0.15s" }}
+                  >
+                    <Trash2 size={16} strokeWidth={SW} />
+                  </button>
+                  <button
+                    onClick={handleDownloadSelectedPhotos}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.12)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                    style={{ background: "none", border: "none", color: "white", cursor: "pointer", padding: 8, borderRadius: 8, display: "flex", transition: "background 0.15s" }}
+                  >
+                    <Download size={16} strokeWidth={SW} />
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Footer CTAs — defaults to just "Save report"; once saved,
                 switches to Download/Copy link (closing is left to the user) */}
