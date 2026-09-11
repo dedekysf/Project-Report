@@ -9,7 +9,7 @@ import {
   Activity, Users, BarChart2, SlidersHorizontal,
   ArrowUpDown, Calendar, AlignJustify, Clock,
   UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, Crown, AlertTriangle,
-  Forward, RotateCw, ZoomIn, ZoomOut, Folder, ArrowLeft, ArrowRight,
+  RotateCw, ZoomIn, ZoomOut, Folder, ArrowLeft, ArrowRight,
 } from "lucide-react";
 
 import logoImg from "./src/Img/tasktag-logo.13f1babda8fdbb1b7251572a0fe11f9e.png";
@@ -732,12 +732,6 @@ function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onCl
         <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0, justifySelf: "end" }}>
           <LightboxIconBtn label="Download" onClick={handleDownloadPhoto}>
             <Download size={16} strokeWidth={SW} />
-          </LightboxIconBtn>
-          <LightboxIconBtn label="Forward">
-            <Forward size={16} strokeWidth={SW} />
-          </LightboxIconBtn>
-          <LightboxIconBtn label="Copy link to share">
-            <Link size={16} strokeWidth={SW} />
           </LightboxIconBtn>
           <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.15)", margin: "0 6px" }} />
           <LightboxIconBtn label="Rotate" onClick={() => setRotation(r => (r + 90) % 360)}>
