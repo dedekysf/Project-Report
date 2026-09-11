@@ -1891,7 +1891,7 @@ function ReportsTab({ demoCase }) {
             style={{ width: 420, maxWidth: "calc(100vw - 32px)", background: "white", borderRadius: 16, padding: 24, boxShadow: "0 16px 48px rgba(10,22,41,0.25)" }}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <p style={{ fontSize: 20, fontWeight: 700, color: "var(--tt-text-1)", margin: 0 }}>Delete Report</p>
+              <p style={{ fontSize: 20, fontWeight: 700, color: "var(--tt-text-1)", margin: 0 }}>Delete report</p>
               <button
                 onClick={() => setDeleteTarget(null)}
                 style={{ background: "none", border: "none", cursor: "pointer", color: "var(--tt-text-1)", padding: 4, display: "flex", borderRadius: 6, transition: "background 0.15s" }}
@@ -1905,7 +1905,7 @@ function ReportsTab({ demoCase }) {
               Generation date: <strong style={{ color: "var(--tt-text-1)" }}>{deleteTarget.date}</strong>
             </p>
             <p style={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, margin: "0 0 24px" }}>
-              This report will be deleted and can't be undone
+              This can't be undone.
             </p>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button
