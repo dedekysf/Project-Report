@@ -523,7 +523,6 @@ function FixedTooltipBtn({ children, label, onAction }) {
 function PhotoThumb({ src, onClick }) {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
-  const overlayRef = useRef(null);
 
   if (!src || failed) {
     return (
@@ -541,8 +540,6 @@ function PhotoThumb({ src, onClick }) {
   return (
     <div
       onClick={onClick}
-      onMouseEnter={() => { if (overlayRef.current) overlayRef.current.style.opacity = "1"; }}
-      onMouseLeave={() => { if (overlayRef.current) overlayRef.current.style.opacity = "0"; }}
       style={{ position: "relative", width: "100%", aspectRatio: "4/3", borderRadius: 8, overflow: "hidden", cursor: onClick ? "pointer" : "default" }}
     >
       {!loaded && <div className="tt-skeleton" style={{ position: "absolute", inset: 0, borderRadius: 0 }} />}
@@ -553,9 +550,6 @@ function PhotoThumb({ src, onClick }) {
         onError={() => setFailed(true)}
         style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: loaded ? 1 : 0, transition: "opacity 0.2s" }}
       />
-      {onClick && (
-        <div ref={overlayRef} style={{ position: "absolute", inset: 0, background: "rgba(10,22,41,0.25)", opacity: 0, transition: "opacity 0.15s", pointerEvents: "none" }} />
-      )}
     </div>
   );
 }
@@ -585,9 +579,15 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
     <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 10 }}>
       {items.map(({ k, i }, viewIdx) => {
         const selected = !!(selectedPhotos && selectedPhotos[`${entryKey}_${i}`]);
+        const canOpen = !!(IMG_MAP[k] && onOpen);
         return (
-          <div key={i} style={{ position: "relative" }}>
-            <PhotoThumb src={IMG_MAP[k]} onClick={IMG_MAP[k] && onOpen ? () => onOpen(visiblePhotoKeys, viewIdx) : undefined} />
+          <div
+            key={i}
+            style={{ position: "relative" }}
+            onMouseEnter={e => { if (canOpen) e.currentTarget.lastElementChild.style.opacity = "1"; }}
+            onMouseLeave={e => { if (canOpen) e.currentTarget.lastElementChild.style.opacity = "0"; }}
+          >
+            <PhotoThumb src={IMG_MAP[k]} onClick={canOpen ? () => onOpen(visiblePhotoKeys, viewIdx) : undefined} />
             {IMG_MAP[k] && (
               <button
                 onClick={e => { e.stopPropagation(); onToggleSelect && onToggleSelect(i, k); }}
@@ -601,6 +601,10 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
               >
                 {selected && <Check size={12} color="white" strokeWidth={3} />}
               </button>
+            )}
+            {canOpen && (
+              <div style={{ position: "absolute", inset: 0, borderRadius: 8, background: "rgba(10,22,41,0.25)", opacity: 0, transition: "opacity 0.15s", pointerEvents: "none" }} />
+            )}
             )}
           </div>
         );
