@@ -1262,7 +1262,7 @@ function ReportsTab({ demoCase }) {
   // Adds a report to the results list (called only once the user confirms
   // via "Save report" in the preview modal — Generate no longer does this
   // directly).
-  const pushReport = ({ reportType, dateRange, period, data }) => {
+  const pushReport = ({ reportType, dateRange, period, data, extraNotes }) => {
     const id = Date.now();
     const newReport = {
       id,
@@ -1272,6 +1272,7 @@ function ReportsTab({ demoCase }) {
       status: "in_progress",
       reportType,
       data,
+      extraNotes,
     };
     setReports(prev => [newReport, ...prev]);
     setTimeout(() => {
@@ -1547,7 +1548,7 @@ function ReportsTab({ demoCase }) {
 
   const handlePreviewCopy = async () => {
     if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to export"); return; }
-    await handleCopy({ reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period });
+    await handleCopy({ reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period, extraNotes: preview.extraNotes });
     setPreviewCopied(true);
     setTimeout(() => setPreviewCopied(false), 2000);
   };
@@ -1560,7 +1561,7 @@ function ReportsTab({ demoCase }) {
       showToast("error", "Save failed. Try again.");
       return;
     }
-    pushReport({ reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period, data: { ...previewData, groups: previewFinalGroups } });
+    pushReport({ reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period, data: { ...previewData, groups: previewFinalGroups }, extraNotes: preview.extraNotes });
     setDateRange("since_last");
     // Closing is left to the user — the footer switches to Download/Copy
     // link so they can act on the just-saved report before dismissing it.
@@ -1595,11 +1596,18 @@ function ReportsTab({ demoCase }) {
     const handleCopy = async (report) => {
     // Report content is fully reproducible from these params, so the link
     // needs no server/storage round-trip — it can never fail to resolve.
+    // Manually-added notes aren't part of the base activity log, so they
+    // have to ride along in the URL too — otherwise the shared link would
+    // silently drop them while the downloaded HTML (built from the saved
+    // snapshot) still shows them, and the two outputs would diverge.
     const params = new URLSearchParams({
       type: report.reportType,
       range: report.dateRange || "custom",
       period: report.period,
     });
+    if (report.extraNotes && Object.keys(report.extraNotes).some(k => report.extraNotes[k]?.trim())) {
+      params.set("notes", JSON.stringify(report.extraNotes));
+    }
     const url = `${window.location.href.split("?")[0]}?${params.toString()}`;
     try { await navigator.clipboard.writeText(url); }
     catch {
@@ -2230,10 +2238,17 @@ function ReportPaywall() {
 // ── Root ──
 // ── Report Page (shared link view) ──
 // Report content is fully reproducible from its URL params (reportType,
-// dateRange, period) — rebuilt on the fly rather than fetched from storage,
-// so a shared link works on any device/browser and can never 404.
-function ReportPage({ reportType, dateRange, period }) {
-  const data = buildReportData(reportType, dateRange, period, null);
+// dateRange, period, and any manually-added notes) — rebuilt on the fly
+// rather than fetched from storage, so a shared link works on any
+// device/browser and can never 404.
+function ReportPage({ reportType, dateRange, period, notesParam }) {
+  let data = buildReportData(reportType, dateRange, period, null);
+  if (notesParam) {
+    try {
+      const extraNotes = JSON.parse(notesParam);
+      data = { ...data, groups: applyExtraNotesToGroups(data.groups, extraNotes) };
+    } catch { /* malformed/tampered param — fall back to the base report */ }
+  }
   const html = buildReportHTML({ reportType, period, data });
 
   return (
@@ -2249,7 +2264,7 @@ function ReportPage({ reportType, dateRange, period }) {
 export default function ProjectDetail() {
   const params = new URLSearchParams(window.location.search);
   const sharedReportType = params.get("type");
-  if (sharedReportType) return <ReportPage reportType={sharedReportType} dateRange={params.get("range")} period={params.get("period")} />;
+  if (sharedReportType) return <ReportPage reportType={sharedReportType} dateRange={params.get("range")} period={params.get("period")} notesParam={params.get("notes")} />;
 
   const [activeTab, setActiveTab] = useState("reports");
   const [demoCase, setDemoCase] = useState("happy");
