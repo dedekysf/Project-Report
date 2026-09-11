@@ -40,6 +40,7 @@ style.textContent = `
     --tt-grey06:     #303742;
     --tt-mint:       #dcf2ec;
     --tt-red:        #e5484d;
+    --tt-pastel-magenta: #a85796;
     --radius: 0.5rem;
   }
 
@@ -599,16 +600,17 @@ function PhotoGrid({ photos, onOpen }) {
 const truncateLabel = (s, n = 20) => (s && s.length > n ? s.slice(0, n) + "..." : s);
 
 // Icon button + hover tooltip for the lightbox's dark chrome — same
-// getBoundingClientRect-based positioning as FixedTooltipBtn, but a
-// lighter hover fill (FixedTooltipBtn's is tuned for light surfaces).
-function LightboxIconBtn({ label, onClick, children }) {
+// bottom-right, getBoundingClientRect-based tooltip positioning as
+// FixedTooltipBtn, but a lighter hover fill (FixedTooltipBtn's is tuned
+// for light surfaces).
+function LightboxIconBtn({ label, onClick, disabled, children }) {
   const [tip, setTip] = useState(null);
   const btnRef = useRef(null);
 
   const showTip = () => {
     if (!btnRef.current) return;
     const r = btnRef.current.getBoundingClientRect();
-    setTip({ top: r.bottom + 6, left: r.left + r.width / 2 });
+    setTip({ top: r.bottom + 6, left: r.right });
   };
   const hideTip = () => setTip(null);
 
@@ -616,16 +618,20 @@ function LightboxIconBtn({ label, onClick, children }) {
     <>
       <button
         ref={btnRef}
+        disabled={disabled}
         onClick={onClick}
-        onMouseEnter={e => { showTip(); e.currentTarget.style.background = "rgba(255,255,255,0.12)"; }}
+        onMouseEnter={e => { showTip(); if (!disabled) e.currentTarget.style.background = "rgba(255,255,255,0.12)"; }}
         onMouseLeave={e => { hideTip(); e.currentTarget.style.background = "transparent"; }}
-        style={{ background: "none", border: "none", cursor: "pointer", color: "white", display: "flex", padding: 8, borderRadius: 8, transition: "background 0.15s" }}
+        style={{
+          background: "none", border: "none", color: "white", display: "flex", padding: 8, borderRadius: 8,
+          transition: "background 0.15s", cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.35 : 1,
+        }}
       >
         {children}
       </button>
       {tip && (
         <div style={{
-          position: "fixed", zIndex: 9999, top: tip.top, left: tip.left, transform: "translateX(-50%)",
+          position: "fixed", zIndex: 9999, top: tip.top, left: tip.left, transform: "translateX(-100%)",
           background: "var(--tt-text-1)", color: "white", fontSize: 11, fontWeight: 500, whiteSpace: "nowrap",
           padding: "4px 8px", borderRadius: 4, pointerEvents: "none",
         }}>
@@ -695,10 +701,10 @@ function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onCl
             <ChevronLeft size={18} strokeWidth={SW} />
           </button>
           <div style={{
-            width: 32, height: 32, borderRadius: "50%", background: "var(--tt-mint)",
+            width: 32, height: 32, borderRadius: "50%", background: "var(--tt-pastel-magenta)",
             display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
           }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--tt-secondary)" }}>MJ</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "white" }}>MJ</span>
           </div>
           <div style={{ lineHeight: 1.3 }}>
             <p style={{ fontSize: 13, fontWeight: 600, color: "white", margin: 0 }}>You</p>
@@ -727,11 +733,11 @@ function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onCl
           <LightboxIconBtn label="Rotate" onClick={() => setRotation(r => (r + 90) % 360)}>
             <RotateCw size={16} strokeWidth={SW} />
           </LightboxIconBtn>
-          <LightboxIconBtn label="Zoom out" onClick={() => setZoom(z => Math.max(50, z - 25))}>
+          <LightboxIconBtn label="Zoom out" disabled={zoom <= 25} onClick={() => setZoom(z => Math.max(25, z - 25))}>
             <ZoomOut size={16} strokeWidth={SW} />
           </LightboxIconBtn>
           <span style={{ fontSize: 12, fontWeight: 500, color: "white", width: 40, textAlign: "center" }}>{zoom}%</span>
-          <LightboxIconBtn label="Zoom in" onClick={() => setZoom(z => Math.min(200, z + 25))}>
+          <LightboxIconBtn label="Zoom in" disabled={zoom >= 200} onClick={() => setZoom(z => Math.min(200, z + 25))}>
             <ZoomIn size={16} strokeWidth={SW} />
           </LightboxIconBtn>
           <LightboxIconBtn label="More actions">
