@@ -9,7 +9,7 @@ import {
   Activity, Users, BarChart2, SlidersHorizontal,
   ArrowUpDown, Calendar, AlignJustify, Clock,
   UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, Crown, AlertTriangle,
-  RotateCw, ZoomIn, ZoomOut, Folder, ArrowLeft, ArrowRight,
+  RotateCw, ZoomIn, ZoomOut, Folder, ArrowLeft, ArrowRight, Info,
 } from "lucide-react";
 
 import logoImg from "./src/Img/tasktag-logo.13f1babda8fdbb1b7251572a0fe11f9e.png";
@@ -655,8 +655,10 @@ function LightboxIconBtn({ label, onClick, disabled, children }) {
 function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onClose }) {
   const [rotation, setRotation] = useState(0);
   const [zoom, setZoom] = useState(100);
+  const [showFileDetails, setShowFileDetails] = useState(false);
+  const [imgDims, setImgDims] = useState(null);
 
-  useEffect(() => { setRotation(0); setZoom(100); }, [index]);
+  useEffect(() => { setRotation(0); setZoom(100); setShowFileDetails(false); setImgDims(null); }, [index]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -675,19 +677,24 @@ function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onCl
   const onIconEnter = e => e.currentTarget.style.background = "rgba(255,255,255,0.12)";
   const onIconLeave = e => e.currentTarget.style.background = "transparent";
 
-  // No real upload timestamp in the data model — derive a stable (not
-  // random-on-every-render) time of day from the entry date + photo index.
-  const uploadedAt = entryDate ? (() => {
-    const dateLabel = parseDate(entryDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    let hash = index;
-    for (let i = 0; i < entryDate.length; i++) hash = (hash * 31 + entryDate.charCodeAt(i)) >>> 0;
-    const hour24 = 7 + (hash % 11);
-    const minute = (hash >> 3) % 60;
-    const period = hour24 >= 12 ? "PM" : "AM";
-    const hour12 = ((hour24 + 11) % 12) + 1;
-    return `${dateLabel} at ${hour12}:${String(minute).padStart(2, "0")} ${period}`;
-  })() : "";
+  // No real upload timestamp (or file size) in the data model — derive
+  // stable (not random-on-every-render) stand-ins from the entry date +
+  // photo index instead.
+  let hash = index;
+  if (entryDate) for (let i = 0; i < entryDate.length; i++) hash = (hash * 31 + entryDate.charCodeAt(i)) >>> 0;
+  const hour24 = 7 + (hash % 11);
+  const minute = (hash >> 3) % 60;
+  const period = hour24 >= 12 ? "PM" : "AM";
+  const hour12 = ((hour24 + 11) % 12) + 1;
+  const timeLabel = `${hour12}:${String(minute).padStart(2, "0")} ${period}`;
+  const uploadedAt = entryDate
+    ? `${parseDate(entryDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })} at ${timeLabel}`
+    : "";
+  const fullTimestamp = entryDate
+    ? `${parseDate(entryDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} ${timeLabel}`
+    : "";
   const fileName = entryDate ? `${entryDate.replace(/-/g, "")}-${String(index + 1).padStart(2, "0")}.jpg` : `photo-${index + 1}.jpg`;
+  const fileSizeKb = 140 + (hash % 260);
 
   const handleDownloadPhoto = () => {
     const a = document.createElement("a");
@@ -744,8 +751,8 @@ function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onCl
           <LightboxIconBtn label="Zoom in" disabled={zoom >= 200} onClick={() => setZoom(z => Math.min(200, z + 25))}>
             <ZoomIn size={16} strokeWidth={SW} />
           </LightboxIconBtn>
-          <LightboxIconBtn label="More actions">
-            <MoreVertical size={16} strokeWidth={SW} />
+          <LightboxIconBtn label="Information" onClick={() => setShowFileDetails(true)}>
+            <Info size={16} strokeWidth={SW} />
           </LightboxIconBtn>
         </div>
       </div>
@@ -786,6 +793,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onCl
         <img
           src={IMG_MAP[photos[index]]}
           alt=""
+          onLoad={e => setImgDims({ w: e.target.naturalWidth, h: e.target.naturalHeight })}
           style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 4, transform: `rotate(${rotation}deg) scale(${zoom / 100})`, transition: "transform 0.15s" }}
         />
         {index < photos.length - 1 && (
@@ -827,6 +835,44 @@ function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onCl
               }} />
             </button>
           ))}
+        </div>
+      )}
+
+      {showFileDetails && (
+        <div
+          style={{ position: "fixed", inset: 0, zIndex: 5100, background: "rgba(10,22,41,0.45)", display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setShowFileDetails(false)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ width: 420, maxWidth: "calc(100vw - 32px)", background: "white", borderRadius: 16, padding: 24, boxShadow: "0 16px 48px rgba(10,22,41,0.25)" }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <p style={{ fontSize: 20, fontWeight: 700, color: "var(--tt-text-1)", margin: 0 }}>File details</p>
+              <button
+                onClick={() => setShowFileDetails(false)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--tt-text-1)", padding: 4, display: "flex", borderRadius: 6, transition: "background 0.15s" }}
+                onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              >
+                <X size={20} strokeWidth={SW} />
+              </button>
+            </div>
+            {[
+              ["Name", fileName],
+              ["Type", "Image"],
+              ["Size", `${fileSizeKb} KB`],
+              ["Dimensions", imgDims ? `${imgDims.w} × ${imgDims.h}` : "—"],
+              ["Owner", "You"],
+              ["Created", fullTimestamp],
+              ["Modified", fullTimestamp],
+            ].map(([label, value], i, arr) => (
+              <div key={label} style={{ marginBottom: i === arr.length - 1 ? 0 : 16 }}>
+                <p style={{ fontSize: 12, color: "var(--tt-grey05)", margin: "0 0 2px" }}>{label}</p>
+                <p style={{ fontSize: 15, fontWeight: 500, color: "var(--tt-text-1)", margin: 0, wordBreak: "break-all" }}>{value}</p>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
