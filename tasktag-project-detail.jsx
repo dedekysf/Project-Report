@@ -517,7 +517,7 @@ function FixedTooltipBtn({ children, label, onAction }) {
 // Photo grid thumbnail — the skeleton only covers the initial fixed delay,
 // not how long the actual image takes to download, so each photo keeps its
 // own shimmer placeholder up until it has genuinely finished loading.
-function PhotoThumb({ src }) {
+function PhotoThumb({ src, onClick }) {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
 
@@ -535,7 +535,10 @@ function PhotoThumb({ src }) {
   }
 
   return (
-    <div style={{ position: "relative", width: "100%", aspectRatio: "4/3", borderRadius: 8, overflow: "hidden" }}>
+    <div
+      onClick={onClick}
+      style={{ position: "relative", width: "100%", aspectRatio: "4/3", borderRadius: 8, overflow: "hidden", cursor: onClick ? "pointer" : "default" }}
+    >
       {!loaded && <div className="tt-skeleton" style={{ position: "absolute", inset: 0, borderRadius: 0 }} />}
       <img
         src={src}
@@ -551,7 +554,7 @@ function PhotoThumb({ src }) {
 // Fixed 4-column photo grid. Beyond 4 photos, only the first row renders —
 // the 4th thumbnail gets a "+N more" overlay, and clicking it reveals (and
 // only then starts loading) the rest.
-function PhotoGrid({ photos }) {
+function PhotoGrid({ photos, onOpen }) {
   const [expanded, setExpanded] = useState(false);
   if (!photos || photos.length === 0) {
     return (
@@ -568,7 +571,7 @@ function PhotoGrid({ photos }) {
     <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 10 }}>
       {visible.map((k, i) => (
         <div key={i} style={{ position: "relative" }}>
-          <PhotoThumb src={IMG_MAP[k]} />
+          <PhotoThumb src={IMG_MAP[k]} onClick={IMG_MAP[k] && onOpen ? () => onOpen(photos, i) : undefined} />
           {!expanded && remaining > 0 && i === 3 && (
             <button
               onClick={() => setExpanded(true)}
@@ -583,6 +586,79 @@ function PhotoGrid({ photos }) {
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+// Full-screen photo viewer — opened by clicking a thumbnail in the side
+// panel. Dark chrome built from the design system's darkest token
+// (--tt-text-1) rather than a plain black, with a filmstrip of the same
+// entry's other photos along the bottom for quick navigation.
+function PhotoLightbox({ photos, index, caption, onIndexChange, onClose }) {
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft") onIndexChange(Math.max(0, index - 1));
+      if (e.key === "ArrowRight") onIndexChange(Math.min(photos.length - 1, index + 1));
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [index, photos.length, onClose, onIndexChange]);
+
+  const iconBtnStyle = {
+    background: "none", border: "none", cursor: "pointer", color: "white",
+    display: "flex", padding: 8, borderRadius: 8, transition: "background 0.15s",
+  };
+  const onIconEnter = e => e.currentTarget.style.background = "rgba(255,255,255,0.12)";
+  const onIconLeave = e => e.currentTarget.style.background = "transparent";
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 5000, background: "var(--tt-text-1)", display: "flex", flexDirection: "column" }}>
+      {/* Top bar */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+          <button onClick={onClose} style={iconBtnStyle} onMouseEnter={onIconEnter} onMouseLeave={onIconLeave}>
+            <ChevronLeft size={20} strokeWidth={SW} />
+          </button>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "white", whiteSpace: "nowrap" }}>{caption}</span>
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", whiteSpace: "nowrap" }}>{index + 1} of {photos.length}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
+          <button style={iconBtnStyle} onMouseEnter={onIconEnter} onMouseLeave={onIconLeave}>
+            <Download size={16} strokeWidth={SW} />
+          </button>
+          <button style={iconBtnStyle} onMouseEnter={onIconEnter} onMouseLeave={onIconLeave}>
+            <Link size={16} strokeWidth={SW} />
+          </button>
+          <button onClick={onClose} style={iconBtnStyle} onMouseEnter={onIconEnter} onMouseLeave={onIconLeave}>
+            <X size={18} strokeWidth={SW} />
+          </button>
+        </div>
+      </div>
+
+      {/* Image */}
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0, padding: "0 24px" }}>
+        <img src={IMG_MAP[photos[index]]} alt="" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 4 }} />
+      </div>
+
+      {/* Filmstrip */}
+      {photos.length > 1 && (
+        <div style={{ display: "flex", gap: 8, padding: "14px 16px", flexShrink: 0, overflowX: "auto" }}>
+          {photos.map((p, i) => (
+            <button
+              key={i}
+              onClick={() => onIndexChange(i)}
+              style={{
+                width: 64, height: 48, borderRadius: 6, overflow: "hidden", flexShrink: 0,
+                border: i === index ? "2px solid white" : "2px solid transparent",
+                padding: 0, cursor: "pointer", opacity: i === index ? 1 : 0.55, transition: "opacity 0.15s",
+              }}
+            >
+              <img src={IMG_MAP[p]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -954,6 +1030,7 @@ function ReportsTab({ demoCase }) {
   const [openPeriod,  setOpenPeriod]  = useState(false);
   const [toast,       setToast]       = useState(null); // { type: "success" | "error", message }
   const [deleteTarget, setDeleteTarget] = useState(null); // report pending delete confirmation
+  const [lightbox, setLightbox] = useState(null); // { photos, index, caption } | null — full-screen photo viewer
   const reportTypeRef = useRef(null);
   const periodRef     = useRef(null);
   const chipRef       = useRef(null);
@@ -1760,7 +1837,7 @@ function ReportsTab({ demoCase }) {
                           return (
                             <div key={entryKey} style={{ marginBottom: 20 }}>
                               <p style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.5", margin: 0 }}>{e.note}</p>
-                              <PhotoGrid photos={e.photos} />
+                              <PhotoGrid photos={e.photos} onOpen={(photos, idx) => setLightbox({ photos, index: idx, caption: e.note })} />
                               {renderNoteSlot(entryKey)}
                             </div>
                           );
@@ -1908,6 +1985,16 @@ function ReportsTab({ demoCase }) {
             </div>
           </div>
         </div>
+      )}
+
+      {lightbox && (
+        <PhotoLightbox
+          photos={lightbox.photos}
+          index={lightbox.index}
+          caption={lightbox.caption}
+          onIndexChange={i => setLightbox(lb => ({ ...lb, index: i }))}
+          onClose={() => setLightbox(null)}
+        />
       )}
     </div>
   );
