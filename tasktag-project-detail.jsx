@@ -818,7 +818,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onCl
             >
               <img src={IMG_MAP[p]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
               <span style={{
-                position: "absolute", top: 6, right: 6, width: 24, height: 24, borderRadius: "50%",
+                position: "absolute", top: 6, right: 6, width: 20, height: 20, borderRadius: "50%",
                 border: "1.5px solid white", background: i === index ? "white" : "rgba(10,22,41,0.35)",
               }} />
             </button>
@@ -1361,24 +1361,24 @@ function ReportsTab({ demoCase }) {
   }, [preview, panelClosing]);
 
   useEffect(() => {
-    if (!preview) return;
+    if (!preview || lightbox) return;
     const handler = (e) => { if (e.key === "Escape") closePreview(); };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [preview]);
+  }, [preview, lightbox]);
 
   // Click outside the side panel closes it — there's no backdrop to catch
-  // this anymore. Suspended while the custom-date calendar is open, since
-  // that popup renders as a sibling (not nested inside the panel) and has
-  // its own outside-click handling.
+  // this anymore. Suspended while the custom-date calendar or the photo
+  // lightbox is open, since both render as siblings (not nested inside the
+  // panel) and would otherwise register every click inside them as "outside".
   useEffect(() => {
-    if (!preview || previewShowCal) return;
+    if (!preview || previewShowCal || lightbox) return;
     const handler = (e) => {
       if (previewPanelRef.current && !previewPanelRef.current.contains(e.target)) closePreview();
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [preview, previewShowCal]);
+  }, [preview, previewShowCal, lightbox]);
 
   // Show a loading skeleton whenever the previewed data would change —
   // both on first open and whenever the period is edited. Once it resolves,
