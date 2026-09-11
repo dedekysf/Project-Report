@@ -1885,7 +1885,7 @@ function ReportPaywall() {
   ];
 
   return (
-    <div style={{ marginTop: 24, border: "1px solid var(--tt-grey03)", borderRadius: 16, padding: "48px 40px", textAlign: "center" }}>
+    <div style={{ marginTop: 24, padding: "48px 40px", textAlign: "center" }}>
       <div style={{
         width: 56, height: 56, borderRadius: 14, background: "var(--tt-mint)",
         display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px",
