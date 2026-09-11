@@ -598,6 +598,44 @@ function PhotoGrid({ photos, onOpen }) {
 // entry's other photos along the bottom for quick navigation.
 const truncateLabel = (s, n = 20) => (s && s.length > n ? s.slice(0, n) + "..." : s);
 
+// Icon button + hover tooltip for the lightbox's dark chrome — same
+// getBoundingClientRect-based positioning as FixedTooltipBtn, but a
+// lighter hover fill (FixedTooltipBtn's is tuned for light surfaces).
+function LightboxIconBtn({ label, onClick, children }) {
+  const [tip, setTip] = useState(null);
+  const btnRef = useRef(null);
+
+  const showTip = () => {
+    if (!btnRef.current) return;
+    const r = btnRef.current.getBoundingClientRect();
+    setTip({ top: r.bottom + 6, left: r.left + r.width / 2 });
+  };
+  const hideTip = () => setTip(null);
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        onClick={onClick}
+        onMouseEnter={e => { showTip(); e.currentTarget.style.background = "rgba(255,255,255,0.12)"; }}
+        onMouseLeave={e => { hideTip(); e.currentTarget.style.background = "transparent"; }}
+        style={{ background: "none", border: "none", cursor: "pointer", color: "white", display: "flex", padding: 8, borderRadius: 8, transition: "background 0.15s" }}
+      >
+        {children}
+      </button>
+      {tip && (
+        <div style={{
+          position: "fixed", zIndex: 9999, top: tip.top, left: tip.left, transform: "translateX(-50%)",
+          background: "var(--tt-text-1)", color: "white", fontSize: 11, fontWeight: 500, whiteSpace: "nowrap",
+          padding: "4px 8px", borderRadius: 4, pointerEvents: "none",
+        }}>
+          {label}
+        </div>
+      )}
+    </>
+  );
+}
+
 function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onClose }) {
   const [rotation, setRotation] = useState(0);
   const [zoom, setZoom] = useState(100);
@@ -668,40 +706,42 @@ function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onCl
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, justifySelf: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 4, minWidth: 0, justifySelf: "center" }}>
           <span style={{ fontSize: 13, fontWeight: 500, color: "white", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{fileName}</span>
-          <Pencil size={13} strokeWidth={SW} color="rgba(255,255,255,0.45)" />
+          <LightboxIconBtn label="Rename">
+            <Pencil size={13} strokeWidth={SW} />
+          </LightboxIconBtn>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0, justifySelf: "end" }}>
-          <button onClick={handleDownloadPhoto} style={iconBtnStyle} onMouseEnter={onIconEnter} onMouseLeave={onIconLeave}>
+          <LightboxIconBtn label="Download" onClick={handleDownloadPhoto}>
             <Download size={16} strokeWidth={SW} />
-          </button>
-          <button style={iconBtnStyle} onMouseEnter={onIconEnter} onMouseLeave={onIconLeave}>
+          </LightboxIconBtn>
+          <LightboxIconBtn label="Forward">
             <Forward size={16} strokeWidth={SW} />
-          </button>
-          <button style={iconBtnStyle} onMouseEnter={onIconEnter} onMouseLeave={onIconLeave}>
+          </LightboxIconBtn>
+          <LightboxIconBtn label="Copy link to share">
             <Link size={16} strokeWidth={SW} />
-          </button>
+          </LightboxIconBtn>
           <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.15)", margin: "0 6px" }} />
-          <button onClick={() => setRotation(r => (r + 90) % 360)} style={iconBtnStyle} onMouseEnter={onIconEnter} onMouseLeave={onIconLeave}>
+          <LightboxIconBtn label="Rotate" onClick={() => setRotation(r => (r + 90) % 360)}>
             <RotateCw size={16} strokeWidth={SW} />
-          </button>
-          <button onClick={() => setZoom(z => Math.max(50, z - 25))} style={iconBtnStyle} onMouseEnter={onIconEnter} onMouseLeave={onIconLeave}>
+          </LightboxIconBtn>
+          <LightboxIconBtn label="Zoom out" onClick={() => setZoom(z => Math.max(50, z - 25))}>
             <ZoomOut size={16} strokeWidth={SW} />
-          </button>
+          </LightboxIconBtn>
           <span style={{ fontSize: 12, fontWeight: 500, color: "white", width: 40, textAlign: "center" }}>{zoom}%</span>
-          <button onClick={() => setZoom(z => Math.min(200, z + 25))} style={iconBtnStyle} onMouseEnter={onIconEnter} onMouseLeave={onIconLeave}>
+          <LightboxIconBtn label="Zoom in" onClick={() => setZoom(z => Math.min(200, z + 25))}>
             <ZoomIn size={16} strokeWidth={SW} />
-          </button>
-          <button style={iconBtnStyle} onMouseEnter={onIconEnter} onMouseLeave={onIconLeave}>
+          </LightboxIconBtn>
+          <LightboxIconBtn label="More actions">
             <MoreVertical size={16} strokeWidth={SW} />
-          </button>
+          </LightboxIconBtn>
         </div>
       </div>
 
       {/* Tag chips */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "2px 16px 14px", flexShrink: 0, background: "var(--tt-grey06)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px 16px", flexShrink: 0, background: "var(--tt-grey06)" }}>
         <span style={{
           display: "inline-flex", alignItems: "center", gap: 6, height: 22, padding: "0 10px",
           borderRadius: 4, background: "var(--tt-secondary)", color: "white", fontSize: 10, fontWeight: 600,
@@ -762,6 +802,8 @@ function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onCl
             <button
               key={i}
               onClick={() => onIndexChange(i)}
+              onMouseEnter={e => { if (i !== index) e.currentTarget.style.opacity = "0.85"; }}
+              onMouseLeave={e => { if (i !== index) e.currentTarget.style.opacity = "0.55"; }}
               style={{
                 position: "relative", width: 160, height: 122, borderRadius: 8, overflow: "hidden", flexShrink: 0,
                 border: i === index ? "2px solid white" : "2px solid transparent",
@@ -770,7 +812,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onCl
             >
               <img src={IMG_MAP[p]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
               <span style={{
-                position: "absolute", top: 6, right: 6, width: 12, height: 12, borderRadius: "50%",
+                position: "absolute", top: 6, right: 6, width: 24, height: 24, borderRadius: "50%",
                 border: "1.5px solid white", background: i === index ? "white" : "rgba(10,22,41,0.35)",
               }} />
             </button>
