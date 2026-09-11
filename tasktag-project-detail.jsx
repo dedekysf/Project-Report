@@ -1402,7 +1402,7 @@ function ReportsTab({ demoCase }) {
   };
 
   const getPeriodRange = (id, cr = customRange) => {
-    if (id === "since_last") return `${sinceLastDate} – ${fmtDate(new Date())}`;
+    if (id === "since_last") return `${sinceLastDate} – ${fmtDate(APP_TODAY)}`;
     if (id === "custom" && cr) return `${cr.start} – ${cr.end}`;
     return PERIOD_RANGE[id];
   };
