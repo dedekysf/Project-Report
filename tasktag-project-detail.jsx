@@ -1645,21 +1645,6 @@ function ReportsTab({ demoCase }) {
   };
   const setNoteDraftFor = (key, text) => setNoteDrafts(prev => ({ ...prev, [key]: text }));
 
-  const handleSaveNote = (key) => {
-    const text = (noteDrafts[key] || "").trim();
-    if (!text) return;
-    setPreview(p => ({ ...p, extraNotes: { ...p.extraNotes, [key]: text } }));
-    closeNoteForm(key);
-  };
-
-  const handleDeleteNote = (key) => {
-    setPreview(p => {
-      const next = { ...p.extraNotes };
-      delete next[key];
-      return { ...p, extraNotes: next };
-    });
-  };
-
   // Checking a photo just marks it selected (green check) — it still shows
   // in the grid until the selection toolbar's Delete is clicked, at which
   // point selected keys move into preview.excludedPhotos (permanently
@@ -1695,15 +1680,14 @@ function ReportsTab({ demoCase }) {
   };
 
   // Rendered under every entry's photo list (and once for the empty-period
-  // state). Each entry can carry at most one manually-added note tied to
-  // that specific photo list — once saved, this becomes an edit/delete
-  // control instead of an "add" button (no stacking multiple notes here).
+  // state). A note is only ever committed by the main Save report button —
+  // the input just stays open (with whatever's typed so far) until then;
+  // there's no separate per-note "save" step or intermediate committed-but-
+  // editable state anymore.
   const renderNoteSlot = (key) => {
-    const savedNote = preview.extraNotes[key];
-
-    // Locked once saved — notes can't be added/edited/removed anymore,
-    // since Download/Copy link now act on the saved snapshot.
+    // Locked once saved — Download/Copy link now act on the saved snapshot.
     if (previewSaved) {
+      const savedNote = preview.extraNotes[key];
       if (!savedNote) return null;
       return (
         <p style={{ fontSize: 12, fontStyle: "italic", color: "var(--tt-text-2)", lineHeight: "1.5", margin: "10px 0 0", background: "var(--tt-grey02)", padding: 8, borderRadius: 8 }}>{savedNote}</p>
@@ -1720,7 +1704,6 @@ function ReportsTab({ demoCase }) {
               type="text"
               value={noteDrafts[key] || ""}
               onChange={e => setNoteDraftFor(key, e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter") handleSaveNote(key); }}
               onFocus={e => e.currentTarget.style.borderColor = "var(--tt-text-1)"}
               onBlur={e => e.currentTarget.style.borderColor = "var(--tt-grey03)"}
               placeholder="Describe the note for this task"
@@ -1728,32 +1711,6 @@ function ReportsTab({ demoCase }) {
             />
           </div>
           <NoteFormCloseBtn onClick={() => closeNoteForm(key)} />
-        </div>
-      );
-    }
-
-    if (savedNote) {
-      return (
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 4, marginTop: 10, background: "var(--tt-grey02)", padding: 8, borderRadius: 8 }}>
-          <p style={{ fontSize: 12, fontStyle: "italic", color: "var(--tt-text-2)", lineHeight: "1.5", margin: 0, flex: 1 }}>{savedNote}</p>
-          <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
-            <button
-              onClick={() => openNoteForm(key, savedNote)}
-              onMouseEnter={e => e.currentTarget.style.background = "white"}
-              onMouseLeave={e => e.currentTarget.style.background = "none"}
-              style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", borderRadius: 6, color: "var(--tt-grey06)", cursor: "pointer", transition: "background 0.15s" }}
-            >
-              <Pencil size={12} strokeWidth={SW} />
-            </button>
-            <button
-              onClick={() => handleDeleteNote(key)}
-              onMouseEnter={e => e.currentTarget.style.background = "white"}
-              onMouseLeave={e => e.currentTarget.style.background = "none"}
-              style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", borderRadius: 6, color: "var(--tt-grey06)", cursor: "pointer", transition: "background 0.15s" }}
-            >
-              <Trash2 size={12} strokeWidth={SW} />
-            </button>
-          </div>
         </div>
       );
     }
@@ -1784,7 +1741,15 @@ function ReportsTab({ demoCase }) {
 
   const handlePreviewSave = () => {
     if (saving) return;
-    if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to save"); return; }
+    // Notes are only ever committed here — fold every currently-typed
+    // draft (regardless of which entries are still "open") into the
+    // notes actually used for this snapshot.
+    const mergedNotes = { ...preview.extraNotes };
+    Object.entries(noteDrafts).forEach(([k, text]) => {
+      if (text && text.trim()) mergedNotes[k] = text.trim();
+    });
+    const finalGroups = applyExtraNotesToGroups(applyPhotoExclusions(previewData.groups, preview.excludedPhotos), mergedNotes);
+    if (!hasGroupData(finalGroups)) { showToast("error", "No data to save"); return; }
     setSaving(true);
     setTimeout(() => {
       // Demo case: "Save report error" always fails to save, regardless of
@@ -1794,10 +1759,11 @@ function ReportsTab({ demoCase }) {
         showToast("error", "Save failed. Try again.");
         return;
       }
-      pushReport({ reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period, data: { ...previewData, groups: previewFinalGroups }, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos });
+      pushReport({ reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period, data: { ...previewData, groups: finalGroups }, extraNotes: mergedNotes, excludedPhotos: preview.excludedPhotos });
       setDateRange("since_last");
       // Closing is left to the user — the footer switches to Download/Copy
       // link so they can act on the just-saved report before dismissing it.
+      setPreview(p => ({ ...p, extraNotes: mergedNotes }));
       setPreviewSaved(true);
       setActiveNoteFormKeys({});
       setNoteDrafts({});
