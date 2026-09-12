@@ -1360,7 +1360,6 @@ function ReportsTab({ demoCase }) {
   const [loadingMore,      setLoadingMore]       = useState(false);
   const [generating,       setGenerating]        = useState(false); // Generate button's own disabled/spinner state, before the inline view appears
   const [saving,           setSaving]             = useState(false); // Save report button's own disabled/spinner state, before the toast appears
-  const [previewSaved,     setPreviewSaved]      = useState(false); // header's Save report swaps to Download/Close once true
   const previewPeriodRef = useRef(null);
 
   useEffect(() => {
@@ -1619,15 +1618,6 @@ function ReportsTab({ demoCase }) {
   const renderNoteSlot = (key) => {
     const savedNote = preview.extraNotes[key];
 
-    // Locked once saved — the header now shows Download/Close instead of
-    // Save report, so there's nothing left to add this note to.
-    if (previewSaved) {
-      if (!savedNote) return null;
-      return (
-        <p style={{ fontSize: 12, fontStyle: "italic", color: "var(--tt-text-2)", lineHeight: "1.5", margin: "10px 0 0", background: "var(--tt-grey02)", padding: 8, borderRadius: 8 }}>{savedNote}</p>
-      );
-    }
-
     if (activeNoteFormKey === key) {
       return (
         <div style={{ position: "relative", marginTop: 10 }}>
@@ -1703,9 +1693,9 @@ function ReportsTab({ demoCase }) {
     );
   };
 
-  // Saving pushes the report into the results table but leaves the draft
-  // open — the header swaps from Save report to Download/Close, so the
-  // just-saved output stays reachable until the user dismisses it.
+  // Saving pushes the report into the results table and returns straight
+  // to the normal view — Download/Copy link for it are already available
+  // per-row in that table, so there's no separate post-save state here.
   const handlePreviewSave = () => {
     if (saving) return;
     if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to save"); return; }
@@ -1721,18 +1711,9 @@ function ReportsTab({ demoCase }) {
       pushReport({ reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period, data: { ...previewData, groups: previewFinalGroups }, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos });
       setDateRange("since_last");
       setSaving(false);
-      setPreviewSaved(true);
-      setActiveNoteFormKey(null);
-      setNoteDraft("");
-      setPreviewPeriodOpen(false);
-      setSelectedPhotos({});
+      closePreview();
       showToast("success", "Report saved");
     }, 900);
-  };
-
-  const handlePreviewDownload = () => {
-    if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to export"); return; }
-    handleDownload({ reportType: preview.reportType, period: preview.period, data: { ...previewData, groups: previewFinalGroups } });
   };
 
   const [isWide, setIsWide] = useState(window.innerWidth > 1280);
@@ -2061,30 +2042,25 @@ function ReportsTab({ demoCase }) {
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
                 <p style={{ fontSize: 15, fontWeight: 600, color: "var(--tt-text-1)" }}>Draft {preview.reportType === "photo" ? "Photo Update" : "Progress Report"}</p>
 
-                {/* Borderless period dropdown, stacked below the title —
-                    locked once saved, so it can't drift out of sync with
-                    what was actually saved */}
+                {/* Borderless period dropdown, stacked below the title */}
                 <div style={{ position: "relative" }} ref={previewPeriodRef}>
                   <button
-                    disabled={previewSaved}
-                    onClick={() => !previewSaved && setPreviewPeriodOpen(o => !o)}
-                    onMouseEnter={e => !previewSaved && (e.currentTarget.style.background = "var(--tt-grey02)")}
+                    onClick={() => setPreviewPeriodOpen(o => !o)}
+                    onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
                     onMouseLeave={e => e.currentTarget.style.background = "none"}
                     style={{
                       display: "flex", alignItems: "center", gap: 4,
                       background: "none", border: "none", borderRadius: 6,
-                      margin: "0 0 0 -8px", padding: "2px 8px", cursor: previewSaved ? "default" : "pointer",
+                      margin: "0 0 0 -8px", padding: "2px 8px", cursor: "pointer",
                       fontSize: 14, fontWeight: 400, color: "var(--tt-grey05)",
                       transition: "background 0.15s",
                     }}
                   >
                     {preview.period}
-                    {!previewSaved && (
-                      <ChevronDown size={14} strokeWidth={SW}
-                        style={{ flexShrink: 0, transform: `rotate(${previewPeriodOpen ? "180deg" : "0deg"})`, transition: "transform 0.15s" }} />
-                    )}
+                    <ChevronDown size={14} strokeWidth={SW}
+                      style={{ flexShrink: 0, transform: `rotate(${previewPeriodOpen ? "180deg" : "0deg"})`, transition: "transform 0.15s" }} />
                   </button>
-                  {previewPeriodOpen && !previewSaved && (
+                  {previewPeriodOpen && (
                     <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 200, minWidth: 220, background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, overflow: "hidden" }}>
                       {PERIOD_OPTIONS.map(({ id }, i) => (
                         <div key={id}>
@@ -2124,62 +2100,43 @@ function ReportsTab({ demoCase }) {
                 </div>
               </div>
 
-              {/* In place of a plain close X: Save report while drafting,
-                  then Download + Close once saved. */}
-              {previewSaved ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
-                  <button
-                    onClick={handlePreviewDownload}
-                    onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
-                    onMouseLeave={e => e.currentTarget.style.background = "none"}
-                    style={{ background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 4, display: "flex", color: "var(--tt-text-2)", transition: "background 0.15s" }}
-                  >
-                    <Download size={18} strokeWidth={SW} />
-                  </button>
-                  <button
-                    onClick={closePreview}
-                    onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
-                    onMouseLeave={e => e.currentTarget.style.background = "none"}
-                    style={{ background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 4, display: "flex", color: "var(--tt-text-2)", transition: "background 0.15s" }}
-                  >
-                    <X size={18} strokeWidth={SW} />
-                  </button>
-                </div>
-              ) : (
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <button
-                    disabled={saving}
-                    onClick={closePreview}
-                    onMouseEnter={e => !saving && (e.currentTarget.style.background = "var(--tt-grey02)")}
-                    onMouseLeave={e => e.currentTarget.style.background = "white"}
-                    style={{
-                      height: 32, padding: "0 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)",
-                      background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)",
-                      display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center",
-                      cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.5 : 1, transition: "background 0.15s",
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    disabled={previewLoading || saving}
-                    onClick={handlePreviewSave}
-                    onMouseEnter={e => !(previewLoading || saving) && (e.currentTarget.style.opacity = "0.85")}
-                    onMouseLeave={e => e.currentTarget.style.opacity = (previewLoading || saving) ? 0.5 : 1}
-                    style={{
-                      height: 32, padding: "0 14px", borderRadius: 8, border: "none",
-                      background: "var(--tt-text-1)", fontSize: 13, fontWeight: 500, color: "white",
-                      display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center",
-                      cursor: (previewLoading || saving) ? "not-allowed" : "pointer",
-                      opacity: (previewLoading || saving) ? 0.5 : 1, transition: "opacity 0.15s",
-                    }}
-                  >
-                    {saving
-                      ? <span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.35)", borderTopColor: "white", display: "inline-block", animation: "tt-spin 0.75s linear infinite" }} />
-                      : "Save report"}
-                  </button>
-                </div>
-              )}
+              {/* In place of a plain close X: Cancel + Save report. Saving
+                  returns straight to the normal choose-card + table view
+                  (with the new report now visible there), same as Cancel —
+                  there's no separate post-save state to dismiss. */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <button
+                  disabled={saving}
+                  onClick={closePreview}
+                  onMouseEnter={e => !saving && (e.currentTarget.style.background = "var(--tt-grey02)")}
+                  onMouseLeave={e => e.currentTarget.style.background = "white"}
+                  style={{
+                    height: 32, padding: "0 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)",
+                    background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)",
+                    display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center",
+                    cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.5 : 1, transition: "background 0.15s",
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  disabled={previewLoading || saving}
+                  onClick={handlePreviewSave}
+                  onMouseEnter={e => !(previewLoading || saving) && (e.currentTarget.style.opacity = "0.85")}
+                  onMouseLeave={e => e.currentTarget.style.opacity = (previewLoading || saving) ? 0.5 : 1}
+                  style={{
+                    height: 32, padding: "0 14px", borderRadius: 8, border: "none",
+                    background: "var(--tt-text-1)", fontSize: 13, fontWeight: 500, color: "white",
+                    display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center",
+                    cursor: (previewLoading || saving) ? "not-allowed" : "pointer",
+                    opacity: (previewLoading || saving) ? 0.5 : 1, transition: "opacity 0.15s",
+                  }}
+                >
+                  {saving
+                    ? <span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.35)", borderTopColor: "white", display: "inline-block", animation: "tt-spin 0.75s linear infinite" }} />
+                    : "Save report"}
+                </button>
+              </div>
             </div>
 
             {/* Body — flows with the page (no fixed height/own scrollbar).
@@ -2255,7 +2212,7 @@ function ReportsTab({ demoCase }) {
                                 excludedPhotos={preview.excludedPhotos}
                                 entryKey={entryKey}
                                 selectedPhotos={selectedPhotos}
-                                onToggleSelect={previewSaved ? undefined : (idx, photoKey) => togglePhotoSelected(entryKey, idx, photoKey)}
+                                onToggleSelect={(idx, photoKey) => togglePhotoSelected(entryKey, idx, photoKey)}
                               />
                               {renderNoteSlot(entryKey)}
                             </div>
