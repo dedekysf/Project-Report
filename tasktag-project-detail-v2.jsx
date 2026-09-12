@@ -1620,7 +1620,7 @@ function ReportsTab({ demoCase }) {
 
     if (activeNoteFormKey === key) {
       return (
-        <div style={{ position: "relative", marginTop: 10 }}>
+        <div style={{ position: "relative", marginTop: 10, display: "inline-block", minWidth: 250, maxWidth: "100%" }}>
           <input
             autoFocus
             type="text"
@@ -1631,7 +1631,10 @@ function ReportsTab({ demoCase }) {
               if (e.key === "Escape") { setActiveNoteFormKey(null); setNoteDraft(""); }
             }}
             placeholder="Describe the note for this task"
-            style={{ width: "100%", height: 40, padding: "0 76px 0 12px", border: "1px solid var(--tt-grey03)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", color: "var(--tt-text-2)", outline: "none", boxSizing: "border-box" }}
+            // No wrapper width, so it starts at a 250px minimum and grows
+            // with typed content (via `size`) up to the row's full width.
+            size={Math.max(20, noteDraft.length + 10)}
+            style={{ minWidth: 250, maxWidth: "100%", height: 40, padding: "0 76px 0 12px", border: "1px solid var(--tt-grey03)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", color: "var(--tt-text-2)", outline: "none", boxSizing: "border-box" }}
           />
           <div style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)", display: "flex", gap: 4 }}>
             <button
