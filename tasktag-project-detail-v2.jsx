@@ -517,6 +517,44 @@ function FixedTooltipBtn({ children, label, onAction }) {
   );
 }
 
+// Outlined 40x40 close button for the note input, with the same bottom-right
+// tooltip convention as FixedTooltipBtn (which can't be reused directly —
+// its className hardcodes a different, smaller icon-button look).
+function NoteFormCloseBtn({ onClick }) {
+  const [tip, setTip] = useState(null);
+  const btnRef = useRef(null);
+
+  const showTip = () => {
+    if (!btnRef.current) return;
+    const r = btnRef.current.getBoundingClientRect();
+    setTip({ top: r.bottom + 6, left: r.right });
+  };
+  const hideTip = () => setTip(null);
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        onClick={onClick}
+        onMouseEnter={e => { showTip(); e.currentTarget.style.background = "var(--tt-grey02)"; }}
+        onMouseLeave={e => { hideTip(); e.currentTarget.style.background = "white"; }}
+        style={{ width: 40, height: 40, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s" }}
+      >
+        <X size={16} strokeWidth={SW} />
+      </button>
+      {tip && (
+        <div style={{
+          position: "fixed", zIndex: 9999, top: tip.top, left: tip.left, transform: "translateX(-100%)",
+          background: "var(--tt-text-1)", color: "white", fontSize: 11, fontWeight: 500, whiteSpace: "nowrap",
+          padding: "4px 8px", borderRadius: 4, pointerEvents: "none",
+        }}>
+          Cancel note
+        </div>
+      )}
+    </>
+  );
+}
+
 // Photo grid thumbnail — the skeleton only covers the initial fixed delay,
 // not how long the actual image takes to download, so each photo keeps its
 // own shimmer placeholder up until it has genuinely finished loading.
@@ -1637,22 +1675,14 @@ function ReportsTab({ demoCase }) {
               type="text"
               value={noteDrafts[key] || ""}
               onChange={e => setNoteDraftFor(key, e.target.value)}
-              onKeyDown={e => {
-                if (e.key === "Enter") handleSaveNote(key);
-                if (e.key === "Escape") closeNoteForm(key);
-              }}
+              onKeyDown={e => { if (e.key === "Enter") handleSaveNote(key); }}
+              onFocus={e => e.currentTarget.style.borderColor = "var(--tt-text-1)"}
+              onBlur={e => e.currentTarget.style.borderColor = "var(--tt-grey03)"}
               placeholder="Describe the note for this task"
               style={{ width: "100%", height: 40, padding: "0 12px 0 36px", border: "1px solid var(--tt-grey03)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", color: "var(--tt-text-2)", outline: "none", boxSizing: "border-box" }}
             />
           </div>
-          <button
-            onClick={() => closeNoteForm(key)}
-            onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
-            onMouseLeave={e => e.currentTarget.style.background = "white"}
-            style={{ width: 40, height: 40, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s" }}
-          >
-            <X size={16} strokeWidth={SW} />
-          </button>
+          <NoteFormCloseBtn onClick={() => closeNoteForm(key)} />
         </div>
       );
     }
