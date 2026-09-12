@@ -2679,7 +2679,10 @@ export default function ProjectDetail() {
           })}
 
           <div className="flex-1" />
-          <div className="flex items-center gap-2 pb-[1px]">
+          {/* Extra right padding so Invite's edge lines up with Open
+              Timesheet's above it, which sits inside a card with its own
+              16px padding on top of this row's 16px (px-4). */}
+          <div className="flex items-center gap-2 pb-[1px] pr-4">
             <Button
               variant="ghost" size="icon"
               className="w-8 h-8 hover:bg-[var(--tt-grey02)]"
