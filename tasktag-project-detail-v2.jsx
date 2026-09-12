@@ -2241,12 +2241,18 @@ function ReportsTab({ demoCase }) {
                 )}
               </div>
 
-            {/* Selection toolbar — appears above the footer once one or
-                more photos are checked; Delete moves them into
-                excludedPhotos (filtered everywhere), Download saves each
-                selected photo's original file. */}
+            {/* Selection toolbar — fixed to the bottom of the viewport
+                (not inline) once one or more photos are checked, so it
+                stays reachable regardless of scroll position now that
+                this content flows with the page. Delete moves selected
+                photos into excludedPhotos (filtered everywhere), Download
+                saves each selected photo's original file. */}
             {Object.keys(selectedPhotos).length > 0 && (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", background: "var(--tt-grey06)", flexShrink: 0 }}>
+              <div style={{
+                position: "fixed", bottom: 0, left: 0, right: 0, maxWidth: 1114, margin: "0 auto", zIndex: 100,
+                display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px",
+                background: "var(--tt-grey06)", borderRadius: "12px 12px 0 0", boxShadow: "0 -8px 24px rgba(10,22,41,0.2)",
+              }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <button
                     onClick={clearPhotoSelection}
