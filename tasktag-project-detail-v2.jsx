@@ -2188,12 +2188,13 @@ function ReportsTab({ demoCase }) {
             <div style={{ overflow: "hidden", borderRadius: "0 0 16px 16px" }}>
               <div style={{ padding: 20 }}>
                 {previewLoading ? (
-                  // Mirrors the real entries about to appear (group count,
-                  // note-line count, and each entry's actual photo count)
-                  // instead of a generic fixed placeholder shape —
-                  // buildReportData is synchronous, so the real data is
-                  // already available even while this artificial delay
-                  // plays out.
+                  // Mirrors the real entries about to appear (group count
+                  // and note-line count come from the actual data —
+                  // buildReportData is synchronous, so it's already
+                  // available during this artificial delay). Each entry's
+                  // photo skeleton is capped to a full row (6, matching the
+                  // grid's column count) rather than that entry's real
+                  // photo count, which may be more or fewer.
                   <>
                     {preview.reportType === "progress" && (
                       <div style={{ marginBottom: 24 }}>
@@ -2212,7 +2213,7 @@ function ReportsTab({ demoCase }) {
                             <div className="tt-skeleton" style={{ width: "85%", height: 16, marginBottom: 10 }} />
                             {e.photos.length > 0 && (
                               <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 8 }}>
-                                {e.photos.map((_, pi) => (
+                                {[0, 1, 2, 3, 4, 5].map(pi => (
                                   <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "4/3" }} />
                                 ))}
                               </div>
@@ -2269,7 +2270,7 @@ function ReportsTab({ demoCase }) {
                         <div className="tt-skeleton" style={{ width: "85%", height: 16, marginBottom: 10 }} />
                         {nextEntry && nextEntry.photos.length > 0 && (
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 8 }}>
-                            {nextEntry.photos.map((_, pi) => (
+                            {[0, 1, 2, 3, 4, 5].map(pi => (
                               <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "4/3" }} />
                             ))}
                           </div>
