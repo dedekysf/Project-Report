@@ -1,4 +1,5 @@
 import { useState, useRef, useLayoutEffect, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -520,6 +521,14 @@ function FixedTooltipBtn({ children, label, onAction }) {
 // Outlined 40x40 close button for the note input, with the same bottom-right
 // tooltip convention as FixedTooltipBtn (which can't be reused directly —
 // its className hardcodes a different, smaller icon-button look).
+//
+// The tooltip is portaled to document.body rather than rendered inline:
+// this button lives inside the side panel, which animates via `transform`
+// (its slide in/out) and clips via `overflow:hidden`. Any non-`none`
+// transform on an ancestor makes it the containing block for that
+// descendant's position:fixed, so without the portal the tooltip would be
+// positioned/clipped relative to the panel instead of the viewport —
+// exactly why it wasn't showing up there.
 function NoteFormCloseBtn({ onClick }) {
   const [tip, setTip] = useState(null);
   const btnRef = useRef(null);
@@ -542,14 +551,15 @@ function NoteFormCloseBtn({ onClick }) {
       >
         <X size={16} strokeWidth={SW} />
       </button>
-      {tip && (
+      {tip && createPortal(
         <div style={{
           position: "fixed", zIndex: 9999, top: tip.top, left: tip.left, transform: "translateX(-100%)",
           background: "var(--tt-text-1)", color: "white", fontSize: 11, fontWeight: 500, whiteSpace: "nowrap",
           padding: "4px 8px", borderRadius: 4, pointerEvents: "none",
         }}>
           Cancel note
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

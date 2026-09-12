@@ -1,4 +1,5 @@
 import { useState, useRef, useLayoutEffect, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -520,6 +521,10 @@ function FixedTooltipBtn({ children, label, onAction }) {
 // Outlined 40x40 close button for the note input, with the same bottom-right
 // tooltip convention as FixedTooltipBtn (which can't be reused directly —
 // its className hardcodes a different, smaller icon-button look).
+// The tooltip is portaled to document.body rather than rendered inline, so
+// it can't get trapped/mispositioned if this button ever ends up inside an
+// ancestor with a `transform` (which becomes the containing block for
+// position:fixed descendants) or overflow:hidden clipping.
 function NoteFormCloseBtn({ onClick }) {
   const [tip, setTip] = useState(null);
   const btnRef = useRef(null);
@@ -542,14 +547,15 @@ function NoteFormCloseBtn({ onClick }) {
       >
         <X size={16} strokeWidth={SW} />
       </button>
-      {tip && (
+      {tip && createPortal(
         <div style={{
           position: "fixed", zIndex: 9999, top: tip.top, left: tip.left, transform: "translateX(-100%)",
           background: "var(--tt-text-1)", color: "white", fontSize: 11, fontWeight: 500, whiteSpace: "nowrap",
           padding: "4px 8px", borderRadius: 4, pointerEvents: "none",
         }}>
           Cancel note
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
