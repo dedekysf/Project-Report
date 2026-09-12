@@ -2043,10 +2043,16 @@ function ReportsTab({ demoCase }) {
           draft is discarded ── */}
       {preview && (
         <>
-        <div style={{ border: "1px solid var(--tt-grey03)", borderRadius: 16, background: "white", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ border: "1px solid var(--tt-grey03)", borderRadius: 16, background: "white", display: "flex", flexDirection: "column" }}>
 
-            {/* Modal chrome */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid var(--tt-grey03)", flexShrink: 0 }}>
+            {/* Modal chrome — sticky so it stays visible while the entries
+                below scroll past (the card no longer clips its own
+                overflow, since that would break position:sticky). */}
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px",
+              borderBottom: "1px solid var(--tt-grey03)", borderRadius: "16px 16px 0 0", flexShrink: 0,
+              position: "sticky", top: 0, zIndex: 10, background: "white",
+            }}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
                 <p style={{ fontSize: 15, fontWeight: 600, color: "var(--tt-text-1)" }}>Draft {preview.reportType === "photo" ? "Photo Update" : "Progress Report"}</p>
 
@@ -2171,8 +2177,10 @@ function ReportsTab({ demoCase }) {
               )}
             </div>
 
-            {/* Body — flows with the page (no fixed height/own scrollbar) */}
-            <div>
+            {/* Body — flows with the page (no fixed height/own scrollbar).
+                Its own overflow:hidden keeps the card's bottom corners
+                clean without affecting the sticky header above. */}
+            <div style={{ overflow: "hidden", borderRadius: "0 0 16px 16px" }}>
               <div style={{ padding: 20 }}>
                 {previewLoading ? (
                   <>
@@ -2254,7 +2262,6 @@ function ReportsTab({ demoCase }) {
                   </>
                 )}
               </div>
-            </div>
 
             {/* Selection toolbar — appears above the footer once one or
                 more photos are checked; Delete moves them into
@@ -2293,6 +2300,7 @@ function ReportsTab({ demoCase }) {
                 </div>
               </div>
             )}
+            </div>
 
           </div>
 
