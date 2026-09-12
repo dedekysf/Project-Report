@@ -8,7 +8,7 @@ import {
   LayoutGrid, MapPin, Hash, FileText, FileImage,
   Activity, Users, BarChart2, SlidersHorizontal,
   ArrowUpDown, Calendar, AlignJustify, Clock,
-  UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, Crown, AlertTriangle,
+  UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, Crown, AlertTriangle, PenLine,
   RotateCw, ZoomIn, ZoomOut, Folder, ArrowLeft, ArrowRight, Info,
 } from "lucide-react";
 
@@ -169,22 +169,6 @@ style.textContent = `
 document.head.appendChild(style);
 
 const SW = 1.2;
-
-// Measures how wide `text` actually renders at the note input's font, so
-// the input can start growing only once the text is about to visually
-// crowd the action buttons docked to its right edge — a char-count
-// estimate (e.g. the `size` attribute) doesn't track real glyph widths
-// closely enough for that to look right.
-let noteMeasureCanvas = null;
-function measureNoteInputWidth(text) {
-  noteMeasureCanvas ||= document.createElement("canvas");
-  const ctx = noteMeasureCanvas.getContext("2d");
-  ctx.font = "400 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
-  const textWidth = ctx.measureText(text).width;
-  // 12px left padding + 76px reserved for the action buttons + 24px of
-  // breathing room before the caret visually reaches them.
-  return Math.max(250, textWidth + 12 + 76 + 24);
-}
 
 // The app's fixed "today" — all mock data (DUMMY_ENTRIES, last-N-days
 // ranges) is anchored to this date rather than the real device clock.
@@ -1636,37 +1620,30 @@ function ReportsTab({ demoCase }) {
 
     if (activeNoteFormKey === key) {
       return (
-        <div style={{ position: "relative", marginTop: 10, display: "inline-block", minWidth: 250, maxWidth: "100%" }}>
-          <input
-            autoFocus
-            type="text"
-            value={noteDraft}
-            onChange={e => setNoteDraft(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === "Enter") handleSaveNote(key);
-              if (e.key === "Escape") { setActiveNoteFormKey(null); setNoteDraft(""); }
-            }}
-            placeholder="Describe the note for this task"
-            style={{ width: measureNoteInputWidth(noteDraft), maxWidth: "100%", height: 40, padding: "0 76px 0 12px", border: "1px solid var(--tt-grey03)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", color: "var(--tt-text-2)", outline: "none", boxSizing: "border-box" }}
-          />
-          <div style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)", display: "flex", gap: 4 }}>
-            <button
-              onClick={() => { setActiveNoteFormKey(null); setNoteDraft(""); }}
-              onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
-              onMouseLeave={e => e.currentTarget.style.background = "none"}
-              style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", borderRadius: 6, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s" }}
-            >
-              <X size={14} strokeWidth={SW} />
-            </button>
-            <button
-              onClick={() => handleSaveNote(key)}
-              onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
-              onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-              style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--tt-text-1)", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", transition: "opacity 0.15s" }}
-            >
-              <Check size={14} strokeWidth={2} />
-            </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
+          <div style={{ position: "relative", flex: 1 }}>
+            <PenLine size={14} strokeWidth={SW} color="var(--tt-grey05)" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+            <input
+              autoFocus
+              type="text"
+              value={noteDraft}
+              onChange={e => setNoteDraft(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter") handleSaveNote(key);
+                if (e.key === "Escape") { setActiveNoteFormKey(null); setNoteDraft(""); }
+              }}
+              placeholder="Describe the note for this task"
+              style={{ width: "100%", height: 40, padding: "0 12px 0 36px", border: "1px solid var(--tt-grey03)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", color: "var(--tt-text-2)", outline: "none", boxSizing: "border-box" }}
+            />
           </div>
+          <button
+            onClick={() => { setActiveNoteFormKey(null); setNoteDraft(""); }}
+            onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+            onMouseLeave={e => e.currentTarget.style.background = "white"}
+            style={{ width: 40, height: 40, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s" }}
+          >
+            <X size={16} strokeWidth={SW} />
+          </button>
         </div>
       );
     }
