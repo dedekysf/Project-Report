@@ -1353,8 +1353,8 @@ function ReportsTab({ demoCase }) {
   const [preview,          setPreview]          = useState(null);
   const [previewPeriodOpen, setPreviewPeriodOpen] = useState(false);
   const [previewShowCal,   setPreviewShowCal]   = useState(false);
-  const [noteDraft,        setNoteDraft]        = useState("");
-  const [activeNoteFormKey, setActiveNoteFormKey] = useState(null); // entryKey whose add/edit note form is open
+  const [noteDrafts,       setNoteDrafts]       = useState({}); // { [entryKey]: draftText } — one independent draft per entry
+  const [activeNoteFormKeys, setActiveNoteFormKeys] = useState({}); // { [entryKey]: true } — every entry currently showing its add/edit note input (more than one can be open at once)
   const [previewLoading,   setPreviewLoading]    = useState(false);
   const [previewSaved,     setPreviewSaved]      = useState(false); // footer switches from Save to Download/Copy link once true
   const [previewCopied,    setPreviewCopied]     = useState(false); // Copy link button shows "Link copied" briefly
@@ -1467,8 +1467,8 @@ function ReportsTab({ demoCase }) {
       setPanelEntered(false); // starts off-screen; the mount effect below slides it in
       setPreviewPeriodOpen(false);
       setPreviewShowCal(false);
-      setActiveNoteFormKey(null);
-      setNoteDraft("");
+      setActiveNoteFormKeys({});
+      setNoteDrafts({});
       setPreviewSaved(false);
       setPreviewCopied(false);
       setVisibleCount(10);
@@ -1489,8 +1489,8 @@ function ReportsTab({ demoCase }) {
     setTimeout(() => {
       setPreview(null);
       setPanelClosing(false);
-      setActiveNoteFormKey(null);
-      setNoteDraft("");
+      setActiveNoteFormKeys({});
+      setNoteDrafts({});
       setPreviewSaved(false);
       setPreviewCopied(false);
       setVisibleCount(10);
@@ -1585,12 +1585,23 @@ function ReportsTab({ demoCase }) {
     }
   };
 
+  // Each entry's add/edit note form is independent — opening one doesn't
+  // close any others already open.
+  const openNoteForm = (key, initialText = "") => {
+    setActiveNoteFormKeys(prev => ({ ...prev, [key]: true }));
+    setNoteDrafts(prev => ({ ...prev, [key]: initialText }));
+  };
+  const closeNoteForm = (key) => {
+    setActiveNoteFormKeys(prev => { const next = { ...prev }; delete next[key]; return next; });
+    setNoteDrafts(prev => { const next = { ...prev }; delete next[key]; return next; });
+  };
+  const setNoteDraftFor = (key, text) => setNoteDrafts(prev => ({ ...prev, [key]: text }));
+
   const handleSaveNote = (key) => {
-    const text = noteDraft.trim();
+    const text = (noteDrafts[key] || "").trim();
     if (!text) return;
     setPreview(p => ({ ...p, extraNotes: { ...p.extraNotes, [key]: text } }));
-    setNoteDraft("");
-    setActiveNoteFormKey(null);
+    closeNoteForm(key);
   };
 
   const handleDeleteNote = (key) => {
@@ -1651,7 +1662,7 @@ function ReportsTab({ demoCase }) {
       );
     }
 
-    if (activeNoteFormKey === key) {
+    if (activeNoteFormKeys[key]) {
       return (
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
           <div style={{ position: "relative", flex: 1 }}>
@@ -1659,18 +1670,18 @@ function ReportsTab({ demoCase }) {
             <input
               autoFocus
               type="text"
-              value={noteDraft}
-              onChange={e => setNoteDraft(e.target.value)}
+              value={noteDrafts[key] || ""}
+              onChange={e => setNoteDraftFor(key, e.target.value)}
               onKeyDown={e => {
                 if (e.key === "Enter") handleSaveNote(key);
-                if (e.key === "Escape") { setActiveNoteFormKey(null); setNoteDraft(""); }
+                if (e.key === "Escape") closeNoteForm(key);
               }}
               placeholder="Describe the note for this task"
               style={{ width: "100%", height: 40, padding: "0 12px 0 36px", border: "1px solid var(--tt-grey03)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", color: "var(--tt-text-2)", outline: "none", boxSizing: "border-box" }}
             />
           </div>
           <button
-            onClick={() => { setActiveNoteFormKey(null); setNoteDraft(""); }}
+            onClick={() => closeNoteForm(key)}
             onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
             onMouseLeave={e => e.currentTarget.style.background = "white"}
             style={{ width: 40, height: 40, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s" }}
@@ -1687,7 +1698,7 @@ function ReportsTab({ demoCase }) {
           <p style={{ fontSize: 12, fontStyle: "italic", color: "var(--tt-text-2)", lineHeight: "1.5", margin: 0, flex: 1 }}>{savedNote}</p>
           <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
             <button
-              onClick={() => { setActiveNoteFormKey(key); setNoteDraft(savedNote); }}
+              onClick={() => openNoteForm(key, savedNote)}
               onMouseEnter={e => e.currentTarget.style.background = "white"}
               onMouseLeave={e => e.currentTarget.style.background = "none"}
               style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", borderRadius: 6, color: "var(--tt-grey06)", cursor: "pointer", transition: "background 0.15s" }}
@@ -1709,7 +1720,7 @@ function ReportsTab({ demoCase }) {
 
     return (
       <button
-        onClick={() => { setActiveNoteFormKey(key); setNoteDraft(""); }}
+        onClick={() => openNoteForm(key)}
         onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
         onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
         style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", padding: 0, marginTop: 10, cursor: "pointer", fontSize: 12, fontWeight: 500, color: "var(--tt-text-2)" }}
@@ -1748,8 +1759,8 @@ function ReportsTab({ demoCase }) {
       // Closing is left to the user — the footer switches to Download/Copy
       // link so they can act on the just-saved report before dismissing it.
       setPreviewSaved(true);
-      setActiveNoteFormKey(null);
-      setNoteDraft("");
+      setActiveNoteFormKeys({});
+      setNoteDrafts({});
       setPreviewPeriodOpen(false);
       setSaving(false);
       setSelectedPhotos({});
