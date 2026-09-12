@@ -1537,6 +1537,11 @@ function ReportsTab({ demoCase }) {
         .filter(Boolean)
     : [];
 
+  // The next entry the infinite-scroll batch will reveal — used to size
+  // its loading skeleton's photo count to the real thing instead of a
+  // generic guess.
+  const nextEntry = previewData ? previewData.groups.flatMap(g => g.entries)[visibleCount] : null;
+
   // Inline content scrolls with the page itself now (not an independently
   // scrollable panel), so infinite scroll is driven off window scroll
   // instead of a container's own scrollTop.
@@ -2183,6 +2188,12 @@ function ReportsTab({ demoCase }) {
             <div style={{ overflow: "hidden", borderRadius: "0 0 16px 16px" }}>
               <div style={{ padding: 20 }}>
                 {previewLoading ? (
+                  // Mirrors the real entries about to appear (group count,
+                  // note-line count, and each entry's actual photo count)
+                  // instead of a generic fixed placeholder shape —
+                  // buildReportData is synchronous, so the real data is
+                  // already available even while this artificial delay
+                  // plays out.
                   <>
                     {preview.reportType === "progress" && (
                       <div style={{ marginBottom: 24 }}>
@@ -2193,19 +2204,23 @@ function ReportsTab({ demoCase }) {
                         <div className="tt-skeleton" style={{ width: "100%", height: 6, borderRadius: 99 }} />
                       </div>
                     )}
-                    <div style={{ marginBottom: 32 }}>
-                      <div className="tt-skeleton" style={{ width: 90, height: 11, marginBottom: 10 }} />
-                      {[0, 1].map(ti => (
-                        <div key={ti} style={{ marginBottom: 20 }}>
-                          <div className="tt-skeleton" style={{ width: "85%", height: 16, marginBottom: 10 }} />
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 8 }}>
-                            {[0, 1, 2].map(pi => (
-                              <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "4/3" }} />
-                            ))}
+                    {visibleGroups.map(g => (
+                      <div key={g.key} style={{ marginBottom: 32 }}>
+                        <div className="tt-skeleton" style={{ width: 90, height: 11, marginBottom: 10 }} />
+                        {g.entries.map((e, i) => (
+                          <div key={i} style={{ marginBottom: 20 }}>
+                            <div className="tt-skeleton" style={{ width: "85%", height: 16, marginBottom: 10 }} />
+                            {e.photos.length > 0 && (
+                              <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 8 }}>
+                                {e.photos.map((_, pi) => (
+                                  <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "4/3" }} />
+                                ))}
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    ))}
                   </>
                 ) : (
                   <>
@@ -2252,11 +2267,13 @@ function ReportsTab({ demoCase }) {
                     {loadingMore && (
                       <div style={{ marginBottom: 20 }}>
                         <div className="tt-skeleton" style={{ width: "85%", height: 16, marginBottom: 10 }} />
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
-                          {[0, 1, 2].map(pi => (
-                            <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "4/3" }} />
-                          ))}
-                        </div>
+                        {nextEntry && nextEntry.photos.length > 0 && (
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 8 }}>
+                            {nextEntry.photos.map((_, pi) => (
+                              <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "4/3" }} />
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </>
