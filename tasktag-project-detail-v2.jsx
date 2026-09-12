@@ -920,8 +920,9 @@ function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onCl
         )}
       </div>
 
-      {/* Filmstrip */}
-      {photos.length > 1 && (
+      {/* Filmstrip — shown even for a single photo, not just when there's
+          more than one to switch between. */}
+      {photos.length > 0 && (
         <div style={{ display: "flex", justifyContent: "center", gap: 10, padding: "14px 16px", flexShrink: 0, overflowX: "auto", background: "var(--tt-grey06)" }}>
           {photos.map((p, i) => {
             const isSelected = selectedFilmstrip[i] !== undefined;
