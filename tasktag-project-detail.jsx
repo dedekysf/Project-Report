@@ -2354,13 +2354,15 @@ function ReportsTab({ demoCase }) {
                       <div style={{ height: 1, background: "var(--tt-grey03)", marginBottom: 20 }} />
 
                       {/* Row 1: period (not editable — mirrors the chrome's
-                          own period control above). Row 2: project name —
-                          editable the same way as a task name, and sized
-                          like the old summary headline now that it's the
-                          document's real title; required, since a report
-                          always needs a title. Row 3: address, in normal
-                          (not all-caps) text. */}
-                      <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-secondary)", margin: "0 0 4px" }}>
+                          own period control above; muted secondary text,
+                          not brand-colored). Row 2: project name — editable
+                          the same way as a task name, and sized like the
+                          old summary headline now that it's the document's
+                          real title; required, since a report always needs
+                          a title. Row 3: address, in normal (not all-caps)
+                          text. Summary and its progress bar sit directly
+                          below, with Target Opening/Prepared For after. */}
+                      <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-text-2)", margin: "0 0 4px" }}>
                         {preview.period}
                       </p>
                       <EditableField
@@ -2373,9 +2375,44 @@ function ReportsTab({ demoCase }) {
                         textStyle={{ fontSize: 24, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 4px" }}
                         inputStyle={{ fontSize: 24, fontWeight: 700 }}
                       />
-                      <p style={{ fontSize: 13, fontWeight: 400, color: "var(--tt-grey05)", margin: "0 0 16px" }}>
+                      <p style={{ fontSize: 13, fontWeight: 400, color: "var(--tt-grey05)", margin: "0 0 20px" }}>
                         {PROJECT_ADDRESS}
                       </p>
+
+                      {/* Summary — set apart in its own grey02 box like a
+                          project description. The box owns its own grey02
+                          chrome (via `boxed`) so editing swaps the same
+                          card for a textarea instead of nesting a separate
+                          bordered box inside it. */}
+                      <EditableField
+                        value={preview.summary}
+                        placeholder="Summarize how the project is going this period"
+                        disabled={previewSaved}
+                        multiline
+                        boxed
+                        onSave={v => setPreview(p => ({ ...p, summary: v }))}
+                        textStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, margin: 0 }}
+                        inputStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6 }}
+                      />
+
+                      {/* Progress — entries logged this period vs. total on
+                          record, gated by the same "Task summary" checkbox
+                          the HTML export uses. */}
+                      {preview.includeSummary && previewData && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 20 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 8px" }}>
+                              {previewData.completed} of {previewData.total} tasks complete
+                            </p>
+                            <div style={{ height: 6, background: "var(--tt-grey03)", borderRadius: 99, overflow: "hidden" }}>
+                              <div style={{ width: `${previewData.pct}%`, height: "100%", background: "var(--tt-secondary)", borderRadius: 99 }} />
+                            </div>
+                          </div>
+                          <span style={{ fontSize: 28, fontWeight: 700, fontStyle: "italic", color: "var(--tt-text-1)", flexShrink: 0, lineHeight: 1 }}>
+                            {previewData.pct}%
+                          </span>
+                        </div>
+                      )}
 
                       <div style={{ height: 1, background: "var(--tt-grey03)", margin: "20px 0" }} />
 
@@ -2424,44 +2461,6 @@ function ReportsTab({ demoCase }) {
                           />
                         </div>
                       </div>
-
-                      {/* Summary — set apart in its own grey02 box like a
-                          project description, after Target Opening/Prepared
-                          For rather than acting as the document's headline.
-                          The box owns its own grey02 chrome (via `boxed`) so
-                          editing swaps the same card for a textarea instead
-                          of nesting a separate bordered box inside it. */}
-                      <div style={{ marginTop: 20 }}>
-                        <EditableField
-                          value={preview.summary}
-                          placeholder="Summarize how the project is going this period"
-                          disabled={previewSaved}
-                          multiline
-                          boxed
-                          onSave={v => setPreview(p => ({ ...p, summary: v }))}
-                          textStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, margin: 0 }}
-                          inputStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6 }}
-                        />
-                      </div>
-
-                      {/* Progress — entries logged this period vs. total on
-                          record. Same numbers the HTML export's progress bar
-                          uses, gated by the same "Task summary" checkbox. */}
-                      {preview.includeSummary && previewData && (
-                        <div style={{ marginTop: 20 }}>
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)" }}>
-                              {previewData.completed} of {previewData.total} tasks complete
-                            </span>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-secondary)" }}>
-                              {previewData.pct}%
-                            </span>
-                          </div>
-                          <div style={{ height: 6, background: "var(--tt-grey03)", borderRadius: 99, overflow: "hidden" }}>
-                            <div style={{ width: `${previewData.pct}%`, height: "100%", background: "var(--tt-secondary)", borderRadius: 99 }} />
-                          </div>
-                        </div>
-                      )}
                     </div>
 
                     {/* ── Site Activity — the dated photo/note log, same
