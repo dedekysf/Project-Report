@@ -2248,9 +2248,9 @@ function ReportsTab({ demoCase }) {
                     {previewData && previewData.groups.length === 0 && renderNoteSlot("empty")}
                     {previewData && visibleGroups.map(g => (
                       <div key={g.key} style={{ marginBottom: 32 }}>
-                        <p style={{ fontSize: 11, fontWeight: 600, color: "var(--tt-grey05)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 2 }}>
-                          {formatGroupLabel(g, previewData.grouping).toUpperCase()}
-                        </p>
+                        {/* No separate date/week section header — each entry's own meta
+                            line below already carries its date, so a group header here
+                            would just repeat it. */}
                         {g.entries.map((e, i) => {
                           const entryKey = `${g.key}_${i}`;
                           const displayTitle = titleOverrides[entryKey] ?? e.note;
@@ -2304,12 +2304,7 @@ function ReportsTab({ demoCase }) {
                               </div>
                               {!isCompleted && (
                                 <p style={{ fontSize: 11, fontWeight: 600, color: "var(--tt-grey05)", letterSpacing: "0.04em", textTransform: "uppercase", margin: "2px 0 0" }}>
-                                  {/* The group header above already shows the date for "day"
-                                      grouping, so repeating it here would just duplicate it —
-                                      only append it for week/month grouping, where the header
-                                      covers a range and the entry's own day isn't otherwise shown. */}
-                                  {e.photos.length} photo{e.photos.length > 1 ? "s" : ""}
-                                  {previewData.grouping !== "day" && ` · ${fmtDate(parseDate(e.date))}`}
+                                  {fmtDate(parseDate(e.date))} · {e.photos.length} photo{e.photos.length > 1 ? "s" : ""}
                                 </p>
                               )}
                               <PhotoGrid
