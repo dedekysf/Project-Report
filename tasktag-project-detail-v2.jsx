@@ -1955,7 +1955,7 @@ function ReportsTab({ demoCase }) {
       {/* Progress — entries logged this period vs. total on record, gated
           by the same "Task summary" checkbox the HTML export uses. */}
       {preview.includeSummary && previewData && (
-        <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 24 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 8px" }}>
               {previewData.completed} of {previewData.total} tasks complete
@@ -1973,8 +1973,8 @@ function ReportsTab({ demoCase }) {
       <div style={{ height: 1, background: "var(--tt-grey03)", margin: "20px 0" }} />
 
       <div style={{ display: "flex", flexWrap: "nowrap", gap: 32 }}>
-        <div style={{ flex: "1 1 0" }}>
-          <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "0 0 4px" }}>Target Opening</p>
+        <div style={{ flex: "1 1 0", display: "flex", alignItems: "center", gap: 8 }}>
+          <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: 0, flexShrink: 0 }}>Target Opening</p>
           <div style={{ position: "relative" }} ref={targetOpeningRef}>
             <p
               onClick={() => setTargetOpeningCalOpen(o => !o)}
@@ -2033,39 +2033,36 @@ function ReportsTab({ demoCase }) {
     </div>
   );
 
-  // Footer — every page gets a page-number strip; the Point of Contact
-  // block only closes out the last page. Light card style (avatar, name,
-  // role/company on the left; generation metadata on the right) rather
-  // than a dark contact-card panel.
-  const renderPageFooter = (pageNum, pageCount, isLast) => (
+  // Footer — the same Point of Contact card (avatar, name, role/company
+  // on the left; generation metadata on the right) plus a page-number
+  // strip repeats on every page, not just the last.
+  const renderPageFooter = (pageNum, pageCount) => (
     <div>
-      {isLast && (
-        <div style={{ padding: `20px ${PAGE_PAD}px`, borderTop: "1px solid var(--tt-grey03)" }}>
-          <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "0 0 12px" }}>
-            Point of Contact
-          </p>
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--tt-pastel-magenta)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "white" }}>{initialsOf(POINT_OF_CONTACT_NAME)}</span>
-              </div>
-              <div>
-                <p style={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 2px" }}>{POINT_OF_CONTACT_NAME}</p>
-                {/* TODO(BE): replace with the contact's actual role/company from the API */}
-                <p style={{ fontSize: 12, fontWeight: 500, color: "var(--tt-secondary)", margin: 0 }}>
-                  {POINT_OF_CONTACT_ROLE} · {POINT_OF_CONTACT_COMPANY}
-                </p>
-              </div>
+      <div style={{ padding: `20px ${PAGE_PAD}px`, borderTop: "1px solid var(--tt-grey03)" }}>
+        <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "0 0 12px" }}>
+          Point of Contact
+        </p>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--tt-pastel-magenta)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "white" }}>{initialsOf(POINT_OF_CONTACT_NAME)}</span>
             </div>
-            <div style={{ textAlign: "right" }}>
-              <p style={{ fontSize: 11, color: "var(--tt-grey05)", margin: "0 0 2px" }}>Generated via TaskTag</p>
-              {/* TODO(BE): replace with the actual report ID from the API */}
-              <p style={{ fontSize: 11, color: "var(--tt-grey05)", margin: 0 }}>Report ID: {REPORT_ID}</p>
+            <div>
+              <p style={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 2px" }}>{POINT_OF_CONTACT_NAME}</p>
+              {/* TODO(BE): replace with the contact's actual role/company from the API */}
+              <p style={{ fontSize: 12, fontWeight: 500, color: "var(--tt-secondary)", margin: 0 }}>
+                {POINT_OF_CONTACT_ROLE} · {POINT_OF_CONTACT_COMPANY}
+              </p>
             </div>
           </div>
+          <div style={{ textAlign: "right" }}>
+            <p style={{ fontSize: 11, color: "var(--tt-grey05)", margin: "0 0 2px" }}>Generated via TaskTag</p>
+            {/* TODO(BE): replace with the actual report ID from the API */}
+            <p style={{ fontSize: 11, color: "var(--tt-grey05)", margin: 0 }}>Report ID: {REPORT_ID}</p>
+          </div>
         </div>
-      )}
-      <div style={{ padding: `10px ${PAGE_PAD}px`, borderTop: isLast ? "none" : "1px solid var(--tt-grey03)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      </div>
+      <div style={{ padding: `10px ${PAGE_PAD}px`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ fontSize: 10, color: "var(--tt-grey05)" }}>{preview.projectName || PROJECT_NAME}</span>
         <span style={{ fontSize: 10, color: "var(--tt-grey05)" }}>Page {pageNum} of {pageCount}</span>
       </div>
@@ -2080,7 +2077,6 @@ function ReportsTab({ demoCase }) {
   const headerMeasureRef = useRef(null);
   const runningHeaderMeasureRef = useRef(null);
   const footerMeasureRef = useRef(null);
-  const lastFooterMeasureRef = useRef(null);
   const blockMeasureRefs = useRef({});
   const [pageLayout, setPageLayout] = useState(null); // { pages: [[block,...],...] } | null while (re)measuring
 
@@ -2636,30 +2632,39 @@ function ReportsTab({ demoCase }) {
               <div style={{ padding: "24px 20px" }}>
               <div style={{ maxWidth: 800, margin: "0 auto" }}>
                 {previewLoading ? (
-                  // Mirrors the real entries about to appear (group count
-                  // and note-line count come from the actual data —
-                  // buildReportData is synchronous, so it's already
-                  // available during this artificial delay). Each entry's
-                  // photo skeleton is capped to a full row (6, matching the
-                  // grid's column count) rather than that entry's real
-                  // photo count, which may be more or fewer.
-                  <div style={{ border: "1px solid var(--tt-grey03)", borderRadius: 12, overflow: "hidden", background: "white" }}>
-                    <div style={{ padding: 28 }}>
-                      <div className="tt-skeleton" style={{ width: 100, height: 20, marginBottom: 20 }} />
-                      <div className="tt-skeleton" style={{ width: 180, height: 11, marginBottom: 16 }} />
-                      <div className="tt-skeleton" style={{ width: "90%", height: 26, marginBottom: 8 }} />
-                      <div className="tt-skeleton" style={{ width: "55%", height: 26 }} />
+                  // Mirrors the real A4 page below it — same width/padding/
+                  // footer structure — so the loading state doesn't jump to
+                  // a different layout once the real draft appears. Entry
+                  // rows still mirror the real data (group/photo counts),
+                  // same as before.
+                  <div style={{ width: PAGE_W, minHeight: PAGE_H, boxSizing: "border-box", border: "1px solid var(--tt-grey03)", borderRadius: 12, overflow: "hidden", background: "white", boxShadow: "0 1px 3px rgba(10,22,41,0.08)" }}>
+                    <div style={{ padding: PAGE_PAD }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                        <div className="tt-skeleton" style={{ width: 80, height: 20 }} />
+                        <div className="tt-skeleton" style={{ width: 100, height: 14 }} />
+                      </div>
+                      <div style={{ height: 1, background: "var(--tt-grey03)", marginBottom: 20 }} />
+                      <div className="tt-skeleton" style={{ width: 100, height: 11, marginBottom: 8 }} />
+                      <div className="tt-skeleton" style={{ width: "70%", height: 26, marginBottom: 8 }} />
+                      <div className="tt-skeleton" style={{ width: "50%", height: 16, marginBottom: 20 }} />
+                      <div className="tt-skeleton" style={{ width: "100%", height: 70, borderRadius: 8, marginBottom: 24 }} />
+                      <div className="tt-skeleton" style={{ width: "100%", height: 6, borderRadius: 99, marginBottom: 20 }} />
+                      <div style={{ height: 1, background: "var(--tt-grey03)", margin: "20px 0" }} />
+                      <div style={{ display: "flex", gap: 32 }}>
+                        <div className="tt-skeleton" style={{ width: 120, height: 16 }} />
+                        <div className="tt-skeleton" style={{ width: 120, height: 16 }} />
+                      </div>
                     </div>
-                    <div style={{ padding: 24 }}>
-                      <div className="tt-skeleton" style={{ width: 150, height: 13, marginBottom: 16 }} />
+                    <div style={{ padding: `0 ${PAGE_PAD}px` }}>
                       {visibleGroups.map(g => (
                         <div key={g.key} style={{ marginBottom: 20 }}>
                           {g.entries.map((e, i) => (
                             <div key={i} style={{ marginBottom: 20 }}>
-                              <div className="tt-skeleton" style={{ width: "85%", height: 16, marginBottom: 10 }} />
+                              <div className="tt-skeleton" style={{ width: "60%", height: 18, marginBottom: 8 }} />
+                              <div className="tt-skeleton" style={{ width: 160, height: 11, marginBottom: 10 }} />
                               {e.photos.length > 0 && (
-                                <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
-                                  {[0, 1, 2].map(pi => (
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 2 }}>
+                                  {[0, 1, 2, 3].map(pi => (
                                     <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "4/3" }} />
                                   ))}
                                 </div>
@@ -2668,6 +2673,15 @@ function ReportsTab({ demoCase }) {
                           ))}
                         </div>
                       ))}
+                    </div>
+                    <div style={{ padding: `20px ${PAGE_PAD}px`, borderTop: "1px solid var(--tt-grey03)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div className="tt-skeleton" style={{ width: 36, height: 36, borderRadius: "50%" }} />
+                        <div>
+                          <div className="tt-skeleton" style={{ width: 100, height: 14, marginBottom: 4 }} />
+                          <div className="tt-skeleton" style={{ width: 140, height: 12 }} />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -2684,8 +2698,7 @@ function ReportsTab({ demoCase }) {
                       <div style={{ width: PAGE_W }}>
                         <div ref={headerMeasureRef}>{renderFullHeader()}</div>
                         <div ref={runningHeaderMeasureRef}>{renderRunningHeader()}</div>
-                        <div ref={footerMeasureRef}>{renderPageFooter(1, 1, false)}</div>
-                        <div ref={lastFooterMeasureRef}>{renderPageFooter(1, 1, true)}</div>
+                        <div ref={footerMeasureRef}>{renderPageFooter(1, 1)}</div>
                         {flatBlocks.map(block => (
                           <div key={block.key} ref={el => { blockMeasureRefs.current[block.key] = el; }} style={{ width: PAGE_W - PAGE_PAD * 2 }}>
                             {renderBlock(block)}
@@ -2699,7 +2712,6 @@ function ReportsTab({ demoCase }) {
                         real paginated report instead of one long scroll. */}
                     {pageLayout && pageLayout.pages.map((pageBlocks, pi) => {
                       const isFirst = pi === 0;
-                      const isLast = pi === pageLayout.pages.length - 1;
                       return (
                         <div
                           key={pi}
@@ -2716,7 +2728,7 @@ function ReportsTab({ demoCase }) {
                             {isFirst && previewData.groups.length === 0 && renderNoteSlot("empty")}
                             {pageBlocks.map(block => <div key={block.key}>{renderBlock(block)}</div>)}
                           </div>
-                          {renderPageFooter(pi + 1, pageLayout.pages.length, isLast)}
+                          {renderPageFooter(pi + 1, pageLayout.pages.length)}
                         </div>
                       );
                     })}
