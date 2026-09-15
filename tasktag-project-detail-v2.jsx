@@ -657,6 +657,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
         return (
           <div
             key={i}
+            className="group"
             style={{ position: "relative" }}
             onMouseEnter={e => { if (canOpen) e.currentTarget.lastElementChild.style.opacity = "1"; }}
             onMouseLeave={e => { if (canOpen) e.currentTarget.lastElementChild.style.opacity = "0"; }}
@@ -666,6 +667,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
               <button
                 onClick={e => { e.stopPropagation(); onToggleSelect && onToggleSelect(i, k); }}
                 disabled={!onToggleSelect}
+                className={`transition-opacity ${selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
                 style={{
                   position: "absolute", top: 6, right: 6, width: 20, height: 20, borderRadius: "50%",
                   border: selected ? "none" : "1.5px solid white", background: selected ? "var(--tt-secondary)" : "rgba(10,22,41,0.35)",
@@ -2247,7 +2249,7 @@ function ReportsTab({ demoCase }) {
 
                     {/* No inline "no data" message here — the proactive toast already covers it */}
                     {previewData && previewData.groups.length === 0 && renderNoteSlot("empty")}
-                    {previewData && visibleGroups.map(g => (
+                    {previewData && visibleGroups.map((g, gIdx) => (
                       <div key={g.key} style={{ marginBottom: 32 }}>
                         {/* "Day" grouping never bundles more than one entry under the
                             same label in practice, so each entry's own meta line below
@@ -2276,8 +2278,9 @@ function ReportsTab({ demoCase }) {
                           // entry merely capped down to 0 photos must never be shown as
                           // "Completed".
                           const isCompleted = e.noPhotos;
+                          const isLastEntry = gIdx === visibleGroups.length - 1 && i === g.entries.length - 1;
                           return (
-                            <div key={entryKey} style={{ marginBottom: 20, paddingBottom: 20, borderBottom: "1px solid var(--tt-grey03)" }}>
+                            <div key={entryKey} style={{ marginBottom: 20, paddingBottom: 20, borderBottom: isLastEntry ? "none" : "1px solid var(--tt-grey03)" }}>
                               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                 {isEditingTitle ? (
                                   // Same height/border chrome as the "Add a note" input below
