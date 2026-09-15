@@ -174,7 +174,11 @@ const SW = 1.2;
 // The app's fixed "today" — all mock data (DUMMY_ENTRIES, last-N-days
 // ranges) is anchored to this date rather than the real device clock.
 const APP_TODAY = new Date(2026, 8, 10); // Sep 10, 2026
+// TODO(BE): replace with the project's actual name/address from the API
 const PROJECT_NAME = "Raintree Hollow Residence Renovation";
+const PROJECT_ADDRESS = "11 North Raintree Hollow Court, Sienna Plantation, Missouri City";
+// TODO(BE): replace with the project's actual point of contact from the API
+const POINT_OF_CONTACT_NAME = "Jordan Blake";
 
 // ── Date Range Calendar ──
 function DateRangeCalendar({ anchorRef, onClose, onApply }) {
@@ -1094,6 +1098,28 @@ const DUMMY_ENTRIES = [
   { date: "2026-06-16", note: "Excavation completed for the new foundation footprint.", photos: ["img8", "img6", "img5", "img1", "img9"] },
 ];
 
+// TODO(BE): replace with the project's actual task/checklist list from the
+// API — this powers the report's "Work Status" section, independent of the
+// dated photo/activity log above (a task can be in progress for weeks
+// before any activity entry ever mentions it).
+const DUMMY_TASKS = [
+  { name: "Site survey and initial documentation", category: "Site", dueDate: null, status: "complete" },
+  { name: "Excavation for foundation footprint", category: "Site", dueDate: null, status: "complete" },
+  { name: "Foundation waterproofing sealant", category: "Site", dueDate: null, status: "complete" },
+  { name: "Framing inspection, second floor", category: "Framing", dueDate: null, status: "complete" },
+  { name: "Electrical panel upgrade", category: "Electrical", dueDate: null, status: "complete" },
+  { name: "Roof shingles, north slope", category: "Site", dueDate: null, status: "complete" },
+  { name: "Insulation, attic space", category: "Framing", dueDate: null, status: "complete" },
+  { name: "Vent hood connection", category: "Mechanical", dueDate: "2026-09-05", status: "in_progress" },
+  { name: "Punch plumbing rough-in", category: "Plumbing", dueDate: "2026-09-12", status: "in_progress" },
+  { name: "Painting, dining room", category: "Finishes", dueDate: "2026-09-15", status: "in_progress" },
+  { name: "Booth installation", category: "Finishes", dueDate: null, status: "in_progress" },
+  { name: "Bar rough-in", category: "Bar fit-out", dueDate: null, status: "upcoming" },
+  { name: "Ceiling grid, dining room", category: "Finishes", dueDate: null, status: "upcoming" },
+  { name: "Health inspection", category: "Site", dueDate: null, status: "upcoming" },
+  { name: "Handover walkthrough", category: "Site", dueDate: null, status: "upcoming" },
+];
+
 // ── Report generation engine ──
 function parseDate(str) {
   const [y, m, d] = str.split("-").map(Number);
@@ -1240,6 +1266,31 @@ function buildReportData(dateRange, periodStr, customRange, includeNoPhotoTasks 
   const pct = Math.round(completed / total * 100);
 
   return { groups, grouping, completed, total, pct };
+}
+
+// Default text for the report's editable headline/body — seeded from
+// DUMMY_TASKS' status mix and the most recent activity entry, so there's
+// always a sensible starting point without the user having to write one
+// from scratch. Purely a starting point: both fields are freely editable
+// afterward and never regenerated once the draft is open.
+function buildDefaultSummary(groups) {
+  const inProgress = DUMMY_TASKS.filter(t => t.status === "in_progress");
+  const focus = inProgress.slice().sort((a, b) => (a.dueDate || "9999") < (b.dueDate || "9999") ? -1 : 1)[0];
+  const headline = inProgress.length > 0
+    ? `${inProgress.length} task${inProgress.length > 1 ? "s" : ""} still in progress — ${focus.category.toLowerCase()} is the current focus. Everything else is on schedule.`
+    : "All tracked tasks are complete or upcoming — nothing in progress this period.";
+  const latestEntry = groups[0]?.entries[0];
+  const body = latestEntry ? latestEntry.note : "";
+  return { headline, body };
+}
+
+// "Next report" nudge in the footer — a rough one-month-out estimate from
+// APP_TODAY, phrased the same loose way a person would ("early October").
+function nextReportLabel() {
+  const next = new Date(APP_TODAY);
+  next.setMonth(next.getMonth() + 1);
+  const month = next.toLocaleDateString("en-US", { month: "long" });
+  return `early ${month}`;
 }
 
 // Photos checked off in the side panel are excluded from the final output
@@ -1415,7 +1466,7 @@ const buildReportHTML = (report) => {
   const meta =
     h("p", { style: "font-size:11px;color:#828282;margin-bottom:24px;text-transform:uppercase;" }, `Period: ${report.period}`) +
     h("h2", { style: "font-size:28px;font-weight:700;color:#0a1629;margin-bottom:4px;line-height:1.15;" }, "Raintree Hollow Residence Renovation") +
-    h("p", { style: "font-size:12px;color:#828282;margin-bottom:24px;" }, "11 North Raintree Hollow Court, Sienna Plantation, Missouri City");
+    h("p", { style: "font-size:12px;color:#828282;margin-bottom:24px;" }, PROJECT_ADDRESS);
 
   const body = h("div", { style: "padding:20px;" }, meta + progressHTML + entriesHTML);
   const card = h("div", { class: "card" }, header + divider + body);
@@ -1498,7 +1549,7 @@ function ReportsTab({ demoCase }) {
   // Adds a report to the results list (called only once the user confirms
   // via "Save report" in the preview modal — Generate no longer does this
   // directly).
-  const pushReport = ({ includeSummary, includeNoPhotoTasks, dateRange, period, data, extraNotes, excludedPhotos, titleOverrides }) => {
+  const pushReport = ({ includeSummary, includeNoPhotoTasks, dateRange, period, data, extraNotes, excludedPhotos, titleOverrides, summaryHeadline, summaryBody, targetOpening, clientName }) => {
     const id = Date.now();
     const newReport = {
       id,
@@ -1512,6 +1563,10 @@ function ReportsTab({ demoCase }) {
       extraNotes,
       excludedPhotos,
       titleOverrides,
+      summaryHeadline,
+      summaryBody,
+      targetOpening,
+      clientName,
     };
     setReports(prev => [newReport, ...prev]);
     setLastSavedId(id);
@@ -1555,6 +1610,7 @@ function ReportsTab({ demoCase }) {
         showToast("error", "No data for this period");
         return; // don't open the modal on an empty period — just the toast
       }
+      const { headline, body } = buildDefaultSummary(data.groups);
       setPreview({
         includeSummary,
         includeNoPhotoTasks,
@@ -1563,6 +1619,12 @@ function ReportsTab({ demoCase }) {
         customRange,
         extraNotes: {},
         excludedPhotos: {},
+        // System-generated starting point — freely editable from here, and
+        // never regenerated for the life of this draft.
+        summaryHeadline: headline,
+        summaryBody: body,
+        targetOpening: "",
+        clientName: "",
       });
       setPanelClosing(false);
       setPanelEntered(false); // starts off-screen; the mount effect below slides it in
@@ -1668,6 +1730,15 @@ function ReportsTab({ demoCase }) {
   // manual notes are only spliced in for real output, not the live modal).
   const totalEntryCount = previewData ? previewData.groups.reduce((s, g) => s + g.entries.length, 0) : 0;
   const hasMoreEntries = totalEntryCount > visibleCount;
+  // "Site Activity" section header stats — total photo count and the most
+  // recent entry's month (groups are sorted newest-first, so the very
+  // first entry of the first group is the latest).
+  const totalPhotoCount = previewData
+    ? previewData.groups.reduce((s, g) => s + g.entries.reduce((s2, e) => s2 + e.photos.length, 0), 0)
+    : 0;
+  const siteActivityMonthLabel = previewData?.groups[0]?.entries[0]
+    ? parseDate(previewData.groups[0].entries[0].date).toLocaleDateString("en-US", { month: "long" }).toUpperCase()
+    : "";
   let entryBudget = visibleCount;
   const visibleGroups = previewData
     ? previewData.groups
@@ -1822,7 +1893,7 @@ function ReportsTab({ demoCase }) {
         showToast("error", "Save failed. Try again.");
         return;
       }
-      pushReport({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, data: { ...previewData, groups: finalGroups }, extraNotes: mergedNotes, excludedPhotos: preview.excludedPhotos, titleOverrides });
+      pushReport({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, data: { ...previewData, groups: finalGroups }, extraNotes: mergedNotes, excludedPhotos: preview.excludedPhotos, titleOverrides, summaryHeadline: preview.summaryHeadline, summaryBody: preview.summaryBody, targetOpening: preview.targetOpening, clientName: preview.clientName });
       setDateRange("since_last");
       // Closing is left to the user — the footer switches to Download/Copy
       // link so they can act on the just-saved report before dismissing it.
@@ -2136,14 +2207,14 @@ function ReportsTab({ demoCase }) {
             transition: "transform 0.25s ease",
           }}>
 
-            {/* Modal chrome */}
+            {/* Modal chrome — just the period control + close now. The
+                document itself (below) carries its own title/branding, so
+                this bar is app chrome, not part of the "report". */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid var(--tt-grey03)", flexShrink: 0 }}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
-                <p style={{ fontSize: 15, fontWeight: 600, color: "var(--tt-text-1)" }}>Draft Report</p>
-
-                {/* Borderless period dropdown, stacked below the title —
-                    locked once the report is saved, so it can't drift out of
-                    sync with what was actually saved */}
+                {/* Borderless period dropdown — locked once the report is
+                    saved, so it can't drift out of sync with what was
+                    actually saved */}
                 <div style={{ position: "relative" }} ref={previewPeriodRef}>
                   <button
                     disabled={previewSaved}
@@ -2218,22 +2289,19 @@ function ReportsTab({ demoCase }) {
               <div style={{ padding: 20 }}>
                 {previewLoading ? (
                   <>
-                    {preview.includeSummary && (
-                      <div style={{ marginBottom: 24 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                          <div className="tt-skeleton" style={{ width: 140, height: 13 }} />
-                          <div className="tt-skeleton" style={{ width: 30, height: 13 }} />
-                        </div>
-                        <div className="tt-skeleton" style={{ width: "100%", height: 6, borderRadius: 99 }} />
-                      </div>
-                    )}
-                    <div style={{ marginBottom: 32 }}>
-                      <div className="tt-skeleton" style={{ width: 90, height: 11, marginBottom: 10 }} />
+                    <div style={{ border: "1px solid var(--tt-grey03)", borderRadius: 12, padding: 28, marginBottom: 16 }}>
+                      <div className="tt-skeleton" style={{ width: 100, height: 20, marginBottom: 20 }} />
+                      <div className="tt-skeleton" style={{ width: 180, height: 11, marginBottom: 16 }} />
+                      <div className="tt-skeleton" style={{ width: "90%", height: 26, marginBottom: 8 }} />
+                      <div className="tt-skeleton" style={{ width: "55%", height: 26 }} />
+                    </div>
+                    <div style={{ border: "1px solid var(--tt-grey03)", borderRadius: 12, padding: 24 }}>
+                      <div className="tt-skeleton" style={{ width: 150, height: 13, marginBottom: 16 }} />
                       {[0, 1].map(ti => (
                         <div key={ti} style={{ marginBottom: 20 }}>
                           <div className="tt-skeleton" style={{ width: "85%", height: 16, marginBottom: 10 }} />
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
-                            {[0, 1, 2, 3].map(pi => (
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
+                            {[0, 1, 2].map(pi => (
                               <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "4/3" }} />
                             ))}
                           </div>
@@ -2243,157 +2311,293 @@ function ReportsTab({ demoCase }) {
                   </>
                 ) : (
                   <>
-                    {preview.includeSummary && previewData && (
-                      <div style={{ marginBottom: 24 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, fontSize: 13, fontWeight: 600 }}>
-                          <span style={{ color: "var(--tt-text-1)" }}>{previewData.completed} of {previewData.total} tasks complete</span>
-                          <span style={{ color: "var(--tt-secondary)" }}>{previewData.pct}%</span>
+                    {/* ── Report document header — project identity, editable
+                        system-generated summary, and editable Target
+                        Opening / Prepared For fields. Locked to plain text
+                        once saved, same as everything else in this panel. */}
+                    <div style={{ border: "1px solid var(--tt-grey03)", borderRadius: 12, padding: 28, marginBottom: 16 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                        <img src={IMG_MAP_LOGO} alt="tasktag" style={{ height: 20, display: "block" }} />
+                        <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)" }}>
+                          Client Report
+                        </span>
+                      </div>
+                      <div style={{ height: 1, background: "var(--tt-grey03)", marginBottom: 20 }} />
+
+                      <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", marginBottom: 12 }}>
+                        {PROJECT_NAME} · {PROJECT_ADDRESS}
+                      </p>
+
+                      {previewSaved ? (
+                        <h2 style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontWeight: 400, fontSize: 24, lineHeight: 1.3, color: "var(--tt-text-1)", margin: "0 0 12px" }}>
+                          {preview.summaryHeadline}
+                        </h2>
+                      ) : (
+                        <textarea
+                          value={preview.summaryHeadline}
+                          onChange={ev => setPreview(p => ({ ...p, summaryHeadline: ev.target.value }))}
+                          rows={2}
+                          placeholder="Summarize how the project is going this period"
+                          style={{ display: "block", width: "100%", fontFamily: "Georgia, 'Times New Roman', serif", fontWeight: 400, fontSize: 24, lineHeight: 1.3, color: "var(--tt-text-1)", border: "none", outline: "none", resize: "none", padding: 0, margin: "0 0 12px", background: "none" }}
+                        />
+                      )}
+
+                      {previewSaved ? (
+                        preview.summaryBody && (
+                          <p style={{ fontSize: 13, color: "var(--tt-text-2)", lineHeight: 1.6, margin: 0 }}>{preview.summaryBody}</p>
+                        )
+                      ) : (
+                        <textarea
+                          value={preview.summaryBody}
+                          onChange={ev => setPreview(p => ({ ...p, summaryBody: ev.target.value }))}
+                          rows={3}
+                          placeholder="Add more detail (optional)"
+                          style={{ display: "block", width: "100%", fontSize: 13, fontFamily: "inherit", color: "var(--tt-text-2)", lineHeight: 1.6, border: "none", outline: "none", resize: "none", padding: 0, margin: 0, background: "none" }}
+                        />
+                      )}
+
+                      <div style={{ height: 1, background: "var(--tt-grey03)", margin: "20px 0" }} />
+
+                      <div style={{ display: "flex", gap: 32 }}>
+                        <div>
+                          <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "0 0 4px" }}>Target Opening</p>
+                          {previewSaved ? (
+                            <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", margin: 0 }}>{preview.targetOpening || "—"}</p>
+                          ) : (
+                            <input
+                              type="text"
+                              value={preview.targetOpening}
+                              onChange={ev => setPreview(p => ({ ...p, targetOpening: ev.target.value }))}
+                              placeholder="Add target date"
+                              style={{ width: 150, fontSize: 14, fontWeight: 600, fontFamily: "inherit", color: "var(--tt-text-1)", border: "none", outline: "none", padding: 0, background: "none" }}
+                            />
+                          )}
                         </div>
-                        <div style={{ height: 6, background: "var(--tt-grey03)", borderRadius: 99, overflow: "hidden" }}>
-                          <div style={{ width: `${previewData.pct}%`, height: "100%", background: "var(--tt-secondary)", borderRadius: 99 }} />
+                        <div>
+                          <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "0 0 4px" }}>Prepared For</p>
+                          {previewSaved ? (
+                            <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", margin: 0 }}>{preview.clientName || "—"}</p>
+                          ) : (
+                            <input
+                              type="text"
+                              value={preview.clientName}
+                              onChange={ev => setPreview(p => ({ ...p, clientName: ev.target.value }))}
+                              placeholder="Add client name"
+                              style={{ width: 170, fontSize: 14, fontWeight: 600, fontFamily: "inherit", color: "var(--tt-text-1)", border: "none", outline: "none", padding: 0, background: "none" }}
+                            />
+                          )}
                         </div>
                       </div>
-                    )}
+                    </div>
 
-                    {/* No inline "no data" message here — the proactive toast already covers it */}
-                    {previewData && previewData.groups.length === 0 && renderNoteSlot("empty")}
-                    {previewData && visibleGroups.map((g, gIdx) => (
-                      <div key={g.key} style={{ marginBottom: 32 }}>
-                        {/* "Day" grouping never bundles more than one entry under the
-                            same label in practice, so each entry's own meta line below
-                            is enough on its own — a group header here would just repeat
-                            it. Week/month grouping, however, genuinely rolls multiple
-                            entries up together, so it needs its own shared header
-                            (with the group's total photo count); the per-entry meta
-                            line then only needs that entry's own count, not the date
-                            again. */}
-                        {previewData.grouping !== "day" && (
-                          <p style={{
-                            fontSize: 11, fontWeight: 600, color: "var(--tt-grey05)",
-                            letterSpacing: "0.06em", textTransform: "uppercase",
-                            position: "sticky", top: 0, zIndex: 2, background: "white",
-                            padding: "8px 0", margin: 0,
-                          }}>
-                            {formatGroupLabel(g, previewData.grouping).toUpperCase()}
-                          </p>
-                        )}
-                        {g.entries.map((e, i) => {
-                          const entryKey = `${g.key}_${i}`;
-                          const displayTitle = titleOverrides[entryKey] ?? e.note;
-                          const isEditingTitle = !previewSaved && editingTitleKey === entryKey;
-                          // e.noPhotos is set once in buildReportData, before applyPhotoCap
-                          // can zero out an otherwise-photographed entry's photos — an
-                          // entry merely capped down to 0 photos must never be shown as
-                          // "Completed".
-                          const isCompleted = e.noPhotos;
-                          const isLastEntry = gIdx === visibleGroups.length - 1 && i === g.entries.length - 1;
-                          return (
-                            <div key={entryKey} style={{ marginBottom: 20, paddingBottom: 20, borderBottom: isLastEntry ? "none" : "1px solid var(--tt-grey03)" }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                {isEditingTitle ? (
-                                  // Same height/border chrome as the "Add a note" input below
-                                  // (no left icon this time) — draft-only until the check
-                                  // button (or Enter) commits it into titleOverrides, or the
-                                  // X (or Escape) discards it. Both sit inside the input
-                                  // itself, on the right. Sized to the text itself (capped at
-                                  // the row's full width) rather than always stretching full
-                                  // width like a normal form field.
-                                  <div style={{ position: "relative", maxWidth: "100%", minWidth: 0 }}>
-                                    <input
-                                      ref={el => { if (el) { el.focus(); const len = el.value.length; el.setSelectionRange(len, len); } }}
-                                      type="text"
-                                      value={renameDraft}
-                                      onChange={ev => setRenameDraft(ev.target.value)}
-                                      onKeyDown={ev => {
-                                        if (ev.key === "Enter") { ev.preventDefault(); confirmRenameTitle(entryKey); }
-                                        if (ev.key === "Escape") { ev.preventDefault(); cancelRenameTitle(); }
-                                      }}
-                                      style={{
-                                        fieldSizing: "content", width: "100%", maxWidth: "100%", minWidth: 120,
-                                        height: 40, padding: "0 76px 0 12px", border: "1px solid var(--tt-text-1)", borderRadius: 8,
-                                        fontSize: 13, fontFamily: "inherit", color: "var(--tt-text-2)", outline: "none", boxSizing: "border-box",
-                                      }}
-                                    />
-                                    <div style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center", gap: 4 }}>
-                                      <button
-                                        onClick={cancelRenameTitle}
-                                        onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
-                                        onMouseLeave={ev => ev.currentTarget.style.background = "none"}
-                                        style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "background 0.15s" }}
-                                      >
-                                        <X size={15} strokeWidth={SW} color="var(--tt-grey06)" />
-                                      </button>
-                                      <button
-                                        onClick={() => confirmRenameTitle(entryKey)}
-                                        onMouseEnter={ev => ev.currentTarget.style.opacity = "0.85"}
-                                        onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
-                                        style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "var(--tt-secondary)", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "opacity 0.15s" }}
-                                      >
-                                        <Check size={15} strokeWidth={SW} color="white" />
-                                      </button>
+                    {/* ── Site Activity — the dated photo/note log, same
+                        rename/note/photo-select editing as before, just
+                        restyled to sit inside the document card. ── */}
+                    <div style={{ border: "1px solid var(--tt-grey03)", borderRadius: 12, padding: 24, marginBottom: 16 }}>
+                      {previewData && (
+                        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", borderBottom: "1px solid var(--tt-grey03)", paddingBottom: 10, marginBottom: 16 }}>
+                          <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-text-1)" }}>
+                            Site Activity{siteActivityMonthLabel ? ` — ${siteActivityMonthLabel}` : ""}
+                          </span>
+                          <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", whiteSpace: "nowrap" }}>
+                            {totalEntryCount} entr{totalEntryCount === 1 ? "y" : "ies"} · {totalPhotoCount} photo{totalPhotoCount === 1 ? "" : "s"}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* No inline "no data" message here — the proactive toast already covers it */}
+                      {previewData && previewData.groups.length === 0 && renderNoteSlot("empty")}
+                      {previewData && visibleGroups.map((g, gIdx) => (
+                        <div key={g.key}>
+                          {/* "Day" grouping never bundles more than one entry under the
+                              same label in practice, so each entry's own date badge
+                              below is enough on its own — a group header here would
+                              just repeat it. Week/month grouping, however, genuinely
+                              rolls multiple entries up together, so it needs its own
+                              shared header (with the group's total photo count). */}
+                          {previewData.grouping !== "day" && (
+                            <p style={{
+                              fontSize: 11, fontWeight: 600, color: "var(--tt-grey05)",
+                              letterSpacing: "0.06em", textTransform: "uppercase",
+                              position: "sticky", top: 0, zIndex: 2, background: "white",
+                              padding: "8px 0", margin: 0,
+                            }}>
+                              {formatGroupLabel(g, previewData.grouping).toUpperCase()}
+                            </p>
+                          )}
+                          {g.entries.map((e, i) => {
+                            const entryKey = `${g.key}_${i}`;
+                            const displayTitle = titleOverrides[entryKey] ?? e.note;
+                            const isEditingTitle = !previewSaved && editingTitleKey === entryKey;
+                            // e.noPhotos is set once in buildReportData, before applyPhotoCap
+                            // can zero out an otherwise-photographed entry's photos — an
+                            // entry merely capped down to 0 photos must never be shown as
+                            // completed here.
+                            const isCompleted = e.noPhotos;
+                            const isLastEntry = gIdx === visibleGroups.length - 1 && i === g.entries.length - 1;
+                            return (
+                              <div key={entryKey} style={{ marginBottom: 20, paddingBottom: 20, borderBottom: isLastEntry ? "none" : "1px solid var(--tt-grey03)" }}>
+                                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                                  {/* Date badge in place of the old "date · N photos" meta
+                                      line, matching the document's own visual language. */}
+                                  <span style={{
+                                    flexShrink: 0, marginTop: 2, height: 20, padding: "0 8px",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    background: "var(--tt-text-1)", color: "white", borderRadius: 4,
+                                    fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", whiteSpace: "nowrap",
+                                  }}>
+                                    {fmtDate(parseDate(e.date)).toUpperCase()}
+                                  </span>
+
+                                  {isEditingTitle ? (
+                                    // Same height/border chrome as the "Add a note" input below
+                                    // (no left icon this time) — draft-only until the check
+                                    // button (or Enter) commits it into titleOverrides, or the
+                                    // X (or Escape) discards it. Both sit inside the input
+                                    // itself, on the right. Sized to the text itself (capped at
+                                    // the row's full width) rather than always stretching full
+                                    // width like a normal form field.
+                                    <div style={{ position: "relative", maxWidth: "100%", minWidth: 0, flex: 1 }}>
+                                      <input
+                                        ref={el => { if (el) { el.focus(); const len = el.value.length; el.setSelectionRange(len, len); } }}
+                                        type="text"
+                                        value={renameDraft}
+                                        onChange={ev => setRenameDraft(ev.target.value)}
+                                        onKeyDown={ev => {
+                                          if (ev.key === "Enter") { ev.preventDefault(); confirmRenameTitle(entryKey); }
+                                          if (ev.key === "Escape") { ev.preventDefault(); cancelRenameTitle(); }
+                                        }}
+                                        style={{
+                                          fieldSizing: "content", width: "100%", maxWidth: "100%", minWidth: 120,
+                                          height: 32, padding: "0 76px 0 12px", border: "1px solid var(--tt-text-1)", borderRadius: 8,
+                                          fontSize: 13, fontFamily: "inherit", color: "var(--tt-text-2)", outline: "none", boxSizing: "border-box",
+                                        }}
+                                      />
+                                      <div style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center", gap: 4 }}>
+                                        <button
+                                          onClick={cancelRenameTitle}
+                                          onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
+                                          onMouseLeave={ev => ev.currentTarget.style.background = "none"}
+                                          style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "background 0.15s" }}
+                                        >
+                                          <X size={14} strokeWidth={SW} color="var(--tt-grey06)" />
+                                        </button>
+                                        <button
+                                          onClick={() => confirmRenameTitle(entryKey)}
+                                          onMouseEnter={ev => ev.currentTarget.style.opacity = "0.85"}
+                                          onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
+                                          style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, background: "var(--tt-secondary)", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "opacity 0.15s" }}
+                                        >
+                                          <Check size={14} strokeWidth={SW} color="white" />
+                                        </button>
+                                      </div>
                                     </div>
-                                  </div>
-                                ) : (
-                                  <>
+                                  ) : (
                                     <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1, minWidth: 0 }}>
-                                      <p style={{ flex: "0 1 auto", minWidth: 0, fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.5", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                      <p style={{ flex: "0 1 auto", minWidth: 0, fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.4", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                         {displayTitle}
                                       </p>
                                       {/* Renaming here only overrides the title for this report —
-                                          the original task/entry text is never modified. Kept right
-                                          next to the (possibly truncated) title, not pushed to the
-                                          far edge of the row. */}
+                                          the original task/entry text is never modified. */}
                                       {!previewSaved && (
                                         <button
                                           onClick={() => startRenameTitle(entryKey, displayTitle)}
                                           onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
                                           onMouseLeave={ev => ev.currentTarget.style.background = "none"}
-                                          style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "background 0.15s" }}
+                                          style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 20, height: 20, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "background 0.15s" }}
                                         >
-                                          <Pencil size={13} strokeWidth={SW} color="var(--tt-grey05)" />
+                                          <Pencil size={12} strokeWidth={SW} color="var(--tt-grey05)" />
                                         </button>
                                       )}
                                     </div>
-                                    {isCompleted && (
-                                      <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: "var(--tt-secondary)", background: "var(--tt-mint)", borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap" }}>
-                                        Completed
-                                      </span>
-                                    )}
-                                  </>
+                                  )}
+                                </div>
+                                {!isCompleted && (
+                                  <PhotoGrid
+                                    photos={e.photos}
+                                    onOpen={(photos, idx, originalIndices) => setLightbox({ photos, index: idx, entryDate: e.date, taskName: displayTitle, entryKey, originalIndices })}
+                                    excludedPhotos={preview.excludedPhotos}
+                                    entryKey={entryKey}
+                                    selectedPhotos={selectedPhotos}
+                                    onToggleSelect={previewSaved ? undefined : (idx, photoKey) => togglePhotoSelected(entryKey, idx, photoKey)}
+                                  />
                                 )}
+                                {renderNoteSlot(entryKey)}
                               </div>
-                              {!isCompleted && (
-                                <p style={{ fontSize: 11, fontWeight: 600, color: "var(--tt-grey05)", letterSpacing: "0.04em", textTransform: "uppercase", margin: isEditingTitle ? "8px 0 0" : "2px 0 0" }}>
-                                  {previewData.grouping === "day" && `${fmtDate(parseDate(e.date))} · `}
-                                  {e.photos.length} photo{e.photos.length > 1 ? "s" : ""}
-                                </p>
-                              )}
-                              <PhotoGrid
-                                photos={e.photos}
-                                onOpen={(photos, idx, originalIndices) => setLightbox({ photos, index: idx, entryDate: e.date, taskName: displayTitle, entryKey, originalIndices })}
-                                excludedPhotos={preview.excludedPhotos}
-                                entryKey={entryKey}
-                                selectedPhotos={selectedPhotos}
-                                onToggleSelect={previewSaved ? undefined : (idx, photoKey) => togglePhotoSelected(entryKey, idx, photoKey)}
-                              />
-                              {renderNoteSlot(entryKey)}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ))}
-
-                    {/* Infinite scroll: one skeleton item while the next batch "loads" */}
-                    {loadingMore && (
-                      <div style={{ marginBottom: 20 }}>
-                        <div className="tt-skeleton" style={{ width: "85%", height: 16, marginBottom: 10 }} />
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
-                          {[0, 1, 2].map(pi => (
-                            <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "4/3" }} />
-                          ))}
+                            );
+                          })}
                         </div>
+                      ))}
+
+                      {/* Infinite scroll: one skeleton item while the next batch "loads" */}
+                      {loadingMore && (
+                        <div style={{ marginBottom: 20 }}>
+                          <div className="tt-skeleton" style={{ width: "85%", height: 16, marginBottom: 10 }} />
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
+                            {[0, 1, 2].map(pi => (
+                              <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "4/3" }} />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ── Work Status — separate from the dated activity log
+                        above; a project's actual task/checklist state, not
+                        an activity summary. Gated by the "Task summary"
+                        checkbox, same as the old progress bar it replaces. ── */}
+                    {preview.includeSummary && (
+                      <div style={{ border: "1px solid var(--tt-grey03)", borderRadius: 12, padding: 24, marginBottom: 16 }}>
+                        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", borderBottom: "1px solid var(--tt-grey03)", paddingBottom: 10, marginBottom: 8 }}>
+                          <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-text-1)" }}>Work Status</span>
+                          <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)" }}>
+                            {DUMMY_TASKS.filter(t => t.status === "complete").length} / {DUMMY_TASKS.length} complete
+                          </span>
+                        </div>
+                        {DUMMY_TASKS.map((t, ti) => (
+                          <div
+                            key={ti}
+                            style={{
+                              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+                              padding: "8px 0", borderBottom: ti < DUMMY_TASKS.length - 1 ? "1px solid var(--tt-grey02)" : "none",
+                            }}
+                          >
+                            <span style={{ fontSize: 13, fontWeight: 500, color: "var(--tt-text-1)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {t.name}
+                            </span>
+                            <span style={{ flexShrink: 0, width: 90, textAlign: "right", fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--tt-grey05)" }}>
+                              {t.category}
+                            </span>
+                            <span style={{ flexShrink: 0, width: 60, textAlign: "right", fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--tt-grey05)" }}>
+                              {t.dueDate ? fmtDate(parseDate(t.dueDate)).toUpperCase() : "—"}
+                            </span>
+                            <span style={{
+                              flexShrink: 0, width: 90, textAlign: "right", fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase",
+                              color: t.status === "complete" ? "var(--tt-secondary)" : t.status === "in_progress" ? "var(--tt-text-2)" : "var(--tt-grey05)",
+                            }}>
+                              {t.status === "in_progress" ? "In progress" : t.status === "complete" ? "Complete" : "Upcoming"}
+                            </span>
+                          </div>
+                        ))}
                       </div>
                     )}
+
+                    {/* ── Point of contact footer — closes out the document. ── */}
+                    <div style={{ background: "var(--tt-text-1)", borderRadius: 12, padding: 20 }}>
+                      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+                        <div>
+                          <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "rgba(255,255,255,0.55)", margin: "0 0 4px" }}>
+                            Point of Contact
+                          </p>
+                          <p style={{ fontSize: 14, fontWeight: 700, color: "white", margin: "0 0 2px" }}>{POINT_OF_CONTACT_NAME}</p>
+                          {/* TODO(BE): replace with the firm's actual phone/email */}
+                          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", margin: 0 }}>TaskTag · [FIRM PHONE] · [FIRM EMAIL]</p>
+                        </div>
+                        <p style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", margin: 0, textAlign: "right" }}>
+                          Next report {nextReportLabel()}. Link does not change.
+                        </p>
+                      </div>
+                    </div>
                   </>
                 )}
               </div>
