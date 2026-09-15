@@ -477,36 +477,31 @@ function TasksTab() {
   );
 }
 
-// ── Report section chip ──
-// Toggle-able pill used to include/exclude a section of the report.
-function ReportChip({ active, label, onClick }) {
+// ── Report section checkbox ──
+// Toggle-able checkbox + label used to include/exclude a section of the
+// report.
+function ReportCheckbox({ active, label, onClick }) {
   return (
     <button
       onClick={onClick}
       style={{
         display: "flex", alignItems: "center", gap: 8,
-        height: 40, padding: "0 14px 0 10px", flexShrink: 0,
-        background: "white",
-        border: `1px solid ${active ? "var(--tt-secondary)" : "var(--tt-grey03)"}`,
-        borderRadius: 999,
+        height: 40, padding: 0, flexShrink: 0,
+        background: "none", border: "none",
         fontSize: 13, fontWeight: 500,
         color: "var(--tt-text-2)",
         cursor: "pointer", whiteSpace: "nowrap",
-        transition: "border-color 0.15s",
       }}
     >
-      {/* Always-visible checkbox-style indicator, so the unselected
-          ("off") state reads as clearly as the selected one instead of
-          just disappearing when there's no checkmark to show. */}
       <span style={{
-        width: 16, height: 16, borderRadius: "50%", flexShrink: 0,
+        width: 18, height: 18, borderRadius: 4, flexShrink: 0,
         display: "flex", alignItems: "center", justifyContent: "center",
         lineHeight: 0, boxSizing: "border-box",
-        background: active ? "var(--tt-secondary)" : "transparent",
+        background: active ? "var(--tt-secondary)" : "white",
         border: active ? "none" : "1.5px solid var(--tt-grey04)",
         transition: "background 0.15s, border-color 0.15s",
       }}>
-        {active && <Check size={11} color="white" strokeWidth={3} style={{ display: "block" }} />}
+        {active && <Check size={12} color="white" strokeWidth={3} style={{ display: "block" }} />}
       </span>
       {label}
     </button>
@@ -2006,8 +2001,8 @@ function ReportsTab({ demoCase }) {
           </div>
 
           {/* Task summary / no-photo-tasks chips */}
-          <ReportChip active={includeSummary} label="Task summary" onClick={() => setIncludeSummary(v => !v)} />
-          <ReportChip active={includeNoPhotoTasks} label="Task complete without photos" onClick={() => setIncludeNoPhotoTasks(v => !v)} />
+          <ReportCheckbox active={includeSummary} label="Task summary" onClick={() => setIncludeSummary(v => !v)} />
+          <ReportCheckbox active={includeNoPhotoTasks} label="Task complete without photos" onClick={() => setIncludeNoPhotoTasks(v => !v)} />
 
           {/* Generate button */}
           <div style={{ flexShrink: 0 }}>
