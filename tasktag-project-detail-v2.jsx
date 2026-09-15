@@ -181,7 +181,7 @@ const PROJECT_ADDRESS = "11 North Raintree Hollow Court, Sienna Plantation, Miss
 const POINT_OF_CONTACT_NAME = "Jordan Blake";
 
 // ── Date Range Calendar ──
-function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false }) {
+function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, singleDate = false }) {
   const today = APP_TODAY;
   const [viewYear,   setViewYear]   = useState(today.getFullYear());
   const [viewMonth,  setViewMonth]  = useState(today.getMonth());
@@ -256,10 +256,13 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false })
     `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
   const todayKey = toKey(today.getFullYear(), today.getMonth(), today.getDate());
 
-  const effectiveEnd = rangeEnd || hovering;
+  // In singleDate mode there's no range to preview — every click just
+  // replaces the one selected day, and hovering never draws a band.
+  const effectiveEnd = singleDate ? null : (rangeEnd || hovering);
 
   const handleDay = (key) => {
     if (!allowFuture && key > todayKey) return; // dates after today can't be selected
+    if (singleDate) { setRangeStart(key); setRangeEnd(null); return; }
     if (!rangeStart || rangeEnd) {
       setRangeStart(key); setRangeEnd(null);
     } else {
@@ -516,18 +519,28 @@ function ReportCheckbox({ active, label, onClick }) {
 // No pencil icon — hovering shows a grey02 background to signal the field
 // is editable, and clicking swaps it for an input (or textarea) with
 // check/cancel icons matching the task-name rename pattern (inside the
-// input for single-line fields, below it for multiline ones, since icons
-// can't sit inside wrapped text). Manages its own draft/editing state, so
-// any number of these can be open independently at once.
+// input for single-line fields, below it in-flow for multiline ones, since
+// icons can't sit inside wrapped text). Manages its own draft/editing
+// state, so any number of these can be open independently at once.
 //
 // `boxed` (multiline only) makes the field own its grey02 card chrome
 // (background/padding/radius) in both states, instead of a caller-side
-// wrapper — so editing swaps the card's plain text for a textarea filling
-// that same box, with the check/cancel icons overlaid inside its bottom
-// corner, rather than nesting a separate bordered textarea inside it.
-function EditableField({ value, placeholder, onSave, onCancel, multiline, disabled, autoEdit, boxed, textStyle, inputStyle, as: Tag = "p" }) {
+// wrapper — so editing swaps the card's plain text for a textarea (plus
+// its check/cancel row) filling that same box, rather than nesting a
+// separate bordered textarea inside it.
+//
+// `required` blocks committing an empty value — the check button (or
+// Enter) just shows `errorMessage` below the field and leaves editing
+// open instead of calling onSave.
+//
+// Whatever sits below an active (editing) field is always 8px away: a
+// non-boxed field's own wrapper carries that as marginBottom, multiline's
+// check/cancel row sits 8px under the textarea, and the error message (if
+// any) sits 8px under that.
+function EditableField({ value, placeholder, onSave, onCancel, multiline, disabled, autoEdit, boxed, required, errorMessage, textStyle, inputStyle, as: Tag = "p" }) {
   const [editing, setEditing] = useState(!!autoEdit);
   const [draft, setDraft] = useState(value || "");
+  const [error, setError] = useState(false);
 
   const boxStyle = boxed ? { background: "var(--tt-grey02)", borderRadius: 8, padding: 16 } : {};
 
@@ -537,21 +550,28 @@ function EditableField({ value, placeholder, onSave, onCancel, multiline, disabl
   }
 
   if (editing) {
-    const commit = () => { onSave(draft.trim()); setEditing(false); };
-    const cancel = () => { setEditing(false); if (onCancel) onCancel(); };
+    const commit = () => {
+      const trimmed = draft.trim();
+      if (required && !trimmed) { setError(true); return; }
+      onSave(trimmed);
+      setEditing(false);
+      setError(false);
+    };
+    const cancel = () => { setEditing(false); setError(false); if (onCancel) onCancel(); };
+    const onChange = ev => { setDraft(ev.target.value); if (error) setError(false); };
     return (
-      <div style={{ position: "relative", maxWidth: "100%", minWidth: 0, ...boxStyle }}>
+      <div style={{ position: "relative", maxWidth: "100%", minWidth: 0, ...(!boxed ? { marginBottom: 8 } : {}), ...boxStyle }}>
         {multiline ? (
           <textarea
             ref={el => { if (el) el.focus(); }}
             value={draft}
-            onChange={ev => setDraft(ev.target.value)}
+            onChange={onChange}
             onKeyDown={ev => { if (ev.key === "Escape") { ev.preventDefault(); cancel(); } }}
             rows={3}
             placeholder={placeholder}
             style={boxed
-              ? { display: "block", width: "100%", fontFamily: "inherit", border: "none", outline: "none", resize: "none", padding: 0, paddingBottom: 36, margin: 0, background: "none", boxSizing: "border-box", ...inputStyle }
-              : { display: "block", width: "100%", fontFamily: "inherit", border: "1px solid var(--tt-text-1)", borderRadius: 8, outline: "none", resize: "none", padding: "8px 12px", boxSizing: "border-box", ...inputStyle }
+              ? { display: "block", width: "100%", fontFamily: "inherit", border: "none", outline: "none", resize: "none", padding: 0, margin: 0, background: "none", boxSizing: "border-box", ...inputStyle }
+              : { display: "block", width: "100%", fontFamily: "inherit", border: `1px solid ${error ? "var(--tt-red)" : "var(--tt-text-1)"}`, borderRadius: 8, outline: "none", resize: "none", padding: "8px 12px", boxSizing: "border-box", ...inputStyle }
             }
           />
         ) : (
@@ -559,19 +579,17 @@ function EditableField({ value, placeholder, onSave, onCancel, multiline, disabl
             ref={el => { if (el) { el.focus(); const len = el.value.length; el.setSelectionRange(len, len); } }}
             type="text"
             value={draft}
-            onChange={ev => setDraft(ev.target.value)}
+            onChange={onChange}
             onKeyDown={ev => {
               if (ev.key === "Enter") { ev.preventDefault(); commit(); }
               if (ev.key === "Escape") { ev.preventDefault(); cancel(); }
             }}
             placeholder={placeholder}
-            style={{ fieldSizing: "content", width: "100%", maxWidth: "100%", minWidth: 120, height: 40, padding: "0 76px 0 12px", border: "1px solid var(--tt-text-1)", borderRadius: 8, fontFamily: "inherit", outline: "none", boxSizing: "border-box", ...inputStyle }}
+            style={{ fieldSizing: "content", width: "100%", maxWidth: "100%", minWidth: 120, height: 40, padding: "0 76px 0 12px", border: `1px solid ${error ? "var(--tt-red)" : "var(--tt-text-1)"}`, borderRadius: 8, fontFamily: "inherit", outline: "none", boxSizing: "border-box", ...inputStyle }}
           />
         )}
         <div style={multiline
-          ? (boxed
-              ? { position: "absolute", right: 16, bottom: 16, display: "flex", alignItems: "center", gap: 4 }
-              : { display: "flex", justifyContent: "flex-end", gap: 4, marginTop: 6 })
+          ? { display: "flex", justifyContent: "flex-end", gap: 4, marginTop: 8 }
           : { position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center", gap: 4 }
         }>
           <button
@@ -591,6 +609,11 @@ function EditableField({ value, placeholder, onSave, onCancel, multiline, disabl
             <Check size={15} strokeWidth={SW} color="white" />
           </button>
         </div>
+        {error && (
+          <p style={{ color: "var(--tt-red)", fontSize: 11, fontWeight: 500, margin: "8px 0 0" }}>
+            {errorMessage || "This can't be empty."}
+          </p>
+        )}
       </div>
     );
   }
@@ -598,7 +621,7 @@ function EditableField({ value, placeholder, onSave, onCancel, multiline, disabl
   return (
     <div style={boxStyle}>
       <Tag
-        onClick={() => { setDraft(value || ""); setEditing(true); }}
+        onClick={() => { setDraft(value || ""); setEditing(true); setError(false); }}
         onMouseEnter={ev => { if (!boxed) ev.currentTarget.style.background = "var(--tt-grey02)"; }}
         onMouseLeave={ev => ev.currentTarget.style.background = "none"}
         style={{ display: "block", cursor: "pointer", borderRadius: 6, transition: "background 0.15s", ...textStyle }}
@@ -2356,18 +2379,22 @@ function ReportsTab({ demoCase }) {
                           own period control above). Row 2: project name —
                           editable the same way as a task name, and sized
                           like the old summary headline now that it's the
-                          document's real title. Row 3: address. */}
+                          document's real title; required, since a report
+                          always needs a title. Row 3: address, in normal
+                          (not all-caps) text. */}
                       <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-secondary)", margin: "0 0 4px" }}>
                         {preview.period}
                       </p>
                       <EditableField
                         value={preview.projectName}
                         placeholder={PROJECT_NAME}
-                        onSave={v => setPreview(p => ({ ...p, projectName: v || PROJECT_NAME }))}
+                        required
+                        errorMessage="Project name can't be empty."
+                        onSave={v => setPreview(p => ({ ...p, projectName: v }))}
                         textStyle={{ fontSize: 24, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 4px" }}
                         inputStyle={{ fontSize: 24, fontWeight: 700 }}
                       />
-                      <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "0 0 16px" }}>
+                      <p style={{ fontSize: 13, fontWeight: 400, color: "var(--tt-grey05)", margin: "0 0 16px" }}>
                         {PROJECT_ADDRESS}
                       </p>
 
@@ -2389,6 +2416,7 @@ function ReportsTab({ demoCase }) {
                               <DateRangeCalendar
                                 anchorRef={targetOpeningRef}
                                 allowFuture
+                                singleDate
                                 onClose={() => setTargetOpeningCalOpen(false)}
                                 onApply={(start) => {
                                   if (start) {
@@ -2413,8 +2441,7 @@ function ReportsTab({ demoCase }) {
                         </div>
                       </div>
 
-                      {/* Summary — small, address-sized caption (not
-                          uppercase), set apart in its own grey02 box like a
+                      {/* Summary — set apart in its own grey02 box like a
                           project description, after Target Opening/Prepared
                           For rather than acting as the document's headline.
                           The box owns its own grey02 chrome (via `boxed`) so
@@ -2427,8 +2454,8 @@ function ReportsTab({ demoCase }) {
                           multiline
                           boxed
                           onSave={v => setPreview(p => ({ ...p, summary: v }))}
-                          textStyle={{ fontSize: 11, color: "var(--tt-text-2)", lineHeight: 1.6, margin: 0 }}
-                          inputStyle={{ fontSize: 11, color: "var(--tt-text-2)", lineHeight: 1.6 }}
+                          textStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, margin: 0 }}
+                          inputStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6 }}
                         />
                       </div>
 
@@ -2513,7 +2540,7 @@ function ReportsTab({ demoCase }) {
                                 />
                                 {/* In place of the separate Work Status section: status,
                                     date, and task owner right under the task name. */}
-                                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
                                   <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--tt-secondary)", flexShrink: 0 }} />
                                   <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--tt-secondary)" }}>
                                     Completed
