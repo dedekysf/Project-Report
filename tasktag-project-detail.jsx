@@ -1988,8 +1988,8 @@ function ReportsTab({ demoCase }) {
 
       <div style={{ height: 1, background: "var(--tt-grey03)", margin: "20px 0" }} />
 
-      <div style={{ display: "flex", gap: 32 }}>
-        <div>
+      <div style={{ display: "flex", flexWrap: "nowrap", gap: 32 }}>
+        <div style={{ flex: "1 1 0" }}>
           <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "0 0 4px" }}>Target Opening</p>
           {previewSaved ? (
             <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", margin: 0 }}>{preview.targetOpening || "—"}</p>
@@ -2021,7 +2021,7 @@ function ReportsTab({ demoCase }) {
             </div>
           )}
         </div>
-        <div>
+        <div style={{ flex: "1 1 0" }}>
           <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "0 0 4px" }}>Prepared For</p>
           <EditableField
             value={preview.clientName}
