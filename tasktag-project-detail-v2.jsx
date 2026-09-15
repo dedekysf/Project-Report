@@ -2321,7 +2321,7 @@ function ReportsTab({ demoCase }) {
                         onChange={ev => setPreview(p => ({ ...p, summaryHeadline: ev.target.value }))}
                         rows={2}
                         placeholder="Summarize how the project is going this period"
-                        style={{ display: "block", width: "100%", fontFamily: "Georgia, 'Times New Roman', serif", fontWeight: 400, fontSize: 24, lineHeight: 1.3, color: "var(--tt-text-1)", border: "none", outline: "none", resize: "none", padding: 0, margin: "0 0 12px", background: "none" }}
+                        style={{ display: "block", width: "100%", fontFamily: "inherit", fontWeight: 400, fontSize: 24, lineHeight: 1.3, color: "var(--tt-text-1)", border: "none", outline: "none", resize: "none", padding: 0, margin: "0 0 12px", background: "none" }}
                       />
 
                       <textarea
