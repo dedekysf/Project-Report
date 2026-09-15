@@ -1191,6 +1191,26 @@ function formatGroupLabel(g, grouping) {
   return new Date(y, m - 1, d).toLocaleDateString("en-US", { day: "numeric", month: "short" }).toUpperCase();
 }
 
+// Same date/week/month label as formatGroupLabel, but without the group's
+// aggregate photo count baked in — used per entry in the live preview,
+// paired with that specific entry's own photo count instead. Respects the
+// same grouping-granularity rule (day ≤ 2 weeks, week ≤ 2 months, month
+// beyond that): a "day"-grouped period shows the entry's own exact date,
+// while week/month grouping shows the shared week/month label instead of
+// the individual day.
+function formatEntryDateLabel(g, grouping, entryDateStr) {
+  if (grouping === "week") {
+    const [y, m, d] = g.key.split("-").map(Number);
+    const mon = new Date(y, m - 1, d);
+    return `week of ${mon.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+  }
+  if (grouping === "month") {
+    const [y, m] = g.key.split("-").map(Number);
+    return new Date(y, m - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  }
+  return fmtDate(parseDate(entryDateStr));
+}
+
 function applyPhotoCap(groups, maxPhotos = 45) {
   // Count total photos
   let total = groups.reduce((sum, g) => sum + g.entries.reduce((s, e) => s + e.photos.length, 0), 0);
@@ -2281,7 +2301,7 @@ function ReportsTab({ demoCase }) {
                               </div>
                               {!isCompleted && (
                                 <p style={{ fontSize: 11, fontWeight: 600, color: "var(--tt-grey05)", letterSpacing: "0.04em", textTransform: "uppercase", margin: "2px 0 0" }}>
-                                  {fmtDate(parseDate(e.date))} · {e.photos.length} photo{e.photos.length > 1 ? "s" : ""}
+                                  {formatEntryDateLabel(g, previewData.grouping, e.date)} · {e.photos.length} photo{e.photos.length > 1 ? "s" : ""}
                                 </p>
                               )}
                               <PhotoGrid
