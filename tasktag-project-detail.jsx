@@ -1212,13 +1212,18 @@ function applyPhotoCap(groups, maxPhotos = 45) {
     selected.add(Math.min(Math.floor(i * step), all.length - 1));
   }
 
-  // Rebuild groups keeping only selected photos
+  // Rebuild groups keeping only selected photos. An entry that started
+  // with photos but got trimmed down to zero by the cap is dropped
+  // entirely — keeping it around as a bare, photo-less title would be
+  // indistinguishable from (and get mislabeled as) a genuinely completed
+  // no-photo task. A genuinely no-photo entry (e.noPhotos, tagged before
+  // capping) is always kept regardless.
   return groups.map((g, gi) => ({
     ...g,
     entries: g.entries.map((e, ei) => ({
       ...e,
       photos: e.photos.filter((_, pi) => selected.has(all.findIndex(a => a.gi === gi && a.ei === ei && a.pi === pi))),
-    })).filter(e => e.photos.length > 0 || e.note),
+    })).filter(e => e.photos.length > 0 || e.noPhotos),
   }));
 }
 
@@ -1231,7 +1236,16 @@ function buildReportData(dateRange, periodStr, customRange, includeNoPhotoTasks 
       .map(g => ({ ...g, entries: g.entries.filter(e => e.photos.length > 0) }))
       .filter(g => g.entries.length > 0);
   }
-  groups = applyPhotoCap(groups);
+  // Tag each entry's "no photos" status now, before applyPhotoCap can trim
+  // an otherwise-photographed entry down to zero photos for display —
+  // otherwise a task that merely got capped would be indistinguishable
+  // from one that was genuinely completed with no photos, and both would
+  // wrongly show the "Completed" tag.
+  groups = groups.map(g => ({
+    ...g,
+    entries: g.entries.map(e => ({ ...e, noPhotos: e.photos.length === 0 })),
+  }));
+  groups = applyPhotoCap(groups).filter(g => g.entries.length > 0);
 
   // completed = entries actually attached to this report (countable from
   // what's shown below), total = the whole project's activity log — so the
@@ -2257,7 +2271,12 @@ function ReportsTab({ demoCase }) {
                             line then only needs that entry's own count, not the date
                             again. */}
                         {previewData.grouping !== "day" && (
-                          <p style={{ fontSize: 11, fontWeight: 600, color: "var(--tt-grey05)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 10 }}>
+                          <p style={{
+                            fontSize: 11, fontWeight: 600, color: "var(--tt-grey05)",
+                            letterSpacing: "0.06em", textTransform: "uppercase",
+                            position: "sticky", top: 0, zIndex: 2, background: "white",
+                            padding: "8px 0", margin: 0,
+                          }}>
                             {formatGroupLabel(g, previewData.grouping).toUpperCase()}
                           </p>
                         )}
@@ -2265,7 +2284,11 @@ function ReportsTab({ demoCase }) {
                           const entryKey = `${g.key}_${i}`;
                           const displayTitle = titleOverrides[entryKey] ?? e.note;
                           const isEditingTitle = !previewSaved && editingTitleKey === entryKey;
-                          const isCompleted = e.photos.length === 0;
+                          // e.noPhotos is set once in buildReportData, before applyPhotoCap
+                          // can zero out an otherwise-photographed entry's photos — an
+                          // entry merely capped down to 0 photos must never be shown as
+                          // "Completed".
+                          const isCompleted = e.noPhotos;
                           return (
                             <div key={entryKey} style={{ marginBottom: 20, paddingBottom: 20, borderBottom: "1px solid var(--tt-grey02)" }}>
                               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
