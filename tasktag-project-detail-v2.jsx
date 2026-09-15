@@ -1987,40 +1987,45 @@ function ReportsTab({ demoCase }) {
 
   const renderBlock = (block) => block.type === "label" ? renderGroupLabelBlock(block.g) : renderEntryBlock(block);
 
-  // Full header — renders identically on every page (this is now the
-  // *only* header variant; there's no separate lightweight running
-  // header for later pages). Logo/company identity, editable project
   // identity, summary + progress, and Target Opening/Prepared For.
+  //
+  // The logo/company identity row is the only thing that repeats on every
+  // page (see renderRunningHeader) — factored out so both variants render
+  // it identically.
+  const renderCompanyIdentityRow = () => (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <LogoUploadBox
+          src={preview.logo}
+          onChange={url => setPreview(p => ({ ...p, logo: url }))}
+        />
+        <div>
+          {/* TODO(BE): replace with the firm's actual name from the API */}
+          <EditableField
+            value={preview.companyName}
+            placeholder={POINT_OF_CONTACT_COMPANY}
+            onSave={v => setPreview(p => ({ ...p, companyName: v }))}
+            textStyle={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: 0 }}
+            inputStyle={{ fontSize: 14, fontWeight: 700 }}
+          />
+          <EditableField
+            value={preview.companyAddress}
+            placeholder={COMPANY_ADDRESS}
+            onSave={v => setPreview(p => ({ ...p, companyAddress: v }))}
+            textStyle={{ fontSize: 11, fontWeight: 400, color: "var(--tt-grey05)", margin: 0 }}
+            inputStyle={{ fontSize: 11, fontWeight: 400 }}
+          />
+        </div>
+      </div>
+      <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)" }}>
+        Report by TaskTag
+      </span>
+    </div>
+  );
+
   const renderFullHeader = () => (
     <div style={{ padding: PAGE_PAD }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <LogoUploadBox
-            src={preview.logo}
-            onChange={url => setPreview(p => ({ ...p, logo: url }))}
-          />
-          <div>
-            {/* TODO(BE): replace with the firm's actual name from the API */}
-            <EditableField
-              value={preview.companyName}
-              placeholder={POINT_OF_CONTACT_COMPANY}
-              onSave={v => setPreview(p => ({ ...p, companyName: v }))}
-              textStyle={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: 0 }}
-              inputStyle={{ fontSize: 14, fontWeight: 700 }}
-            />
-            <EditableField
-              value={preview.companyAddress}
-              placeholder={COMPANY_ADDRESS}
-              onSave={v => setPreview(p => ({ ...p, companyAddress: v }))}
-              textStyle={{ fontSize: 11, fontWeight: 400, color: "var(--tt-grey05)", margin: 0 }}
-              inputStyle={{ fontSize: 11, fontWeight: 400 }}
-            />
-          </div>
-        </div>
-        <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)" }}>
-          Report by TaskTag
-        </span>
-      </div>
+      {renderCompanyIdentityRow()}
       <div style={{ height: 1, background: "var(--tt-grey03)", marginBottom: 20 }} />
 
       {/* Row 1: period (not editable — mirrors the chrome's own period
@@ -2105,30 +2110,14 @@ function ReportsTab({ demoCase }) {
     </div>
   );
 
-  // Running header — pages 2+: a lightweight recap (logo, company name,
-  // project name, address) for orientation when flipping through pages.
-  // Everything else on the full header (summary, progress, Target
-  // Opening/Prepared For) is page-1-only content, not repeated.
+  // Running header — pages 2+: only the logo/company identity row
+  // repeats. Everything else on the full header (period, project
+  // name/address, summary, progress, Target Opening/Prepared For) is
+  // page-1-only content, not repeated.
   const renderRunningHeader = () => (
     <div style={{ padding: `${PAGE_PAD}px ${PAGE_PAD}px 0` }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {preview.logo && (
-            <img src={preview.logo} alt="Company logo" style={{ width: 24, height: 24, borderRadius: 6, objectFit: "contain" }} />
-          )}
-          <span style={{ fontSize: 12, fontWeight: 700, color: "var(--tt-text-1)" }}>
-            {preview.companyName || POINT_OF_CONTACT_COMPANY}
-          </span>
-        </div>
-        <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)" }}>
-          Report by TaskTag
-        </span>
-      </div>
-      <p style={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 2px" }}>
-        {preview.projectName || PROJECT_NAME}
-      </p>
-      <p style={{ fontSize: 11, fontWeight: 400, color: "var(--tt-grey05)", margin: 0 }}>{preview.address || PROJECT_ADDRESS}</p>
-      <div style={{ height: 1, background: "var(--tt-grey03)", marginTop: 16 }} />
+      {renderCompanyIdentityRow()}
+      <div style={{ height: 1, background: "var(--tt-grey03)" }} />
     </div>
   );
 
