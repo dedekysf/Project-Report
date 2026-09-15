@@ -2108,7 +2108,7 @@ function ReportsTab({ demoCase }) {
                   onMouseEnter={e => !saving && (e.currentTarget.style.background = "var(--tt-grey02)")}
                   onMouseLeave={e => e.currentTarget.style.background = "white"}
                   style={{
-                    height: 32, padding: "0 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)",
+                    height: 40, padding: "0 24px", minWidth: isWide ? 120 : "auto", borderRadius: 8, border: "1px solid var(--tt-grey03)",
                     background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)",
                     display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center",
                     cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.5 : 1, transition: "background 0.15s",
@@ -2122,7 +2122,7 @@ function ReportsTab({ demoCase }) {
                   onMouseEnter={e => !(previewLoading || saving) && (e.currentTarget.style.opacity = "0.85")}
                   onMouseLeave={e => e.currentTarget.style.opacity = (previewLoading || saving) ? 0.5 : 1}
                   style={{
-                    height: 32, padding: "0 14px", borderRadius: 8, border: "none",
+                    height: 40, padding: "0 24px", minWidth: isWide ? 120 : "auto", borderRadius: 8, border: "none",
                     background: "var(--tt-text-1)", fontSize: 13, fontWeight: 500, color: "white",
                     display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center",
                     cursor: (previewLoading || saving) ? "not-allowed" : "pointer",
