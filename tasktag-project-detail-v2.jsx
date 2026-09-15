@@ -180,6 +180,11 @@ const PROJECT_NAME = "The Alvarez Home Renovation";
 const PROJECT_ADDRESS = "11 North Raintree Hollow Court, Sienna Plantation, Missouri City";
 // TODO(BE): replace with the project's actual point of contact from the API
 const POINT_OF_CONTACT_NAME = "Jordan Blake";
+const POINT_OF_CONTACT_ROLE = "Project Manager";
+const POINT_OF_CONTACT_COMPANY = "Reynolds Construction Co.";
+const initialsOf = (name) => name.split(" ").map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
+// TODO(BE): replace with the actual report ID from the API
+const REPORT_ID = `TX-1520-${APP_TODAY.getFullYear()}-${String(APP_TODAY.getMonth() + 1).padStart(2, "0")}`;
 
 // ── Paginated document sizing ──
 // The live preview lays out its document as stacked A4 sheets (each with
@@ -1392,15 +1397,6 @@ function buildDefaultSummary(groups) {
   return latestEntry ? `${headline} ${latestEntry.note}` : headline;
 }
 
-// "Next report" nudge in the footer — a rough one-month-out estimate from
-// APP_TODAY, phrased the same loose way a person would ("early October").
-function nextReportLabel() {
-  const next = new Date(APP_TODAY);
-  next.setMonth(next.getMonth() + 1);
-  const month = next.toLocaleDateString("en-US", { month: "long" });
-  return `early ${month}`;
-}
-
 // Photos checked off in the side panel are excluded from the final output
 // (download / copy-link / save) but still shown (checked) in the live
 // panel so the exclusion can be undone. Keyed the same way as extraNotes —
@@ -1652,7 +1648,7 @@ function ReportsTab({ demoCase }) {
   // Adds a report to the results list (called only once the user confirms
   // via "Save report" in the preview modal — Generate no longer does this
   // directly).
-  const pushReport = ({ includeSummary, includeNoPhotoTasks, dateRange, period, data, extraNotes, excludedPhotos, titleOverrides, projectName, summary, targetOpening, clientName }) => {
+  const pushReport = ({ includeSummary, includeNoPhotoTasks, dateRange, period, data, extraNotes, excludedPhotos, titleOverrides, projectName, address, summary, targetOpening, clientName }) => {
     const id = Date.now();
     const newReport = {
       id,
@@ -1667,6 +1663,7 @@ function ReportsTab({ demoCase }) {
       excludedPhotos,
       titleOverrides,
       projectName,
+      address,
       summary,
       targetOpening,
       clientName,
@@ -1724,6 +1721,7 @@ function ReportsTab({ demoCase }) {
         // System-generated starting point — freely editable from here, and
         // never regenerated for the life of this draft.
         projectName: PROJECT_NAME,
+        address: PROJECT_ADDRESS,
         summary: buildDefaultSummary(data.groups),
         targetOpening: "",
         clientName: "",
@@ -1920,7 +1918,7 @@ function ReportsTab({ demoCase }) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <img src={IMG_MAP_LOGO} alt="tasktag" style={{ height: 20, display: "block" }} />
         <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)" }}>
-          Client Report
+          Report by TaskTag
         </span>
       </div>
       <div style={{ height: 1, background: "var(--tt-grey03)", marginBottom: 20 }} />
@@ -1929,24 +1927,27 @@ function ReportsTab({ demoCase }) {
           control above; muted secondary text, not brand-colored). Row 2:
           project name — editable the same way as a task name, and sized
           like the old summary headline now that it's the document's real
-          title; required, since a report always needs a title. Row 3:
-          address, in normal (not all-caps) text. Summary and its progress
-          bar sit directly below, with Target Opening/Prepared For after. */}
+          title. Row 3: address, in normal (not all-caps) text, also
+          editable. Neither is required — an empty field just shows its
+          placeholder. Summary and its progress bar sit directly below,
+          with Target Opening/Prepared For after. */}
       <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-text-2)", margin: "0 0 4px" }}>
         {preview.period}
       </p>
       <EditableField
         value={preview.projectName}
         placeholder={PROJECT_NAME}
-        required
-        errorMessage="Project name can't be empty."
         onSave={v => setPreview(p => ({ ...p, projectName: v }))}
         textStyle={{ fontSize: 24, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 4px" }}
         inputStyle={{ fontSize: 24, fontWeight: 700 }}
       />
-      <p style={{ fontSize: 13, fontWeight: 400, color: "var(--tt-grey05)", margin: "0 0 20px" }}>
-        {PROJECT_ADDRESS}
-      </p>
+      <EditableField
+        value={preview.address}
+        placeholder={PROJECT_ADDRESS}
+        onSave={v => setPreview(p => ({ ...p, address: v }))}
+        textStyle={{ fontSize: 13, fontWeight: 400, color: "var(--tt-grey05)", margin: "0 0 20px" }}
+        inputStyle={{ fontSize: 13, fontWeight: 400 }}
+      />
 
       {/* Summary — set apart in its own grey02 box like a project
           description. The box owns its own grey02 chrome (via `boxed`) so
@@ -2043,35 +2044,46 @@ function ReportsTab({ demoCase }) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
         <img src={IMG_MAP_LOGO} alt="tasktag" style={{ height: 16, display: "block" }} />
         <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)" }}>
-          Client Report
+          Report by TaskTag
         </span>
       </div>
       <p style={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 2px" }}>
         {preview.projectName || PROJECT_NAME}
       </p>
-      <p style={{ fontSize: 11, fontWeight: 400, color: "var(--tt-grey05)", margin: 0 }}>{PROJECT_ADDRESS}</p>
+      <p style={{ fontSize: 11, fontWeight: 400, color: "var(--tt-grey05)", margin: 0 }}>{preview.address || PROJECT_ADDRESS}</p>
       <div style={{ height: 1, background: "var(--tt-grey03)", marginTop: 16 }} />
     </div>
   );
 
   // Footer — every page gets a page-number strip; the Point of Contact
-  // block only closes out the last page.
+  // block only closes out the last page. Light card style (avatar, name,
+  // role/company on the left; generation metadata on the right) rather
+  // than a dark contact-card panel.
   const renderPageFooter = (pageNum, pageCount, isLast) => (
     <div>
       {isLast && (
-        <div style={{ background: "var(--tt-text-1)", padding: 20 }}>
-          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-            <div>
-              <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "rgba(255,255,255,0.55)", margin: "0 0 4px" }}>
-                Point of Contact
-              </p>
-              <p style={{ fontSize: 14, fontWeight: 700, color: "white", margin: "0 0 2px" }}>{POINT_OF_CONTACT_NAME}</p>
-              {/* TODO(BE): replace with the firm's actual phone/email */}
-              <p style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", margin: 0 }}>TaskTag · [FIRM PHONE] · [FIRM EMAIL]</p>
+        <div style={{ padding: `20px ${PAGE_PAD}px`, borderTop: "1px solid var(--tt-grey03)" }}>
+          <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "0 0 12px" }}>
+            Point of Contact
+          </p>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--tt-pastel-magenta)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "white" }}>{initialsOf(POINT_OF_CONTACT_NAME)}</span>
+              </div>
+              <div>
+                <p style={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 2px" }}>{POINT_OF_CONTACT_NAME}</p>
+                {/* TODO(BE): replace with the contact's actual role/company from the API */}
+                <p style={{ fontSize: 12, fontWeight: 500, color: "var(--tt-secondary)", margin: 0 }}>
+                  {POINT_OF_CONTACT_ROLE} · {POINT_OF_CONTACT_COMPANY}
+                </p>
+              </div>
             </div>
-            <p style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", margin: 0, textAlign: "right" }}>
-              Next report {nextReportLabel()}. Link does not change.
-            </p>
+            <div style={{ textAlign: "right" }}>
+              <p style={{ fontSize: 11, color: "var(--tt-grey05)", margin: "0 0 2px" }}>Generated via TaskTag</p>
+              {/* TODO(BE): replace with the actual report ID from the API */}
+              <p style={{ fontSize: 11, color: "var(--tt-grey05)", margin: 0 }}>Report ID: {REPORT_ID}</p>
+            </div>
           </div>
         </div>
       )}
@@ -2224,7 +2236,7 @@ function ReportsTab({ demoCase }) {
         showToast("error", "Save failed. Try again.");
         return;
       }
-      pushReport({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, data: { ...previewData, groups: finalGroups }, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides, projectName: preview.projectName, summary: preview.summary, targetOpening: preview.targetOpening, clientName: preview.clientName });
+      pushReport({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, data: { ...previewData, groups: finalGroups }, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides, projectName: preview.projectName, address: preview.address, summary: preview.summary, targetOpening: preview.targetOpening, clientName: preview.clientName });
       setDateRange("since_last");
       setSaving(false);
       closePreview();
