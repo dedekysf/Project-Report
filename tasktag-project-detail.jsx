@@ -632,7 +632,7 @@ function PhotoThumb({ src, onClick }) {
 // uncapped photo list for that entry so the rest are still reachable via
 // the filmstrip). Each visible photo also carries a select checkbox in its
 // top-right corner; checking one or more surfaces a selection toolbar
-// (rendered by the caller) with Delete/Download actions. Deleted photos
+// (rendered by the caller) with a Delete action. Deleted photos
 // are filtered out here by their *original* index (excludedPhotos), so
 // remaining photos keep the same index-based keys even after some are
 // removed. An entry with zero visible photos renders nothing.
@@ -647,6 +647,10 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
   const remaining = items.length - CAP;
   const visibleItems = remaining > 0 ? items.slice(0, CAP) : items;
   const visiblePhotoKeys = items.map(it => it.k);
+  // Original (pre-filter) indices for each visible photo, in the same
+  // order as visiblePhotoKeys — lets the lightbox map a filmstrip
+  // selection back to this entry's real excludedPhotos keys.
+  const visibleOriginalIndices = items.map(it => it.i);
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 10 }}>
@@ -661,7 +665,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
             onMouseEnter={e => { if (canOpen) e.currentTarget.lastElementChild.style.opacity = "1"; }}
             onMouseLeave={e => { if (canOpen) e.currentTarget.lastElementChild.style.opacity = "0"; }}
           >
-            <PhotoThumb src={IMG_MAP[k]} onClick={canOpen ? () => onOpen(visiblePhotoKeys, viewIdx) : undefined} />
+            <PhotoThumb src={IMG_MAP[k]} onClick={canOpen ? () => onOpen(visiblePhotoKeys, viewIdx, visibleOriginalIndices) : undefined} />
             {!isCapCell && IMG_MAP[k] && (
               <button
                 onClick={e => { e.stopPropagation(); onToggleSelect && onToggleSelect(i, k); }}
@@ -681,7 +685,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
             )}
             {isCapCell && (
               <button
-                onClick={() => onOpen && onOpen(visiblePhotoKeys, 0)}
+                onClick={() => onOpen && onOpen(visiblePhotoKeys, 0, visibleOriginalIndices)}
                 style={{
                   position: "absolute", inset: 0, background: "rgba(10,22,41,0.55)",
                   border: "none", borderRadius: 8, color: "white",
@@ -747,7 +751,7 @@ function LightboxIconBtn({ label, onClick, disabled, children }) {
   );
 }
 
-function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onClose }) {
+function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onClose, onDeleteSelected }) {
   const [rotation, setRotation] = useState(0);
   const [zoom, setZoom] = useState(100);
   const [showFileDetails, setShowFileDetails] = useState(false);
@@ -764,17 +768,8 @@ function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onCl
     });
   };
 
-  const handleDownloadSelectedFilmstrip = () => {
-    Object.values(selectedFilmstrip).forEach(photoKey => {
-      const src = IMG_MAP[photoKey];
-      if (!src) return;
-      const a = document.createElement("a");
-      a.href = src;
-      a.download = `${photoKey}.jpg`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    });
+  const handleDeleteSelectedFilmstrip = () => {
+    onDeleteSelected && onDeleteSelected(Object.keys(selectedFilmstrip).map(Number));
   };
 
   useEffect(() => {
@@ -813,15 +808,6 @@ function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onCl
   const fileName = entryDate ? `${entryDate.replace(/-/g, "")}-${String(index + 1).padStart(2, "0")}.jpg` : `photo-${index + 1}.jpg`;
   const fileSizeKb = 140 + (hash % 260);
 
-  const handleDownloadPhoto = () => {
-    const a = document.createElement("a");
-    a.href = IMG_MAP[photos[index]];
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
-
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 5000, background: "black", display: "flex", flexDirection: "column" }}>
       {/* Top bar */}
@@ -854,10 +840,6 @@ function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onCl
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0, justifySelf: "end" }}>
-          <LightboxIconBtn label="Download" onClick={handleDownloadPhoto}>
-            <Download size={16} strokeWidth={SW} />
-          </LightboxIconBtn>
-          <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.15)", margin: "0 6px" }} />
           <LightboxIconBtn label="Rotate" onClick={() => setRotation(r => (r + 90) % 360)}>
             <RotateCw size={16} strokeWidth={SW} />
           </LightboxIconBtn>
@@ -868,6 +850,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onCl
           <LightboxIconBtn label="Zoom in" disabled={zoom >= 200} onClick={() => setZoom(z => Math.min(200, z + 25))}>
             <ZoomIn size={16} strokeWidth={SW} />
           </LightboxIconBtn>
+          <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.15)", margin: "0 6px" }} />
           <LightboxIconBtn label="Information" onClick={() => setShowFileDetails(true)}>
             <Info size={16} strokeWidth={SW} />
           </LightboxIconBtn>
@@ -932,14 +915,14 @@ function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onCl
         {Object.keys(selectedFilmstrip).length > 0 && (
           <div style={{ position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 10 }}>
             <button
-              onClick={handleDownloadSelectedFilmstrip}
+              onClick={handleDeleteSelectedFilmstrip}
               style={{
                 display: "flex", alignItems: "center", gap: 8, background: "rgba(10,22,41,0.75)",
                 border: "1px solid rgba(255,255,255,0.2)", borderRadius: 999, padding: "10px 16px",
                 color: "white", fontSize: 14, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
               }}
             >
-              <Download size={16} strokeWidth={SW} /> Download
+              <Trash2 size={16} strokeWidth={SW} /> Delete
               <span style={{
                 background: "var(--tt-secondary)", color: "white", borderRadius: "50%",
                 width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center",
@@ -1758,19 +1741,6 @@ function ReportsTab({ demoCase }) {
     setSelectedPhotos({});
   };
 
-  const handleDownloadSelectedPhotos = () => {
-    Object.values(selectedPhotos).forEach(photoKey => {
-      const src = IMG_MAP[photoKey];
-      if (!src) return;
-      const a = document.createElement("a");
-      a.href = src;
-      a.download = `${photoKey}.jpg`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    });
-  };
-
   // Rendered under every entry's photo list (and once for the empty-period
   // state). A note is only ever committed by the main Save report button —
   // the input just stays open (with whatever's typed so far) until then;
@@ -2388,7 +2358,7 @@ function ReportsTab({ demoCase }) {
                               )}
                               <PhotoGrid
                                 photos={e.photos}
-                                onOpen={(photos, idx) => setLightbox({ photos, index: idx, entryDate: e.date, taskName: displayTitle })}
+                                onOpen={(photos, idx, originalIndices) => setLightbox({ photos, index: idx, entryDate: e.date, taskName: displayTitle, entryKey, originalIndices })}
                                 excludedPhotos={preview.excludedPhotos}
                                 entryKey={entryKey}
                                 selectedPhotos={selectedPhotos}
@@ -2421,8 +2391,7 @@ function ReportsTab({ demoCase }) {
                 more photos are checked. Delete acts immediately (no
                 confirmation modal) since the "original photo won't be
                 deleted" disclaimer is always visible right here; it moves
-                the selection into excludedPhotos (filtered everywhere).
-                Download saves each selected photo's original file. */}
+                the selection into excludedPhotos (filtered everywhere). */}
             {Object.keys(selectedPhotos).length > 0 && (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", background: "var(--tt-grey06)", flexShrink: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -2449,14 +2418,6 @@ function ReportsTab({ demoCase }) {
                     style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: "1px solid rgba(255,255,255,0.4)", color: "white", cursor: "pointer", padding: "6px 12px", borderRadius: 8, fontSize: 13, fontWeight: 500, transition: "background 0.15s" }}
                   >
                     <Trash2 size={14} strokeWidth={SW} /> Delete
-                  </button>
-                  <button
-                    onClick={handleDownloadSelectedPhotos}
-                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.12)"}
-                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                    style={{ background: "none", border: "none", color: "white", cursor: "pointer", padding: 8, borderRadius: 8, display: "flex", transition: "background 0.15s" }}
-                  >
-                    <Download size={16} strokeWidth={SW} />
                   </button>
                 </div>
               </div>
@@ -2604,6 +2565,20 @@ function ReportsTab({ demoCase }) {
           taskName={lightbox.taskName}
           onIndexChange={i => setLightbox(lb => ({ ...lb, index: i }))}
           onClose={() => setLightbox(null)}
+          onDeleteSelected={(indices) => {
+            // originalIndices map filmstrip position -> this entry's real
+            // photo index, so the exclusion lands on the same keys the
+            // panel's own photo-select/delete already uses.
+            const originalIndices = indices.map(i => lightbox.originalIndices[i]);
+            setPreview(p => ({
+              ...p,
+              excludedPhotos: {
+                ...p.excludedPhotos,
+                ...Object.fromEntries(originalIndices.map(i => [`${lightbox.entryKey}_${i}`, true])),
+              },
+            }));
+            setLightbox(null);
+          }}
         />
       )}
     </div>
