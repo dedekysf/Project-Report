@@ -477,6 +477,30 @@ function TasksTab() {
   );
 }
 
+// ── Report section chip ──
+// Toggle-able pill used to include/exclude a section of the report.
+function ReportChip({ active, label, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: "flex", alignItems: "center", gap: 6,
+        height: 40, padding: "0 14px", flexShrink: 0,
+        background: active ? "var(--tt-mint)" : "white",
+        border: `1px solid ${active ? "var(--tt-secondary)" : "var(--tt-grey03)"}`,
+        borderRadius: 999,
+        fontSize: 13, fontWeight: 500,
+        color: active ? "var(--tt-secondary)" : "var(--tt-text-2)",
+        cursor: "pointer", whiteSpace: "nowrap",
+        transition: "background 0.15s, border-color 0.15s, color 0.15s",
+      }}
+    >
+      {active && <Check size={14} strokeWidth={2.5} />}
+      {label}
+    </button>
+  );
+}
+
 // ── Fixed-position tooltip button ──
 // Renders tooltip via a fixed div that escapes overflow clipping
 function FixedTooltipBtn({ children, label, onAction }) {
@@ -1185,10 +1209,15 @@ function applyPhotoCap(groups, maxPhotos = 45) {
   }));
 }
 
-function buildReportData(reportType, dateRange, periodStr, customRange) {
+function buildReportData(dateRange, periodStr, customRange, includeNoPhotoTasks = true) {
   const { start, end } = parsePeriodDates(periodStr, dateRange, customRange);
   const grouping = getGrouping(start, end);
   let groups = groupEntries(DUMMY_ENTRIES, start, end, grouping);
+  if (!includeNoPhotoTasks) {
+    groups = groups
+      .map(g => ({ ...g, entries: g.entries.filter(e => e.photos.length > 0) }))
+      .filter(g => g.entries.length > 0);
+  }
   groups = applyPhotoCap(groups);
 
   // completed = entries actually attached to this report (countable from
@@ -1199,7 +1228,7 @@ function buildReportData(reportType, dateRange, periodStr, customRange) {
   const total = DUMMY_ENTRIES.length;
   const pct = Math.round(completed / total * 100);
 
-  return { groups, grouping, completed, total, pct, reportType };
+  return { groups, grouping, completed, total, pct };
 }
 
 // Photos checked off in the side panel are excluded from the final output
@@ -1280,8 +1309,8 @@ const toAbsoluteUrl = (src) => {
 // rollup, grouped notes + photos) as a standalone HTML string, shared by
 // both the "Download" button and the copy-link shared view.
 const buildReportHTML = (report) => {
-  const { groups, grouping, completed, total, pct, reportType: rType } =
-    report.data || buildReportData(report.reportType, "custom", report.period, null);
+  const { groups, grouping, completed, total, pct } =
+    report.data || buildReportData("custom", report.period, null, report.includeNoPhotoTasks);
 
   const h = (tag, attrs, ...children) => {
     const attrStr = Object.entries(attrs || {}).map(([k, v]) => ` ${k}="${v}"`).join("");
@@ -1307,7 +1336,7 @@ const buildReportHTML = (report) => {
 
   const groupLabel = (g) => formatGroupLabel(g, grouping);
 
-  const progressHTML = rType === "progress"
+  const progressHTML = report.includeSummary
     ? h("div", { style: "margin-bottom:24px;" },
         h("div", { style: "display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:13px;font-weight:600;" },
           h("span", { style: "color:#0a1629;" }, `${completed} of ${total} tasks complete`),
@@ -1348,7 +1377,7 @@ const buildReportHTML = (report) => {
 
   const headerContent =
     selfClose("img", { src: toAbsoluteUrl(IMG_MAP_LOGO), alt: "tasktag", style: "height:24px;display:block;" }) +
-    h("span", { style: "font-size:10px;font-weight:600;letter-spacing:.04em;color:#16a97d;text-transform:uppercase;border:1px solid #16a97d;border-radius:20px;padding:3px 10px;" }, rType === "photo" ? "Photo Update" : "Progress Report");
+    h("span", { style: "font-size:10px;font-weight:600;letter-spacing:.04em;color:#16a97d;text-transform:uppercase;border:1px solid #16a97d;border-radius:20px;padding:3px 10px;" }, "Project Report");
 
   const header = h("div", { style: "display:flex;align-items:center;justify-content:space-between;padding:14px 20px;" }, headerContent);
   // Inset divider (not edge-to-edge) between header and body.
@@ -1363,7 +1392,7 @@ const buildReportHTML = (report) => {
   const body = h("div", { style: "padding:20px;" }, meta + progressHTML + entriesHTML);
   const card = h("div", { class: "card" }, header + divider + body);
 
-  const title = rType === "photo" ? "Photo Update" : "Progress Report";
+  const title = "Project Report";
   return "<!DOCTYPE html>" +
     h("html", {},
       h("head", {},
@@ -1377,26 +1406,25 @@ const buildReportHTML = (report) => {
 
 // ── Reports Tab ──
 function ReportsTab({ demoCase }) {
-  const [reportType,  setReportType]  = useState("progress");
+  const [includeSummary,      setIncludeSummary]      = useState(true); // "Task summary" chip — progress bar section
+  const [includeNoPhotoTasks, setIncludeNoPhotoTasks] = useState(true); // "Task complete without photos" chip
   const [dateRange,   setDateRange]   = useState("last_7");
   const [showCal,     setShowCal]     = useState(false);
   const [customRange, setCustomRange] = useState(null); // { start, end } date strings
   const prevDateRangeRef = useRef("last_7"); // dateRange to fall back to if custom is opened but no date is picked
   const [reports,     setReports]     = useState([]);
   const [lastSavedId, setLastSavedId] = useState(null); // highlights the most recently saved row in the results table
-  const [openType,    setOpenType]    = useState(false);
   const [openPeriod,  setOpenPeriod]  = useState(false);
   const [toast,       setToast]       = useState(null); // { type: "success" | "error", message }
   const [deleteTarget, setDeleteTarget] = useState(null); // report pending delete confirmation
   const [confirmDeletePhotos, setConfirmDeletePhotos] = useState(false); // whether the selected-photos delete confirmation is open
   const [lightbox, setLightbox] = useState(null); // { photos, index, caption } | null — full-screen photo viewer
   const [selectedPhotos, setSelectedPhotos] = useState({}); // { [entryKey_photoIndex]: photoKey } — in-progress checkbox selection, not yet deleted
-  const reportTypeRef = useRef(null);
   const periodRef     = useRef(null);
   const chipRef       = useRef(null);
 
   // ── Generate preview modal ──
-  // { reportType, dateRange, period, customRange, extraNotes } | null
+  // { includeSummary, includeNoPhotoTasks, dateRange, period, customRange, extraNotes } | null
   // extraNotes: { [entryKey]: noteText } — one note per entry/photo-list at most
   const [preview,          setPreview]          = useState(null);
   const [previewPeriodOpen, setPreviewPeriodOpen] = useState(false);
@@ -1416,23 +1444,11 @@ function ReportsTab({ demoCase }) {
   const previewPanelRef = useRef(null);
 
   useEffect(() => {
-    if (!openType) return;
-    const handler = (e) => { if (reportTypeRef.current && !reportTypeRef.current.contains(e.target)) setOpenType(false); };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [openType]);
-
-  useEffect(() => {
     if (!openPeriod) return;
     const handler = (e) => { if (periodRef.current && !periodRef.current.contains(e.target)) setOpenPeriod(false); };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [openPeriod]);
-
-  const reportOptions = [
-    { id: "progress", title: "Progress report",  desc: "Schedule status, task rollup, and photos" },
-    { id: "photo",    title: "Photo update",      desc: "Photos and notes, no schedule or task list" },
-  ];
 
   const handleChip = (id) => {
     setDateRange(id);
@@ -1452,7 +1468,7 @@ function ReportsTab({ demoCase }) {
   // Adds a report to the results list (called only once the user confirms
   // via "Save report" in the preview modal — Generate no longer does this
   // directly).
-  const pushReport = ({ reportType, dateRange, period, data, extraNotes, excludedPhotos }) => {
+  const pushReport = ({ includeSummary, includeNoPhotoTasks, dateRange, period, data, extraNotes, excludedPhotos }) => {
     const id = Date.now();
     const newReport = {
       id,
@@ -1460,7 +1476,8 @@ function ReportsTab({ demoCase }) {
       period,
       dateRange,
       status: "in_progress",
-      reportType,
+      includeSummary,
+      includeNoPhotoTasks,
       data,
       extraNotes,
       excludedPhotos,
@@ -1501,14 +1518,15 @@ function ReportsTab({ demoCase }) {
         return;
       }
       const period = getPeriodRange(dateRange);
-      const data = buildReportData(reportType, dateRange, period, customRange);
+      const data = buildReportData(dateRange, period, customRange, includeNoPhotoTasks);
       if (!hasGroupData(data.groups)) {
         setGenerating(false);
         showToast("error", "No data for this period");
         return; // don't open the modal on an empty period — just the toast
       }
       setPreview({
-        reportType,
+        includeSummary,
+        includeNoPhotoTasks,
         dateRange,
         period,
         customRange,
@@ -1592,7 +1610,7 @@ function ReportsTab({ demoCase }) {
     setSelectedPhotos({}); // entry/photo indices no longer line up with a different dataset
     const t = setTimeout(() => {
       setPreviewLoading(false);
-      const data = buildReportData(preview.reportType, preview.dateRange, preview.period, preview.customRange);
+      const data = buildReportData(preview.dateRange, preview.period, preview.customRange, preview.includeNoPhotoTasks);
       const finalGroups = applyExtraNotesToGroups(applyPhotoExclusions(data.groups, preview.excludedPhotos), preview.extraNotes);
       if (!hasGroupData(finalGroups)) showToast("error", "No data for this period");
     }, 500);
@@ -1600,7 +1618,7 @@ function ReportsTab({ demoCase }) {
   }, [preview?.period]);
 
   const previewData = preview
-    ? buildReportData(preview.reportType, preview.dateRange, preview.period, preview.customRange)
+    ? buildReportData(preview.dateRange, preview.period, preview.customRange, preview.includeNoPhotoTasks)
     : null;
   // Final groups with excluded photos filtered out and manually-added
   // notes spliced in at their entry — what actually gets downloaded /
@@ -1733,12 +1751,12 @@ function ReportsTab({ demoCase }) {
 
   const handlePreviewDownload = () => {
     if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to export"); return; }
-    handleDownload({ reportType: preview.reportType, period: preview.period, data: { ...previewData, groups: previewFinalGroups } });
+    handleDownload({ includeSummary: preview.includeSummary, period: preview.period, data: { ...previewData, groups: previewFinalGroups } });
   };
 
   const handlePreviewCopy = async () => {
     if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to export"); return; }
-    await handleCopy({ reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos });
+    await handleCopy({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos });
     setPreviewCopied(true);
     setTimeout(() => setPreviewCopied(false), 2000);
   };
@@ -1763,7 +1781,7 @@ function ReportsTab({ demoCase }) {
         showToast("error", "Save failed. Try again.");
         return;
       }
-      pushReport({ reportType: preview.reportType, dateRange: preview.dateRange, period: preview.period, data: { ...previewData, groups: finalGroups }, extraNotes: mergedNotes, excludedPhotos: preview.excludedPhotos });
+      pushReport({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, data: { ...previewData, groups: finalGroups }, extraNotes: mergedNotes, excludedPhotos: preview.excludedPhotos });
       setDateRange("since_last");
       // Closing is left to the user — the footer switches to Download/Copy
       // link so they can act on the just-saved report before dismissing it.
@@ -1787,7 +1805,7 @@ function ReportsTab({ demoCase }) {
 
   const handleDownload = (report) => {
     const html = buildReportHTML(report);
-    const fileName = report.reportType + "_" + report.period.replace(/[\s]/g, "_").replace(/–/g, "-") + ".html";
+    const fileName = "report_" + report.period.replace(/[\s]/g, "_").replace(/–/g, "-") + ".html";
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -1807,10 +1825,11 @@ function ReportsTab({ demoCase }) {
     // silently drop them while the downloaded HTML (built from the saved
     // snapshot) still shows them, and the two outputs would diverge.
     const params = new URLSearchParams({
-      type: report.reportType,
       range: report.dateRange || "custom",
       period: report.period,
     });
+    if (report.includeSummary === false) params.set("summary", "0");
+    if (report.includeNoPhotoTasks === false) params.set("nophotos", "0");
     if (report.extraNotes && Object.keys(report.extraNotes).some(k => report.extraNotes[k]?.trim())) {
       params.set("notes", JSON.stringify(report.extraNotes));
     }
@@ -1877,59 +1896,8 @@ function ReportsTab({ demoCase }) {
         {/* Filter row */}
         <div style={{ display: "flex", alignItems: "flex-end", gap: 12, width: "100%" }}>
 
-          {/* Report Type — custom div dropdown */}
-          <div style={{ flex: 1, minWidth: 0, position: "relative" }} ref={reportTypeRef}>
-            <Label style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)", marginBottom: 6, display: "block" }}>Report type</Label>
-            <div
-              onClick={() => setOpenType(o => !o)}
-              style={{
-                width: "100%", height: 40, padding: "0 12px",
-                background: "white", border: `1px solid ${openType ? "var(--tt-text-1)" : "var(--tt-grey03)"}`,
-                borderRadius: 8, fontSize: 13, fontWeight: 500,
-                color: "var(--tt-text-1)", cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                userSelect: "none", transition: "border-color 0.15s",
-              }}
-            >
-              <span>{reportType === "progress" ? "Progress report" : "Photo update"}</span>
-              <ChevronDown size={14} strokeWidth={SW} color="var(--tt-grey05)"
-                style={{ flexShrink: 0, transform: `rotate(${openType ? "180deg" : "0deg"})`, transition: "transform 0.15s" }} />
-            </div>
-            {openType && (
-              <div style={{
-                position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 200,
-                background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, overflow: "hidden",
-              }}>
-                {reportOptions.map(({ id, title, desc }, i) => (
-                  <div key={id}>
-                    <div
-                      onClick={() => { setReportType(id); setOpenType(false); }}
-                      style={{
-                        padding: "10px 12px", cursor: "pointer",
-                        background: reportType === id ? "var(--tt-grey02)" : "white",
-                        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
-                        transition: "background 0.1s",
-                      }}
-                      onMouseEnter={e => { if (reportType !== id) e.currentTarget.style.background = "var(--tt-grey02)"; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = reportType === id ? "var(--tt-grey02)" : "white"; }}
-                    >
-                      <div>
-                        <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: 0 }}>{title}</p>
-                        <p style={{ fontSize: 11, color: "var(--tt-grey05)", margin: 0, lineHeight: "16px" }}>{desc}</p>
-                      </div>
-                      {reportType === id && <Check size={14} color="var(--tt-secondary)" strokeWidth={2} style={{ flexShrink: 0 }} />}
-                    </div>
-                    {i < reportOptions.length - 1 && (
-                      <div style={{ height: 1, background: "var(--tt-grey03)", margin: "0 12px" }} />
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
           {/* Period — custom div dropdown */}
-          <div style={{ flex: 1, minWidth: 0, position: "relative" }} ref={periodRef}>
+          <div style={{ flex: "0 0 auto", width: 240, position: "relative" }} ref={periodRef}>
             <Label style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)", marginBottom: 6, display: "block" }}>Period</Label>
             <div
               onClick={() => setOpenPeriod(o => !o)}
@@ -1982,6 +1950,10 @@ function ReportsTab({ demoCase }) {
               </div>
             )}
           </div>
+
+          {/* Task summary / no-photo-tasks chips */}
+          <ReportChip active={includeSummary} label="Task summary" onClick={() => setIncludeSummary(v => !v)} />
+          <ReportChip active={includeNoPhotoTasks} label="Task complete without photos" onClick={() => setIncludeNoPhotoTasks(v => !v)} />
 
           {/* Generate button */}
           <div style={{ flexShrink: 0 }}>
@@ -2112,7 +2084,7 @@ function ReportsTab({ demoCase }) {
             {/* Modal chrome */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid var(--tt-grey03)", flexShrink: 0 }}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
-                <p style={{ fontSize: 15, fontWeight: 600, color: "var(--tt-text-1)" }}>Draft {preview.reportType === "photo" ? "Photo Update" : "Progress Report"}</p>
+                <p style={{ fontSize: 15, fontWeight: 600, color: "var(--tt-text-1)" }}>Draft Report</p>
 
                 {/* Borderless period dropdown, stacked below the title —
                     locked once the report is saved, so it can't drift out of
@@ -2191,7 +2163,7 @@ function ReportsTab({ demoCase }) {
               <div style={{ padding: 20 }}>
                 {previewLoading ? (
                   <>
-                    {preview.reportType === "progress" && (
+                    {preview.includeSummary && (
                       <div style={{ marginBottom: 24 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
                           <div className="tt-skeleton" style={{ width: 140, height: 13 }} />
@@ -2216,7 +2188,7 @@ function ReportsTab({ demoCase }) {
                   </>
                 ) : (
                   <>
-                    {preview.reportType === "progress" && previewData && (
+                    {preview.includeSummary && previewData && (
                       <div style={{ marginBottom: 24 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, fontSize: 13, fontWeight: 600 }}>
                           <span style={{ color: "var(--tt-text-1)" }}>{previewData.completed} of {previewData.total} tasks complete</span>
@@ -2548,12 +2520,12 @@ function ReportPaywall() {
 
 // ── Root ──
 // ── Report Page (shared link view) ──
-// Report content is fully reproducible from its URL params (reportType,
-// dateRange, period, excluded photos, and any manually-added notes) —
-// rebuilt on the fly rather than fetched from storage, so a shared link
-// works on any device/browser and can never 404.
-function ReportPage({ reportType, dateRange, period, notesParam, excludedParam }) {
-  let data = buildReportData(reportType, dateRange, period, null);
+// Report content is fully reproducible from its URL params (dateRange,
+// period, included sections, excluded photos, and any manually-added
+// notes) — rebuilt on the fly rather than fetched from storage, so a
+// shared link works on any device/browser and can never 404.
+function ReportPage({ dateRange, period, includeSummary, includeNoPhotoTasks, notesParam, excludedParam }) {
+  let data = buildReportData(dateRange, period, null, includeNoPhotoTasks);
   let groups = data.groups;
   if (excludedParam) {
     try {
@@ -2569,7 +2541,7 @@ function ReportPage({ reportType, dateRange, period, notesParam, excludedParam }
     } catch { /* malformed/tampered param — ignore */ }
   }
   data = { ...data, groups };
-  const html = buildReportHTML({ reportType, period, data });
+  const html = buildReportHTML({ includeSummary, period, data });
 
   return (
     <iframe
@@ -2583,8 +2555,17 @@ function ReportPage({ reportType, dateRange, period, notesParam, excludedParam }
 
 export default function ProjectDetail() {
   const params = new URLSearchParams(window.location.search);
-  const sharedReportType = params.get("type");
-  if (sharedReportType) return <ReportPage reportType={sharedReportType} dateRange={params.get("range")} period={params.get("period")} notesParam={params.get("notes")} excludedParam={params.get("excluded")} />;
+  const sharedPeriod = params.get("period");
+  if (sharedPeriod) return (
+    <ReportPage
+      dateRange={params.get("range")}
+      period={sharedPeriod}
+      includeSummary={params.get("summary") !== "0"}
+      includeNoPhotoTasks={params.get("nophotos") !== "0"}
+      notesParam={params.get("notes")}
+      excludedParam={params.get("excluded")}
+    />
+  );
 
   const [activeTab, setActiveTab] = useState("reports");
   const [demoCase, setDemoCase] = useState("happy");
