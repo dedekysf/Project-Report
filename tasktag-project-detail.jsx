@@ -1877,8 +1877,8 @@ function ReportsTab({ demoCase }) {
               const next = { ...prev }; delete next[entryKey]; return next;
             });
           }}
-          textStyle={{ fontSize: 22, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.35", margin: 0 }}
-          inputStyle={{ fontSize: 22 }}
+          textStyle={{ fontSize: 18, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.35", margin: 0 }}
+          inputStyle={{ fontSize: 18, fontWeight: 600 }}
         />
         {/* Status/date/owner meta line — completed (green), in progress
             (blue), or past due (red, with how many days). */}
