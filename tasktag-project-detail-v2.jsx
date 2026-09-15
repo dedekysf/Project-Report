@@ -484,8 +484,8 @@ function ReportChip({ active, label, onClick }) {
     <button
       onClick={onClick}
       style={{
-        display: "flex", alignItems: "center", gap: 6,
-        height: 40, padding: "0 14px", flexShrink: 0,
+        display: "flex", alignItems: "center", gap: 8,
+        height: 40, padding: "0 14px 0 10px", flexShrink: 0,
         background: active ? "var(--tt-mint)" : "white",
         border: `1px solid ${active ? "var(--tt-secondary)" : "var(--tt-grey03)"}`,
         borderRadius: 999,
@@ -495,7 +495,18 @@ function ReportChip({ active, label, onClick }) {
         transition: "background 0.15s, border-color 0.15s, color 0.15s",
       }}
     >
-      {active && <Check size={14} strokeWidth={2.5} />}
+      {/* Always-visible checkbox-style indicator, so the unselected
+          ("off") state reads as clearly as the selected one instead of
+          just disappearing when there's no checkmark to show. */}
+      <span style={{
+        width: 16, height: 16, borderRadius: "50%", flexShrink: 0,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        background: active ? "var(--tt-secondary)" : "transparent",
+        border: active ? "none" : "1.5px solid var(--tt-grey04)",
+        transition: "background 0.15s, border-color 0.15s",
+      }}>
+        {active && <Check size={11} color="white" strokeWidth={3} />}
+      </span>
       {label}
     </button>
   );
