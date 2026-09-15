@@ -486,13 +486,13 @@ function ReportChip({ active, label, onClick }) {
       style={{
         display: "flex", alignItems: "center", gap: 8,
         height: 40, padding: "0 14px 0 10px", flexShrink: 0,
-        background: active ? "var(--tt-mint)" : "white",
+        background: "white",
         border: `1px solid ${active ? "var(--tt-secondary)" : "var(--tt-grey03)"}`,
         borderRadius: 999,
         fontSize: 13, fontWeight: 500,
-        color: active ? "var(--tt-secondary)" : "var(--tt-text-2)",
+        color: "var(--tt-text-2)",
         cursor: "pointer", whiteSpace: "nowrap",
-        transition: "background 0.15s, border-color 0.15s, color 0.15s",
+        transition: "border-color 0.15s",
       }}
     >
       {/* Always-visible checkbox-style indicator, so the unselected
