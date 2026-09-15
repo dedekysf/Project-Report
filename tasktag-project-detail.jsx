@@ -2000,9 +2000,15 @@ function ReportsTab({ demoCase }) {
             )}
           </div>
 
-          {/* Task summary / no-photo-tasks chips */}
-          <ReportCheckbox active={includeSummary} label="Task summary" onClick={() => setIncludeSummary(v => !v)} />
-          <ReportCheckbox active={includeNoPhotoTasks} label="Task complete without photos" onClick={() => setIncludeNoPhotoTasks(v => !v)} />
+          {/* Task summary / no-photo-tasks checkboxes, grouped under one
+              "Include" label — same label treatment as Period above. */}
+          <div style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
+            <Label style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)", marginBottom: 6, display: "block" }}>Include</Label>
+            <div style={{ display: "flex", alignItems: "center", gap: 20, height: 40 }}>
+              <ReportCheckbox active={includeSummary} label="Task summary" onClick={() => setIncludeSummary(v => !v)} />
+              <ReportCheckbox active={includeNoPhotoTasks} label="Task complete without photos" onClick={() => setIncludeNoPhotoTasks(v => !v)} />
+            </div>
+          </div>
 
           {/* Generate button */}
           <div style={{ flexShrink: 0 }}>
