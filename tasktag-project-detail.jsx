@@ -2259,39 +2259,43 @@ function ReportsTab({ demoCase }) {
                           return (
                             <div key={entryKey} style={{ marginBottom: 20 }}>
                               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                {isEditingTitle ? (
-                                  <input
-                                    autoFocus
-                                    type="text"
-                                    value={displayTitle}
-                                    onChange={ev => setTitleOverrides(prev => ({ ...prev, [entryKey]: ev.target.value }))}
-                                    onBlur={() => {
-                                      setTitleOverrides(prev => {
-                                        if (prev[entryKey] && prev[entryKey].trim()) return prev;
-                                        const next = { ...prev }; delete next[entryKey]; return next;
-                                      });
-                                      setEditingTitleKey(null);
-                                    }}
-                                    onKeyDown={ev => { if (ev.key === "Enter") ev.currentTarget.blur(); }}
-                                    style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.5", fontFamily: "inherit", border: "1px solid var(--tt-text-1)", borderRadius: 6, padding: "1px 6px", outline: "none" }}
-                                  />
-                                ) : (
-                                  <p style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.5", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                    {displayTitle}
-                                  </p>
-                                )}
-                                {/* Renaming here only overrides the title for this report —
-                                    the original task/entry text is never modified. */}
-                                {!previewSaved && !isEditingTitle && (
-                                  <button
-                                    onClick={() => setEditingTitleKey(entryKey)}
-                                    onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
-                                    onMouseLeave={ev => ev.currentTarget.style.background = "none"}
-                                    style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "background 0.15s" }}
-                                  >
-                                    <Pencil size={13} strokeWidth={SW} color="var(--tt-grey05)" />
-                                  </button>
-                                )}
+                                <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1, minWidth: 0 }}>
+                                  {isEditingTitle ? (
+                                    <input
+                                      autoFocus
+                                      type="text"
+                                      value={displayTitle}
+                                      onChange={ev => setTitleOverrides(prev => ({ ...prev, [entryKey]: ev.target.value }))}
+                                      onBlur={() => {
+                                        setTitleOverrides(prev => {
+                                          if (prev[entryKey] && prev[entryKey].trim()) return prev;
+                                          const next = { ...prev }; delete next[entryKey]; return next;
+                                        });
+                                        setEditingTitleKey(null);
+                                      }}
+                                      onKeyDown={ev => { if (ev.key === "Enter") ev.currentTarget.blur(); }}
+                                      style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.5", fontFamily: "inherit", border: "1px solid var(--tt-text-1)", borderRadius: 6, padding: "1px 6px", outline: "none" }}
+                                    />
+                                  ) : (
+                                    <p style={{ flex: "0 1 auto", minWidth: 0, fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.5", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                      {displayTitle}
+                                    </p>
+                                  )}
+                                  {/* Renaming here only overrides the title for this report —
+                                      the original task/entry text is never modified. Kept right
+                                      next to the (possibly truncated) title, not pushed to the
+                                      far edge of the row. */}
+                                  {!previewSaved && !isEditingTitle && (
+                                    <button
+                                      onClick={() => setEditingTitleKey(entryKey)}
+                                      onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
+                                      onMouseLeave={ev => ev.currentTarget.style.background = "none"}
+                                      style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "background 0.15s" }}
+                                    >
+                                      <Pencil size={13} strokeWidth={SW} color="var(--tt-grey05)" />
+                                    </button>
+                                  )}
+                                </div>
                                 {isCompleted && !isEditingTitle && (
                                   <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: "var(--tt-secondary)", background: "var(--tt-mint)", borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap" }}>
                                     Completed
@@ -2300,7 +2304,12 @@ function ReportsTab({ demoCase }) {
                               </div>
                               {!isCompleted && (
                                 <p style={{ fontSize: 11, fontWeight: 600, color: "var(--tt-grey05)", letterSpacing: "0.04em", textTransform: "uppercase", margin: "2px 0 0" }}>
-                                  {e.photos.length} photo{e.photos.length > 1 ? "s" : ""} · {fmtDate(parseDate(e.date))}
+                                  {/* The group header above already shows the date for "day"
+                                      grouping, so repeating it here would just duplicate it —
+                                      only append it for week/month grouping, where the header
+                                      covers a range and the entry's own day isn't otherwise shown. */}
+                                  {e.photos.length} photo{e.photos.length > 1 ? "s" : ""}
+                                  {previewData.grouping !== "day" && ` · ${fmtDate(parseDate(e.date))}`}
                                 </p>
                               )}
                               <PhotoGrid
