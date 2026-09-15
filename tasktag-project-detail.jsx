@@ -521,20 +521,28 @@ function ReportCheckbox({ active, label, onClick }) {
 // any number of these can be open independently at once. When disabled,
 // renders as inert plain text (used once a report preview is locked
 // read-only after saving).
-function EditableField({ value, placeholder, onSave, onCancel, multiline, disabled, autoEdit, textStyle, inputStyle, as: Tag = "p" }) {
+//
+// `boxed` (multiline only) makes the field own its grey02 card chrome
+// (background/padding/radius) in both states, instead of a caller-side
+// wrapper — so editing swaps the card's plain text for a textarea filling
+// that same box, with the check/cancel icons overlaid inside its bottom
+// corner, rather than nesting a separate bordered textarea inside it.
+function EditableField({ value, placeholder, onSave, onCancel, multiline, disabled, autoEdit, boxed, textStyle, inputStyle, as: Tag = "p" }) {
   const [editing, setEditing] = useState(!!autoEdit);
   const [draft, setDraft] = useState(value || "");
 
+  const boxStyle = boxed ? { background: "var(--tt-grey02)", borderRadius: 8, padding: 16 } : {};
+
   if (disabled) {
-    if (value) return <Tag style={textStyle}>{value}</Tag>;
-    return placeholder ? <Tag style={{ ...textStyle, color: "var(--tt-grey05)" }}>{placeholder}</Tag> : null;
+    if (value) return <div style={boxStyle}><Tag style={{ display: "block", ...textStyle }}>{value}</Tag></div>;
+    return placeholder ? <div style={boxStyle}><Tag style={{ display: "block", ...textStyle, color: "var(--tt-grey05)" }}>{placeholder}</Tag></div> : null;
   }
 
   if (editing) {
     const commit = () => { onSave(draft.trim()); setEditing(false); };
     const cancel = () => { setEditing(false); if (onCancel) onCancel(); };
     return (
-      <div style={{ position: "relative", maxWidth: "100%", minWidth: 0 }}>
+      <div style={{ position: "relative", maxWidth: "100%", minWidth: 0, ...boxStyle }}>
         {multiline ? (
           <textarea
             ref={el => { if (el) el.focus(); }}
@@ -543,7 +551,10 @@ function EditableField({ value, placeholder, onSave, onCancel, multiline, disabl
             onKeyDown={ev => { if (ev.key === "Escape") { ev.preventDefault(); cancel(); } }}
             rows={3}
             placeholder={placeholder}
-            style={{ display: "block", width: "100%", fontFamily: "inherit", border: "1px solid var(--tt-text-1)", borderRadius: 8, outline: "none", resize: "none", padding: "8px 12px", boxSizing: "border-box", ...inputStyle }}
+            style={boxed
+              ? { display: "block", width: "100%", fontFamily: "inherit", border: "none", outline: "none", resize: "none", padding: 0, paddingBottom: 36, margin: 0, background: "none", boxSizing: "border-box", ...inputStyle }
+              : { display: "block", width: "100%", fontFamily: "inherit", border: "1px solid var(--tt-text-1)", borderRadius: 8, outline: "none", resize: "none", padding: "8px 12px", boxSizing: "border-box", ...inputStyle }
+            }
           />
         ) : (
           <input
@@ -560,12 +571,14 @@ function EditableField({ value, placeholder, onSave, onCancel, multiline, disabl
           />
         )}
         <div style={multiline
-          ? { display: "flex", justifyContent: "flex-end", gap: 4, marginTop: 6 }
+          ? (boxed
+              ? { position: "absolute", right: 16, bottom: 16, display: "flex", alignItems: "center", gap: 4 }
+              : { display: "flex", justifyContent: "flex-end", gap: 4, marginTop: 6 })
           : { position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center", gap: 4 }
         }>
           <button
             onClick={cancel}
-            onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
+            onMouseEnter={ev => ev.currentTarget.style.background = boxed ? "rgba(255,255,255,0.6)" : "var(--tt-grey02)"}
             onMouseLeave={ev => ev.currentTarget.style.background = "none"}
             style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "background 0.15s" }}
           >
@@ -585,14 +598,16 @@ function EditableField({ value, placeholder, onSave, onCancel, multiline, disabl
   }
 
   return (
-    <Tag
-      onClick={() => { setDraft(value || ""); setEditing(true); }}
-      onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
-      onMouseLeave={ev => ev.currentTarget.style.background = "none"}
-      style={{ cursor: "pointer", borderRadius: 6, transition: "background 0.15s", ...textStyle }}
-    >
-      {value || <span style={{ color: "var(--tt-grey05)" }}>{placeholder}</span>}
-    </Tag>
+    <div style={boxStyle}>
+      <Tag
+        onClick={() => { setDraft(value || ""); setEditing(true); }}
+        onMouseEnter={ev => { if (!boxed) ev.currentTarget.style.background = "var(--tt-grey02)"; }}
+        onMouseLeave={ev => ev.currentTarget.style.background = "none"}
+        style={{ display: "block", cursor: "pointer", borderRadius: 6, transition: "background 0.15s", ...textStyle }}
+      >
+        {value || <span style={{ color: "var(--tt-grey05)" }}>{placeholder}</span>}
+      </Tag>
+    </div>
   );
 }
 
@@ -1136,10 +1151,16 @@ const DUMMY_ENTRIES = [
   { date: "2026-06-16", note: "Excavation completed for the new foundation footprint.", photos: ["img8", "img6", "img5", "img1", "img9"] },
 ];
 
+// TODO(BE): replace with the crew member who actually logged each entry,
+// from the API — derived from the entry's date here only because DUMMY_
+// ENTRIES has no owner field of its own.
+const ENTRY_OWNERS = ["Paul A.", "Morgan T.", "Jordan B.", "Casey L.", "Riley S."];
+const ownerForEntry = (dateStr) => ENTRY_OWNERS[parseDate(dateStr).getDate() % ENTRY_OWNERS.length];
+
 // TODO(BE): replace with the project's actual task/checklist list from the
-// API — this powers the report's "Work Status" section, independent of the
-// dated photo/activity log above (a task can be in progress for weeks
-// before any activity entry ever mentions it).
+// API — powers the auto-generated summary text and the completion count
+// used there, independent of the dated photo/activity log above (a task
+// can be in progress for weeks before any activity entry ever mentions it).
 const DUMMY_TASKS = [
   { name: "Site survey and initial documentation", category: "Site", dueDate: null, status: "complete" },
   { name: "Excavation for foundation footprint", category: "Site", dueDate: null, status: "complete" },
@@ -2184,32 +2205,33 @@ function ReportsTab({ demoCase }) {
               <button
                 onClick={closePreview}
                 onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
-                onMouseLeave={e => e.currentTarget.style.background = "none"}
-                style={{ background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 4, display: "flex", color: "var(--tt-text-2)", transition: "background 0.15s", flexShrink: 0, marginRight: 8 }}
+                onMouseLeave={e => e.currentTarget.style.background = "white"}
+                style={{ width: 40, height: 40, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, cursor: "pointer", color: "var(--tt-text-2)", transition: "background 0.15s", marginRight: 8 }}
               >
-                <ChevronLeft size={20} strokeWidth={SW} />
+                <ChevronLeft size={18} strokeWidth={SW} />
               </button>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
-                {/* Borderless period dropdown — locked once the report is
-                    saved, so it can't drift out of sync with what was
-                    actually saved */}
+                {/* Period dropdown — sized/bordered like the initial filter
+                    on the results page, so the two line up visually. Locked
+                    once the report is saved, so it can't drift out of sync
+                    with what was actually saved. */}
                 <div style={{ position: "relative" }} ref={previewPeriodRef}>
                   <button
                     disabled={previewSaved}
                     onClick={() => !previewSaved && setPreviewPeriodOpen(o => !o)}
-                    onMouseEnter={e => !previewSaved && (e.currentTarget.style.background = "var(--tt-grey02)")}
-                    onMouseLeave={e => e.currentTarget.style.background = "none"}
+                    onMouseEnter={e => !previewSaved && (e.currentTarget.style.borderColor = "var(--tt-text-1)")}
+                    onMouseLeave={e => e.currentTarget.style.borderColor = previewPeriodOpen ? "var(--tt-text-1)" : "var(--tt-grey03)"}
                     style={{
                       display: "flex", alignItems: "center", gap: 4,
-                      background: "none", border: "none", borderRadius: 6,
-                      margin: 0, padding: "2px 8px", cursor: previewSaved ? "default" : "pointer",
-                      fontSize: 14, fontWeight: 400, color: "var(--tt-grey05)",
-                      transition: "background 0.15s",
+                      background: "white", border: `1px solid ${previewPeriodOpen ? "var(--tt-text-1)" : "var(--tt-grey03)"}`, borderRadius: 8,
+                      height: 40, margin: 0, padding: "0 12px", cursor: previewSaved ? "default" : "pointer",
+                      fontSize: 13, fontWeight: 500, color: "var(--tt-text-1)",
+                      transition: "border-color 0.15s",
                     }}
                   >
-                    {preview.period}
+                    <span>{preview.period}</span>
                     {!previewSaved && (
-                      <ChevronDown size={14} strokeWidth={SW}
+                      <ChevronDown size={14} strokeWidth={SW} color="var(--tt-grey05)"
                         style={{ flexShrink: 0, transform: `rotate(${previewPeriodOpen ? "180deg" : "0deg"})`, transition: "transform 0.15s" }} />
                     )}
                   </button>
@@ -2289,10 +2311,10 @@ function ReportsTab({ demoCase }) {
                   </div>
                 ) : (
                   // One continuous document wrapper — header, Site Activity,
-                  // Work Status, and the Point of Contact footer are all
-                  // sections of the same card now, not separate bordered
-                  // boxes with gaps between them, and with no divider line
-                  // between sections either.
+                  // and the Point of Contact footer are all sections of the
+                  // same card now, not separate bordered boxes with gaps
+                  // between them, and with no divider line between sections
+                  // either.
                   <div style={{ border: "1px solid var(--tt-grey03)", borderRadius: 12, overflow: "hidden", background: "white" }}>
                     {/* ── Report document header — project identity (name
                         editable), editable Target Opening / Prepared For,
@@ -2308,21 +2330,25 @@ function ReportsTab({ demoCase }) {
                       </div>
                       <div style={{ height: 1, background: "var(--tt-grey03)", marginBottom: 20 }} />
 
-                      {/* Row 1: address (not editable). Row 2: project name
-                          — editable the same way as a task name, and sized
+                      {/* Row 1: period (not editable — mirrors the chrome's
+                          own period control above). Row 2: project name —
+                          editable the same way as a task name, and sized
                           like the old summary headline now that it's the
-                          document's real title. */}
-                      <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "0 0 4px" }}>
-                        {PROJECT_ADDRESS}
+                          document's real title. Row 3: address. */}
+                      <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-secondary)", margin: "0 0 4px" }}>
+                        {preview.period}
                       </p>
                       <EditableField
                         value={preview.projectName}
                         placeholder={PROJECT_NAME}
                         disabled={previewSaved}
                         onSave={v => setPreview(p => ({ ...p, projectName: v || PROJECT_NAME }))}
-                        textStyle={{ fontSize: 24, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 16px" }}
+                        textStyle={{ fontSize: 24, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 4px" }}
                         inputStyle={{ fontSize: 24, fontWeight: 700 }}
                       />
+                      <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "0 0 16px" }}>
+                        {PROJECT_ADDRESS}
+                      </p>
 
                       <div style={{ height: 1, background: "var(--tt-grey03)", margin: "20px 0" }} />
 
@@ -2374,18 +2400,41 @@ function ReportsTab({ demoCase }) {
                       {/* Summary — small, address-sized caption (not
                           uppercase), set apart in its own grey02 box like a
                           project description, after Target Opening/Prepared
-                          For rather than acting as the document's headline. */}
-                      <div style={{ background: "var(--tt-grey02)", borderRadius: 8, padding: 16, marginTop: 20 }}>
+                          For rather than acting as the document's headline.
+                          The box owns its own grey02 chrome (via `boxed`) so
+                          editing swaps the same card for a textarea instead
+                          of nesting a separate bordered box inside it. */}
+                      <div style={{ marginTop: 20 }}>
                         <EditableField
                           value={preview.summary}
                           placeholder="Summarize how the project is going this period"
                           disabled={previewSaved}
                           multiline
+                          boxed
                           onSave={v => setPreview(p => ({ ...p, summary: v }))}
-                          textStyle={{ display: "block", fontSize: 11, color: "var(--tt-text-2)", lineHeight: 1.6, margin: 0 }}
+                          textStyle={{ fontSize: 11, color: "var(--tt-text-2)", lineHeight: 1.6, margin: 0 }}
                           inputStyle={{ fontSize: 11, color: "var(--tt-text-2)", lineHeight: 1.6 }}
                         />
                       </div>
+
+                      {/* Progress — entries logged this period vs. total on
+                          record. Same numbers the HTML export's progress bar
+                          uses, gated by the same "Task summary" checkbox. */}
+                      {preview.includeSummary && previewData && (
+                        <div style={{ marginTop: 20 }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)" }}>
+                              {previewData.completed} of {previewData.total} tasks complete
+                            </span>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-secondary)" }}>
+                              {previewData.pct}%
+                            </span>
+                          </div>
+                          <div style={{ height: 6, background: "var(--tt-grey03)", borderRadius: 99, overflow: "hidden" }}>
+                            <div style={{ width: `${previewData.pct}%`, height: "100%", background: "var(--tt-secondary)", borderRadius: 99 }} />
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* ── Site Activity — the dated photo/note log, same
@@ -2433,35 +2482,36 @@ function ReportsTab({ demoCase }) {
                             const isCompleted = e.noPhotos;
                             return (
                               <div key={entryKey} style={{ marginBottom: 20 }}>
-                                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                                  {/* Date badge in place of the old "date · N photos" meta
-                                      line, matching the document's own visual language. */}
-                                  <span style={{
-                                    flexShrink: 0, marginTop: 2, height: 20, padding: "0 8px",
-                                    display: "flex", alignItems: "center", justifyContent: "center",
-                                    background: "var(--tt-text-1)", color: "white", borderRadius: 4,
-                                    fontSize: 10, fontWeight: 700, letterSpacing: "0.04em", whiteSpace: "nowrap",
-                                  }}>
-                                    {fmtDate(parseDate(e.date)).toUpperCase()}
+                                {/* Renaming here only overrides the title for this report —
+                                    the original task/entry text is never modified. No pencil
+                                    icon — hover shows the grey02 affordance, click edits. */}
+                                <EditableField
+                                  value={displayTitle}
+                                  disabled={previewSaved}
+                                  onSave={v => {
+                                    setTitleOverrides(prev => {
+                                      if (v && v.trim()) return { ...prev, [entryKey]: v.trim() };
+                                      const next = { ...prev }; delete next[entryKey]; return next;
+                                    });
+                                  }}
+                                  textStyle={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.4", margin: 0 }}
+                                  inputStyle={{ fontSize: 14 }}
+                                />
+                                {/* In place of the separate Work Status section: status,
+                                    date, and task owner right under the task name. */}
+                                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+                                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--tt-secondary)", flexShrink: 0 }} />
+                                  <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--tt-secondary)" }}>
+                                    Completed
                                   </span>
-
-                                  {/* Renaming here only overrides the title for this report —
-                                      the original task/entry text is never modified. No pencil
-                                      icon — hover shows the grey02 affordance, click edits. */}
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <EditableField
-                                      value={displayTitle}
-                                      disabled={previewSaved}
-                                      onSave={v => {
-                                        setTitleOverrides(prev => {
-                                          if (v && v.trim()) return { ...prev, [entryKey]: v.trim() };
-                                          const next = { ...prev }; delete next[entryKey]; return next;
-                                        });
-                                      }}
-                                      textStyle={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.4", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                                      inputStyle={{ fontSize: 13, height: 32 }}
-                                    />
-                                  </div>
+                                  <span style={{ width: 3, height: 3, borderRadius: "50%", background: "var(--tt-grey04)", flexShrink: 0 }} />
+                                  <span style={{ fontSize: 11, fontWeight: 500, color: "var(--tt-grey05)" }}>
+                                    {fmtDate(parseDate(e.date))}
+                                  </span>
+                                  <span style={{ width: 3, height: 3, borderRadius: "50%", background: "var(--tt-grey04)", flexShrink: 0 }} />
+                                  <span style={{ fontSize: 11, fontWeight: 500, color: "var(--tt-grey05)" }}>
+                                    {ownerForEntry(e.date)}
+                                  </span>
                                 </div>
                                 {!isCompleted && (
                                   <PhotoGrid
@@ -2492,46 +2542,6 @@ function ReportsTab({ demoCase }) {
                         </div>
                       )}
                     </div>
-
-                    {/* ── Work Status — separate from the dated activity log
-                        above; a project's actual task/checklist state, not
-                        an activity summary. Gated by the "Task summary"
-                        checkbox, same as the old progress bar it replaces. ── */}
-                    {preview.includeSummary && (
-                      <div style={{ padding: 24 }}>
-                        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", borderBottom: "1px solid var(--tt-grey03)", paddingBottom: 10, marginBottom: 8 }}>
-                          <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-text-1)" }}>Work Status</span>
-                          <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)" }}>
-                            {DUMMY_TASKS.filter(t => t.status === "complete").length} / {DUMMY_TASKS.length} complete
-                          </span>
-                        </div>
-                        {DUMMY_TASKS.map((t, ti) => (
-                          <div
-                            key={ti}
-                            style={{
-                              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
-                              padding: "8px 0", borderBottom: ti < DUMMY_TASKS.length - 1 ? "1px solid var(--tt-grey02)" : "none",
-                            }}
-                          >
-                            <span style={{ fontSize: 13, fontWeight: 500, color: "var(--tt-text-1)", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {t.name}
-                            </span>
-                            <span style={{ flexShrink: 0, width: 90, textAlign: "right", fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--tt-grey05)" }}>
-                              {t.category}
-                            </span>
-                            <span style={{ flexShrink: 0, width: 60, textAlign: "right", fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--tt-grey05)" }}>
-                              {t.dueDate ? fmtDate(parseDate(t.dueDate)).toUpperCase() : "—"}
-                            </span>
-                            <span style={{
-                              flexShrink: 0, width: 90, textAlign: "right", fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase",
-                              color: t.status === "complete" ? "var(--tt-secondary)" : t.status === "in_progress" ? "var(--tt-text-2)" : "var(--tt-grey05)",
-                            }}>
-                              {t.status === "in_progress" ? "In progress" : t.status === "complete" ? "Complete" : "Upcoming"}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
 
                     {/* ── Point of contact footer — closes out the document. ── */}
                     <div style={{ background: "var(--tt-text-1)", padding: 20 }}>
