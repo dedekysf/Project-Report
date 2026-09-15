@@ -175,7 +175,7 @@ const SW = 1.2;
 // ranges) is anchored to this date rather than the real device clock.
 const APP_TODAY = new Date(2026, 8, 10); // Sep 10, 2026
 // TODO(BE): replace with the project's actual name/address from the API
-const PROJECT_NAME = "Raintree Hollow Residence Renovation";
+const PROJECT_NAME = "The Alvarez Home Renovation";
 const PROJECT_ADDRESS = "11 North Raintree Hollow Court, Sienna Plantation, Missouri City";
 // TODO(BE): replace with the project's actual point of contact from the API
 const POINT_OF_CONTACT_NAME = "Jordan Blake";
@@ -1461,7 +1461,7 @@ const buildReportHTML = (report) => {
   // TODO(BE): replace with the project's actual name and address from the API
   const meta =
     h("p", { style: "font-size:11px;color:#828282;margin-bottom:24px;text-transform:uppercase;" }, `Period: ${report.period}`) +
-    h("h2", { style: "font-size:28px;font-weight:700;color:#0a1629;margin-bottom:4px;line-height:1.15;" }, "Raintree Hollow Residence Renovation") +
+    h("h2", { style: "font-size:28px;font-weight:700;color:#0a1629;margin-bottom:4px;line-height:1.15;" }, PROJECT_NAME) +
     h("p", { style: "font-size:12px;color:#828282;margin-bottom:24px;" }, PROJECT_ADDRESS);
 
   const body = h("div", { style: "padding:20px;" }, meta + progressHTML + entriesHTML);
@@ -2312,25 +2312,33 @@ function ReportsTab({ demoCase }) {
                       </div>
                       <div style={{ height: 1, background: "var(--tt-grey03)", marginBottom: 20 }} />
 
-                      <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", marginBottom: 12 }}>
-                        {PROJECT_NAME} · {PROJECT_ADDRESS}
+                      <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "0 0 4px" }}>
+                        {PROJECT_ADDRESS}
+                      </p>
+                      <p style={{ fontSize: 16, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 16px" }}>
+                        {PROJECT_NAME}
                       </p>
 
-                      <textarea
-                        value={preview.summaryHeadline}
-                        onChange={ev => setPreview(p => ({ ...p, summaryHeadline: ev.target.value }))}
-                        rows={2}
-                        placeholder="Summarize how the project is going this period"
-                        style={{ display: "block", width: "100%", fontFamily: "inherit", fontWeight: 400, fontSize: 24, lineHeight: 1.3, color: "var(--tt-text-1)", border: "none", outline: "none", resize: "none", padding: 0, margin: "0 0 12px", background: "none" }}
-                      />
+                      {/* Summary — set apart in its own grey01 box, like a
+                          project description, rather than floating directly
+                          on the card's white background. */}
+                      <div style={{ background: "var(--tt-grey01)", borderRadius: 8, padding: 16 }}>
+                        <textarea
+                          value={preview.summaryHeadline}
+                          onChange={ev => setPreview(p => ({ ...p, summaryHeadline: ev.target.value }))}
+                          rows={2}
+                          placeholder="Summarize how the project is going this period"
+                          style={{ display: "block", width: "100%", fontFamily: "inherit", fontWeight: 400, fontSize: 24, lineHeight: 1.3, color: "var(--tt-text-1)", border: "none", outline: "none", resize: "none", padding: 0, margin: "0 0 12px", background: "none" }}
+                        />
 
-                      <textarea
-                        value={preview.summaryBody}
-                        onChange={ev => setPreview(p => ({ ...p, summaryBody: ev.target.value }))}
-                        rows={3}
-                        placeholder="Add more detail (optional)"
-                        style={{ display: "block", width: "100%", fontSize: 13, fontFamily: "inherit", color: "var(--tt-text-2)", lineHeight: 1.6, border: "none", outline: "none", resize: "none", padding: 0, margin: 0, background: "none" }}
-                      />
+                        <textarea
+                          value={preview.summaryBody}
+                          onChange={ev => setPreview(p => ({ ...p, summaryBody: ev.target.value }))}
+                          rows={3}
+                          placeholder="Add more detail (optional)"
+                          style={{ display: "block", width: "100%", fontSize: 13, fontFamily: "inherit", color: "var(--tt-text-2)", lineHeight: 1.6, border: "none", outline: "none", resize: "none", padding: 0, margin: 0, background: "none" }}
+                        />
+                      </div>
 
                       <div style={{ height: 1, background: "var(--tt-grey03)", margin: "20px 0" }} />
 
@@ -2892,7 +2900,7 @@ export default function ProjectDetail() {
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <p className="text-[18px] font-semibold leading-[1.1] text-[var(--tt-text-1)] truncate">
-                Raintree Hollow Residence Renovation
+                {PROJECT_NAME}
               </p>
               <Button variant="ghost" size="icon" className="w-6 h-6 shrink-0 text-[var(--tt-text-2)] hover:bg-[var(--tt-grey02)]" style={{ borderRadius: 12 }}>
                 <MoreVertical size={16} strokeWidth={SW} />
@@ -2903,7 +2911,7 @@ export default function ProjectDetail() {
                 <LayoutGrid size={11} strokeWidth={SW} /> Personal Projects
               </span>
               <span className="flex items-center gap-1 text-[12px] text-[var(--tt-grey05)]">
-                <MapPin size={11} strokeWidth={SW} /> 11 North Raintree Hollow Court, Sienna Plantation, Missouri City
+                <MapPin size={11} strokeWidth={SW} /> {PROJECT_ADDRESS}
               </span>
             </div>
           </div>
