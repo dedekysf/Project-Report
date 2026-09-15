@@ -1802,15 +1802,6 @@ function ReportsTab({ demoCase }) {
   // manual notes are only spliced in for real output, not the live modal).
   const totalEntryCount = previewData ? previewData.groups.reduce((s, g) => s + g.entries.length, 0) : 0;
   const hasMoreEntries = totalEntryCount > visibleCount;
-  // "Site Activity" section header stats — total photo count and the most
-  // recent entry's month (groups are sorted newest-first, so the very
-  // first entry of the first group is the latest).
-  const totalPhotoCount = previewData
-    ? previewData.groups.reduce((s, g) => s + g.entries.reduce((s2, e) => s2 + e.photos.length, 0), 0)
-    : 0;
-  const siteActivityMonthLabel = previewData?.groups[0]?.entries[0]
-    ? parseDate(previewData.groups[0].entries[0].date).toLocaleDateString("en-US", { month: "long" }).toUpperCase()
-    : "";
   let entryBudget = visibleCount;
   const visibleGroups = previewData
     ? previewData.groups
@@ -1910,9 +1901,7 @@ function ReportsTab({ demoCase }) {
   const renderBlock = (block) => block.type === "label" ? renderGroupLabelBlock(block.g) : renderEntryBlock(block);
 
   // Full header — page 1 only: logo/label, editable project identity,
-  // summary + progress, Target Opening/Prepared For, and the Site
-  // Activity section's own title/count row (so its height is packed into
-  // page 1's header measurement along with everything above it).
+  // summary + progress, and Target Opening/Prepared For.
   const renderFullHeader = () => (
     <div style={{ padding: PAGE_PAD }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
@@ -2023,17 +2012,6 @@ function ReportsTab({ demoCase }) {
           />
         </div>
       </div>
-
-      {previewData && (
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", borderBottom: "1px solid var(--tt-grey03)", paddingBottom: 10, marginTop: 20 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-text-1)" }}>
-            Site Activity{siteActivityMonthLabel ? ` — ${siteActivityMonthLabel}` : ""}
-          </span>
-          <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", whiteSpace: "nowrap" }}>
-            {totalEntryCount} entr{totalEntryCount === 1 ? "y" : "ies"} · {totalPhotoCount} photo{totalPhotoCount === 1 ? "" : "s"}
-          </span>
-        </div>
-      )}
     </div>
   );
 
