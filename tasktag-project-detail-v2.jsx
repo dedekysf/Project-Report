@@ -1067,6 +1067,7 @@ const DUMMY_ENTRIES = [
   { date: "2026-09-08", note: "Final electrical connections completed in the main panel.", photos: ["img9", "img8"] },
   { date: "2026-09-07", note: "Plumbing fixtures installed in all bathrooms.", photos: ["img7"] },
   { date: "2026-09-06", note: "Ceiling lights installed and tested.", photos: ["img8", "img7"] },
+  { date: "2026-09-06", note: "Final walkthrough completed with the client — no issues noted.", photos: [] },
   { date: "2026-09-05", note: "Bathroom tile installation completed on the second floor.", photos: ["img3", "img8"] },
   { date: "2026-09-04", note: "Kitchen cabinet hardware installed.", photos: ["img6", "img1", "img9"] },
   { date: "2026-09-03", note: "Interior door hardware fitted — knobs and locks in place.", photos: ["img6", "img7"] },
@@ -1403,7 +1404,7 @@ const buildReportHTML = (report) => {
 // ── Reports Tab ──
 function ReportsTab({ demoCase }) {
   const [includeSummary,      setIncludeSummary]      = useState(true); // "Task summary" chip — progress bar section
-  const [includeNoPhotoTasks, setIncludeNoPhotoTasks] = useState(true); // "Task complete without photos" chip
+  const [includeNoPhotoTasks, setIncludeNoPhotoTasks] = useState(false); // "Task complete without photos" chip
   const [dateRange,   setDateRange]   = useState("last_7");
   const [showCal,     setShowCal]     = useState(false);
   const [customRange, setCustomRange] = useState(null); // { start, end } date strings
