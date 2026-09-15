@@ -572,18 +572,7 @@ function PhotoThumb({ src, onClick }) {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
 
-  if (!src || failed) {
-    return (
-      <div
-        style={{
-          width: "100%", aspectRatio: "4/3", borderRadius: 8,
-          background: "var(--tt-grey03)", display: "flex", alignItems: "center", justifyContent: "center",
-        }}
-      >
-        <span style={{ fontSize: 12, fontWeight: 500, color: "var(--tt-grey05)" }}>No Image</span>
-      </div>
-    );
-  }
+  if (!src || failed) return null;
 
   return (
     <div
@@ -602,32 +591,33 @@ function PhotoThumb({ src, onClick }) {
   );
 }
 
-// Full photo grid — every photo is always shown (no "+N more" cap). Each
-// photo carries a select checkbox in its top-right corner; checking one or
-// more surfaces a selection toolbar (rendered by the caller) with Delete/
-// Download actions. Deleted photos are filtered out here by their
-// *original* index (excludedPhotos), so remaining photos keep the same
-// index-based keys even after some are removed.
+// Photo grid capped to 4 per row — beyond that, the last visible cell
+// becomes a "+N more" overlay that opens the lightbox (with the full,
+// uncapped photo list for that entry so the rest are still reachable via
+// the filmstrip). Each visible photo also carries a select checkbox in its
+// top-right corner; checking one or more surfaces a selection toolbar
+// (rendered by the caller) with Delete/Download actions. Deleted photos
+// are filtered out here by their *original* index (excludedPhotos), so
+// remaining photos keep the same index-based keys even after some are
+// removed. An entry with zero visible photos renders nothing.
 function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, onToggleSelect }) {
+  const CAP = 4;
   const items = (photos || [])
     .map((k, i) => ({ k, i }))
     .filter(({ i }) => !(excludedPhotos && excludedPhotos[`${entryKey}_${i}`]));
 
-  if (items.length === 0) {
-    return (
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 10 }}>
-        <PhotoThumb src={null} />
-      </div>
-    );
-  }
+  if (items.length === 0) return null;
 
+  const remaining = items.length - CAP;
+  const visibleItems = remaining > 0 ? items.slice(0, CAP) : items;
   const visiblePhotoKeys = items.map(it => it.k);
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 10 }}>
-      {items.map(({ k, i }, viewIdx) => {
+      {visibleItems.map(({ k, i }, viewIdx) => {
         const selected = !!(selectedPhotos && selectedPhotos[`${entryKey}_${i}`]);
-        const canOpen = !!(IMG_MAP[k] && onOpen);
+        const isCapCell = remaining > 0 && viewIdx === visibleItems.length - 1;
+        const canOpen = !!(IMG_MAP[k] && onOpen) && !isCapCell;
         return (
           <div
             key={i}
@@ -636,7 +626,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
             onMouseLeave={e => { if (canOpen) e.currentTarget.lastElementChild.style.opacity = "0"; }}
           >
             <PhotoThumb src={IMG_MAP[k]} onClick={canOpen ? () => onOpen(visiblePhotoKeys, viewIdx) : undefined} />
-            {IMG_MAP[k] && (
+            {!isCapCell && IMG_MAP[k] && (
               <button
                 onClick={e => { e.stopPropagation(); onToggleSelect && onToggleSelect(i, k); }}
                 disabled={!onToggleSelect}
@@ -652,6 +642,18 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
             )}
             {canOpen && (
               <div style={{ position: "absolute", inset: 0, borderRadius: 8, background: "rgba(10,22,41,0.25)", opacity: 0, transition: "opacity 0.15s", pointerEvents: "none" }} />
+            )}
+            {isCapCell && (
+              <button
+                onClick={() => onOpen && onOpen(visiblePhotoKeys, viewIdx)}
+                style={{
+                  position: "absolute", inset: 0, background: "rgba(10,22,41,0.55)",
+                  border: "none", borderRadius: 8, color: "white",
+                  fontSize: 13, fontWeight: 600, cursor: "pointer",
+                }}
+              >
+                +{remaining} more
+              </button>
             )}
           </div>
         );
@@ -1040,7 +1042,7 @@ const PERIOD_RANGE = {
 
 // ── Dummy data ──
 const DUMMY_ENTRIES = [
-  { date: "2026-09-10", note: "Flooring installation started on the ground floor.", photos: ["img5", "img1", "img6"] },
+  { date: "2026-09-10", note: "Flooring installation started on the ground floor.", photos: ["img5", "img1", "img6", "img2", "img3", "img7", "img4", "img8"] },
   { date: "2026-09-09", note: "Exterior siding repairs completed on the south wall.", photos: ["img9", "img2", "img3", "img7", "img4"] },
   { date: "2026-09-08", note: "Final electrical connections completed in the main panel.", photos: ["img9", "img8"] },
   { date: "2026-09-07", note: "Plumbing fixtures installed in all bathrooms.", photos: ["img7"] },
@@ -1290,20 +1292,16 @@ const buildReportHTML = (report) => {
     return `<${tag}${attrStr}/>`;
   };
 
-  // Fixed 4-column grid -- cell size never changes with row count.
-  const noImageCell = h("div", { style: "width:100%;aspect-ratio:4/3;border-radius:8px;background:#e8e8e6;display:flex;align-items:center;justify-content:center;" },
-    h("span", { style: "font-size:12px;font-weight:500;color:#828282;" }, "No Image")
-  );
+  // Fixed 4-column grid -- cell size never changes with row count. Photos
+  // that don't resolve to a real asset are simply omitted (no placeholder).
   const renderPhotos = (photos) => {
-    if (!photos || photos.length === 0) {
-      return h("div", { style: "display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;" }, noImageCell);
-    }
-    const cells = photos.map(k => {
+    const cells = (photos || []).map(k => {
       const src = IMG_MAP[k];
       return src
         ? selfClose("img", { src: toAbsoluteUrl(src), style: "width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px;display:block;" })
-        : noImageCell;
-    });
+        : "";
+    }).filter(Boolean);
+    if (cells.length === 0) return "";
     return h("div", { style: "display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;" }, ...cells);
   };
 
