@@ -1195,26 +1195,6 @@ function formatGroupLabel(g, grouping) {
   return new Date(y, m - 1, d).toLocaleDateString("en-US", { day: "numeric", month: "short" }).toUpperCase();
 }
 
-// Same date/week/month label as formatGroupLabel, but without the group's
-// aggregate photo count baked in — used per entry in the live preview,
-// paired with that specific entry's own photo count instead. Respects the
-// same grouping-granularity rule (day ≤ 2 weeks, week ≤ 2 months, month
-// beyond that): a "day"-grouped period shows the entry's own exact date,
-// while week/month grouping shows the shared week/month label instead of
-// the individual day.
-function formatEntryDateLabel(g, grouping, entryDateStr) {
-  if (grouping === "week") {
-    const [y, m, d] = g.key.split("-").map(Number);
-    const mon = new Date(y, m - 1, d);
-    return `week of ${mon.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
-  }
-  if (grouping === "month") {
-    const [y, m] = g.key.split("-").map(Number);
-    return new Date(y, m - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
-  }
-  return fmtDate(parseDate(entryDateStr));
-}
-
 function applyPhotoCap(groups, maxPhotos = 45) {
   // Count total photos
   let total = groups.reduce((sum, g) => sum + g.entries.reduce((s, e) => s + e.photos.length, 0), 0);
@@ -2268,9 +2248,19 @@ function ReportsTab({ demoCase }) {
                     {previewData && previewData.groups.length === 0 && renderNoteSlot("empty")}
                     {previewData && visibleGroups.map(g => (
                       <div key={g.key} style={{ marginBottom: 32 }}>
-                        {/* No separate date/week section header — each entry's own meta
-                            line below already carries its date, so a group header here
-                            would just repeat it. */}
+                        {/* "Day" grouping never bundles more than one entry under the
+                            same label in practice, so each entry's own meta line below
+                            is enough on its own — a group header here would just repeat
+                            it. Week/month grouping, however, genuinely rolls multiple
+                            entries up together, so it needs its own shared header
+                            (with the group's total photo count); the per-entry meta
+                            line then only needs that entry's own count, not the date
+                            again. */}
+                        {previewData.grouping !== "day" && (
+                          <p style={{ fontSize: 11, fontWeight: 600, color: "var(--tt-grey05)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 10 }}>
+                            {formatGroupLabel(g, previewData.grouping).toUpperCase()}
+                          </p>
+                        )}
                         {g.entries.map((e, i) => {
                           const entryKey = `${g.key}_${i}`;
                           const displayTitle = titleOverrides[entryKey] ?? e.note;
@@ -2324,7 +2314,8 @@ function ReportsTab({ demoCase }) {
                               </div>
                               {!isCompleted && (
                                 <p style={{ fontSize: 11, fontWeight: 600, color: "var(--tt-grey05)", letterSpacing: "0.04em", textTransform: "uppercase", margin: "2px 0 0" }}>
-                                  {formatEntryDateLabel(g, previewData.grouping, e.date)} · {e.photos.length} photo{e.photos.length > 1 ? "s" : ""}
+                                  {previewData.grouping === "day" && `${fmtDate(parseDate(e.date))} · `}
+                                  {e.photos.length} photo{e.photos.length > 1 ? "s" : ""}
                                 </p>
                               )}
                               <PhotoGrid
