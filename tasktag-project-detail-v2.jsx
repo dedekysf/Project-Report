@@ -818,7 +818,7 @@ function PhotoThumb({ src, onClick }) {
   );
 }
 
-// Photo grid capped to 6 per row — beyond that, the last visible cell
+// Photo grid capped to one row of 4 — beyond that, the last visible cell
 // becomes a "+N more" overlay that expands the grid in place to show every
 // photo (no cap), rather than jumping into the lightbox. Each visible photo
 // also carries a select checkbox in its top-right corner; checking one or
@@ -828,7 +828,7 @@ function PhotoThumb({ src, onClick }) {
 // even after some are removed. An entry with zero visible photos renders
 // nothing.
 function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, onToggleSelect }) {
-  const CAP = 6;
+  const CAP = 4;
   const [expanded, setExpanded] = useState(false);
   const items = (photos || [])
     .map((k, i) => ({ k, i }))
@@ -845,7 +845,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
   const visibleOriginalIndices = items.map(it => it.i);
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 4, marginTop: 10 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 4, marginTop: 10 }}>
       {visibleItems.map(({ k, i }, viewIdx) => {
         const selected = !!(selectedPhotos && selectedPhotos[`${entryKey}_${i}`]);
         const isCapCell = !expanded && remaining > 0 && viewIdx === visibleItems.length - 1;
@@ -2032,7 +2032,7 @@ function ReportsTab({ demoCase }) {
           placeholder. Summary and its progress bar sit directly below,
           with Target Opening/Prepared For after. */}
       <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-text-2)", margin: "0 0 4px" }}>
-        {preview.period}
+        Period: {preview.period}
       </p>
       <EditableField
         value={preview.projectName}
@@ -2106,37 +2106,30 @@ function ReportsTab({ demoCase }) {
   );
 
   // Footer — the same Point of Contact card (avatar, name, role/company
-  // on the left; generation metadata on the right) plus a page-number
-  // strip repeats on every page, not just the last.
-  const renderPageFooter = (pageNum, pageCount) => (
-    <div>
-      <div style={{ padding: `20px ${PAGE_PAD}px`, borderTop: "1px solid var(--tt-grey03)" }}>
-        <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "0 0 12px" }}>
-          Point of Contact
-        </p>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--tt-pastel-magenta)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "white" }}>{initialsOf(POINT_OF_CONTACT_NAME)}</span>
-            </div>
-            <div>
-              <p style={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 2px" }}>{POINT_OF_CONTACT_NAME}</p>
-              {/* TODO(BE): replace with the contact's actual role/company from the API */}
-              <p style={{ fontSize: 12, fontWeight: 500, color: "var(--tt-secondary)", margin: 0 }}>
-                {POINT_OF_CONTACT_ROLE} · {POINT_OF_CONTACT_COMPANY}
-              </p>
-            </div>
+  // on the left; generation metadata on the right) repeats on every page.
+  const renderPageFooter = () => (
+    <div style={{ padding: `20px ${PAGE_PAD}px`, borderTop: "1px solid var(--tt-grey03)" }}>
+      <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "0 0 12px" }}>
+        Point of Contact
+      </p>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--tt-pastel-magenta)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "white" }}>{initialsOf(POINT_OF_CONTACT_NAME)}</span>
           </div>
-          <div style={{ textAlign: "right" }}>
-            <p style={{ fontSize: 11, color: "var(--tt-grey05)", margin: "0 0 2px" }}>Generated via TaskTag</p>
-            {/* TODO(BE): replace with the actual report ID from the API */}
-            <p style={{ fontSize: 11, color: "var(--tt-grey05)", margin: 0 }}>Report ID: {REPORT_ID}</p>
+          <div>
+            <p style={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 2px" }}>{POINT_OF_CONTACT_NAME}</p>
+            {/* TODO(BE): replace with the contact's actual role/company from the API */}
+            <p style={{ fontSize: 12, fontWeight: 500, color: "var(--tt-secondary)", margin: 0 }}>
+              {POINT_OF_CONTACT_ROLE} · {POINT_OF_CONTACT_COMPANY}
+            </p>
           </div>
         </div>
-      </div>
-      <div style={{ padding: `10px ${PAGE_PAD}px`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 10, color: "var(--tt-grey05)" }}>{preview.projectName || PROJECT_NAME}</span>
-        <span style={{ fontSize: 10, color: "var(--tt-grey05)" }}>Page {pageNum} of {pageCount}</span>
+        <div style={{ textAlign: "right" }}>
+          <p style={{ fontSize: 11, color: "var(--tt-grey05)", margin: "0 0 2px" }}>Generated via TaskTag</p>
+          {/* TODO(BE): replace with the actual report ID from the API */}
+          <p style={{ fontSize: 11, color: "var(--tt-grey05)", margin: 0 }}>Report ID: {REPORT_ID}</p>
+        </div>
       </div>
     </div>
   );
@@ -2783,7 +2776,7 @@ function ReportsTab({ demoCase }) {
                     <div aria-hidden="true" style={{ visibility: "hidden", height: 0, overflow: "hidden" }}>
                       <div style={{ width: PAGE_W }}>
                         <div ref={headerMeasureRef}>{renderFullHeader()}</div>
-                        <div ref={footerMeasureRef}>{renderPageFooter(1, 1)}</div>
+                        <div ref={footerMeasureRef}>{renderPageFooter()}</div>
                         {flatBlocks.map(block => (
                           <div key={block.key} ref={el => { blockMeasureRefs.current[block.key] = el; }} style={{ width: PAGE_W - PAGE_PAD * 2 }}>
                             {renderBlock(block)}
@@ -2823,7 +2816,7 @@ function ReportsTab({ demoCase }) {
                             {isFirst && previewData.groups.length === 0 && renderNoteSlot("empty")}
                             {pageBlocks.map(block => <div key={block.key}>{renderBlock(block)}</div>)}
                           </div>
-                          {renderPageFooter(pi + 1, pageLayout.pages.length)}
+                          {renderPageFooter()}
                         </div>
                       );
                     })}
