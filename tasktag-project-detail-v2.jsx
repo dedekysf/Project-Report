@@ -1896,7 +1896,7 @@ function ReportsTab({ demoCase }) {
         </div>
 
         {/* Filter row */}
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 16, width: "100%" }}>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 24, width: "100%" }}>
 
           {/* Period — custom div dropdown */}
           <div style={{ flex: "1 1 auto", minWidth: 0, position: "relative" }} ref={periodRef}>
