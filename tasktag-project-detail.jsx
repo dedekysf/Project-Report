@@ -2117,6 +2117,33 @@ function ReportsTab({ demoCase }) {
     </div>
   );
 
+  // Running header — pages 2+: a lightweight recap (logo, company name,
+  // project name, address) for orientation when flipping through pages.
+  // Everything else on the full header (summary, progress, Target
+  // Opening/Prepared For) is page-1-only content, not repeated.
+  const renderRunningHeader = () => (
+    <div style={{ padding: `${PAGE_PAD}px ${PAGE_PAD}px 0` }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {preview.logo && (
+            <img src={preview.logo} alt="Company logo" style={{ width: 24, height: 24, borderRadius: 6, objectFit: "contain" }} />
+          )}
+          <span style={{ fontSize: 12, fontWeight: 700, color: "var(--tt-text-1)" }}>
+            {preview.companyName || POINT_OF_CONTACT_COMPANY}
+          </span>
+        </div>
+        <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)" }}>
+          Report by TaskTag
+        </span>
+      </div>
+      <p style={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 2px" }}>
+        {preview.projectName || PROJECT_NAME}
+      </p>
+      <p style={{ fontSize: 11, fontWeight: 400, color: "var(--tt-grey05)", margin: 0 }}>{preview.address || PROJECT_ADDRESS}</p>
+      <div style={{ height: 1, background: "var(--tt-grey03)", marginTop: 16 }} />
+    </div>
+  );
+
   // Footer — the same Point of Contact card (avatar, name, role/company
   // on the left; generation metadata on the right) repeats on every page.
   const renderPageFooter = () => (
@@ -2150,10 +2177,11 @@ function ReportsTab({ demoCase }) {
   // real page content width) and greedily pack them onto A4 pages — the
   // same technique a real paginated document layout engine uses, just
   // done in JS against actual rendered heights instead of a print
-  // engine's own reflow. The header is now identical on every page (no
-  // more separate running-header variant), so every page reserves the
-  // same headerH.
+  // engine's own reflow. Page 1 gets the full header; every later page
+  // gets the lighter running header, so only page 1 reserves headerH —
+  // the rest reserve runningHeaderH.
   const headerMeasureRef = useRef(null);
+  const runningHeaderMeasureRef = useRef(null);
   const footerMeasureRef = useRef(null);
   const blockMeasureRefs = useRef({});
   const [pageLayout, setPageLayout] = useState(null); // { pages: [[block,...],...] } | null while (re)measuring
@@ -2180,18 +2208,21 @@ function ReportsTab({ demoCase }) {
       return;
     }
     const headerH = headerMeasureRef.current?.offsetHeight || 0;
+    const runningHeaderH = runningHeaderMeasureRef.current?.offsetHeight || 0;
     const footerH = footerMeasureRef.current?.offsetHeight || 0;
 
     const pages = [];
     let current = [];
     let used = 0;
+    let isFirstPage = true;
     flatBlocks.forEach(block => {
       const h = blockMeasureRefs.current[block.key]?.offsetHeight || 0;
-      const available = PAGE_H - PAGE_PAD * 2 - headerH - footerH;
+      const available = PAGE_H - PAGE_PAD * 2 - (isFirstPage ? headerH : runningHeaderH) - footerH;
       if (current.length > 0 && used + h > available) {
         pages.push(current);
         current = [];
         used = 0;
+        isFirstPage = false;
       }
       current.push(block);
       used += h;
@@ -2770,6 +2801,7 @@ function ReportsTab({ demoCase }) {
                     <div aria-hidden="true" style={{ visibility: "hidden", height: 0, overflow: "hidden" }}>
                       <div style={{ width: PAGE_W }}>
                         <div ref={headerMeasureRef}>{renderFullHeader()}</div>
+                        <div ref={runningHeaderMeasureRef}>{renderRunningHeader()}</div>
                         <div ref={footerMeasureRef}>{renderPageFooter()}</div>
                         {flatBlocks.map(block => (
                           <div key={block.key} ref={el => { blockMeasureRefs.current[block.key] = el; }} style={{ width: PAGE_W - PAGE_PAD * 2 }}>
@@ -2805,7 +2837,7 @@ function ReportsTab({ demoCase }) {
                             containIntrinsicSize: `${PAGE_W}px ${PAGE_H}px`,
                           }}
                         >
-                          {renderFullHeader()}
+                          {isFirst ? renderFullHeader() : renderRunningHeader()}
                           <div style={{ padding: `0 ${PAGE_PAD}px`, flex: 1 }}>
                             {isFirst && previewData.groups.length === 0 && renderNoteSlot("empty")}
                             {pageBlocks.map(block => <div key={block.key}>{renderBlock(block)}</div>)}
