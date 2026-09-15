@@ -501,11 +501,12 @@ function ReportChip({ active, label, onClick }) {
       <span style={{
         width: 16, height: 16, borderRadius: "50%", flexShrink: 0,
         display: "flex", alignItems: "center", justifyContent: "center",
+        lineHeight: 0, boxSizing: "border-box",
         background: active ? "var(--tt-secondary)" : "transparent",
         border: active ? "none" : "1.5px solid var(--tt-grey04)",
         transition: "background 0.15s, border-color 0.15s",
       }}>
-        {active && <Check size={11} color="white" strokeWidth={3} />}
+        {active && <Check size={11} color="white" strokeWidth={3} style={{ display: "block" }} />}
       </span>
       {label}
     </button>
@@ -1909,7 +1910,7 @@ function ReportsTab({ demoCase }) {
         <div style={{ display: "flex", alignItems: "flex-end", gap: 12, width: "100%" }}>
 
           {/* Period — custom div dropdown */}
-          <div style={{ flex: "0 0 auto", width: 240, position: "relative" }} ref={periodRef}>
+          <div style={{ flex: "1 1 auto", minWidth: 0, position: "relative" }} ref={periodRef}>
             <Label style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)", marginBottom: 6, display: "block" }}>Period</Label>
             <div
               onClick={() => setOpenPeriod(o => !o)}
