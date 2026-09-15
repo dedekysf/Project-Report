@@ -1470,6 +1470,9 @@ function ReportsTab({ demoCase }) {
     setTimeout(() => {
       setReports(prev => prev.map(r => r.id === id ? { ...r, status: "done" } : r));
     }, 3000);
+    setTimeout(() => {
+      setLastSavedId(current => (current === id ? null : current));
+    }, 8000);
   };
 
   const handleDeleteReport = () => {
@@ -2055,7 +2058,7 @@ function ReportsTab({ demoCase }) {
             </thead>
             <tbody>
               {reports.map((r, i) => (
-                <tr key={r.id} style={{ background: r.id === lastSavedId ? "var(--tt-mint)" : "white", borderTop: i > 0 ? `1px solid var(--tt-grey03)` : "none" }}>
+                <tr key={r.id} style={{ background: r.id === lastSavedId ? "var(--tt-mint)" : "white", borderTop: i > 0 ? `1px solid var(--tt-grey03)` : "none", transition: "background 0.6s ease" }}>
                   <td style={{ padding: "0 16px", fontSize: 13, color: "var(--tt-text-2)", whiteSpace: "nowrap", height: 52, verticalAlign: "middle" }}>{r.date}</td>
                   <td style={{ padding: "0 16px", fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", height: 52, verticalAlign: "middle" }}>{r.period}</td>
                   <td style={{ padding: "0 14px 0 16px", textAlign: "right", height: 52, verticalAlign: "middle", width: 160 }}>
