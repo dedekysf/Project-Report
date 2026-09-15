@@ -9,7 +9,7 @@ import {
   LayoutGrid, MapPin, Hash, FileText, FileImage,
   Activity, Users, BarChart2, SlidersHorizontal,
   ArrowUpDown, Calendar, AlignJustify, Clock,
-  UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, Crown, AlertTriangle, PenLine,
+  UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, Crown, AlertTriangle,
   RotateCw, ZoomIn, ZoomOut, Folder, ArrowLeft, ArrowRight, Info, StickyNote,
 } from "lucide-react";
 
@@ -181,7 +181,7 @@ const PROJECT_ADDRESS = "11 North Raintree Hollow Court, Sienna Plantation, Miss
 const POINT_OF_CONTACT_NAME = "Jordan Blake";
 
 // ── Date Range Calendar ──
-function DateRangeCalendar({ anchorRef, onClose, onApply }) {
+function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false }) {
   const today = APP_TODAY;
   const [viewYear,   setViewYear]   = useState(today.getFullYear());
   const [viewMonth,  setViewMonth]  = useState(today.getMonth());
@@ -259,7 +259,7 @@ function DateRangeCalendar({ anchorRef, onClose, onApply }) {
   const effectiveEnd = rangeEnd || hovering;
 
   const handleDay = (key) => {
-    if (key > todayKey) return; // dates after today can't be selected
+    if (!allowFuture && key > todayKey) return; // dates after today can't be selected
     if (!rangeStart || rangeEnd) {
       setRangeStart(key); setRangeEnd(null);
     } else {
@@ -346,7 +346,7 @@ function DateRangeCalendar({ anchorRef, onClose, onApply }) {
           const key      = toKey(cYear, cMonth, d);
           const isToday  = key === todayKey;
           const isFuture = key > todayKey;
-          const disabled = isFuture; // prev/next-month preview days are selectable, just future dates aren't
+          const disabled = !allowFuture && isFuture; // prev/next-month preview days are selectable, just future dates aren't (unless allowFuture)
           const start    = key === rangeStart;
           const end      = key === rangeEnd;
           const selected = start || end;
@@ -388,7 +388,7 @@ function DateRangeCalendar({ anchorRef, onClose, onApply }) {
                 borderRadius: "50%",
                 background: selected ? "var(--tt-text-1)" : "transparent",
                 border: isToday && !selected ? "1.5px solid var(--tt-text-1)" : "none",
-                color: selected ? "#fff" : inBand ? "var(--tt-text-1)" : isFuture ? "var(--tt-grey04)" : otherMonth ? "var(--tt-grey03)" : isToday ? "var(--tt-text-1)" : "var(--tt-text-2)",
+                color: selected ? "#fff" : inBand ? "var(--tt-text-1)" : disabled ? "var(--tt-grey04)" : otherMonth ? "var(--tt-grey03)" : isToday ? "var(--tt-text-1)" : "var(--tt-text-2)",
                 fontSize: 13,
                 fontWeight: selected || isToday ? 600 : 400,
                 zIndex: 1,
@@ -512,6 +512,90 @@ function ReportCheckbox({ active, label, onClick }) {
   );
 }
 
+// ── Inline-editable text ──
+// No pencil icon — hovering shows a grey02 background to signal the field
+// is editable, and clicking swaps it for an input (or textarea) with
+// check/cancel icons matching the task-name rename pattern (inside the
+// input for single-line fields, below it for multiline ones, since icons
+// can't sit inside wrapped text). Manages its own draft/editing state, so
+// any number of these can be open independently at once. When disabled,
+// renders as inert plain text (used once a report preview is locked
+// read-only after saving).
+function EditableField({ value, placeholder, onSave, onCancel, multiline, disabled, autoEdit, textStyle, inputStyle, as: Tag = "p" }) {
+  const [editing, setEditing] = useState(!!autoEdit);
+  const [draft, setDraft] = useState(value || "");
+
+  if (disabled) {
+    if (value) return <Tag style={textStyle}>{value}</Tag>;
+    return placeholder ? <Tag style={{ ...textStyle, color: "var(--tt-grey05)" }}>{placeholder}</Tag> : null;
+  }
+
+  if (editing) {
+    const commit = () => { onSave(draft.trim()); setEditing(false); };
+    const cancel = () => { setEditing(false); if (onCancel) onCancel(); };
+    return (
+      <div style={{ position: "relative", maxWidth: "100%", minWidth: 0 }}>
+        {multiline ? (
+          <textarea
+            ref={el => { if (el) el.focus(); }}
+            value={draft}
+            onChange={ev => setDraft(ev.target.value)}
+            onKeyDown={ev => { if (ev.key === "Escape") { ev.preventDefault(); cancel(); } }}
+            rows={3}
+            placeholder={placeholder}
+            style={{ display: "block", width: "100%", fontFamily: "inherit", border: "1px solid var(--tt-text-1)", borderRadius: 8, outline: "none", resize: "none", padding: "8px 12px", boxSizing: "border-box", ...inputStyle }}
+          />
+        ) : (
+          <input
+            ref={el => { if (el) { el.focus(); const len = el.value.length; el.setSelectionRange(len, len); } }}
+            type="text"
+            value={draft}
+            onChange={ev => setDraft(ev.target.value)}
+            onKeyDown={ev => {
+              if (ev.key === "Enter") { ev.preventDefault(); commit(); }
+              if (ev.key === "Escape") { ev.preventDefault(); cancel(); }
+            }}
+            placeholder={placeholder}
+            style={{ fieldSizing: "content", width: "100%", maxWidth: "100%", minWidth: 120, height: 40, padding: "0 76px 0 12px", border: "1px solid var(--tt-text-1)", borderRadius: 8, fontFamily: "inherit", outline: "none", boxSizing: "border-box", ...inputStyle }}
+          />
+        )}
+        <div style={multiline
+          ? { display: "flex", justifyContent: "flex-end", gap: 4, marginTop: 6 }
+          : { position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center", gap: 4 }
+        }>
+          <button
+            onClick={cancel}
+            onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
+            onMouseLeave={ev => ev.currentTarget.style.background = "none"}
+            style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "background 0.15s" }}
+          >
+            <X size={15} strokeWidth={SW} color="var(--tt-grey06)" />
+          </button>
+          <button
+            onClick={commit}
+            onMouseEnter={ev => ev.currentTarget.style.opacity = "0.85"}
+            onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
+            style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "var(--tt-secondary)", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "opacity 0.15s" }}
+          >
+            <Check size={15} strokeWidth={SW} color="white" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Tag
+      onClick={() => { setDraft(value || ""); setEditing(true); }}
+      onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
+      onMouseLeave={ev => ev.currentTarget.style.background = "none"}
+      style={{ cursor: "pointer", borderRadius: 6, transition: "background 0.15s", ...textStyle }}
+    >
+      {value || <span style={{ color: "var(--tt-grey05)" }}>{placeholder}</span>}
+    </Tag>
+  );
+}
+
 // ── Fixed-position tooltip button ──
 // Renders tooltip via a fixed div that escapes overflow clipping
 function FixedTooltipBtn({ children, label, onAction }) {
@@ -548,53 +632,6 @@ function FixedTooltipBtn({ children, label, onAction }) {
         }}>
           {label}
         </div>
-      )}
-    </>
-  );
-}
-
-// Outlined 40x40 close button for the note input, with the same bottom-right
-// tooltip convention as FixedTooltipBtn (which can't be reused directly —
-// its className hardcodes a different, smaller icon-button look).
-//
-// The tooltip is portaled to document.body rather than rendered inline:
-// this button lives inside the side panel, which animates via `transform`
-// (its slide in/out) and clips via `overflow:hidden`. Any non-`none`
-// transform on an ancestor makes it the containing block for that
-// descendant's position:fixed, so without the portal the tooltip would be
-// positioned/clipped relative to the panel instead of the viewport —
-// exactly why it wasn't showing up there.
-function NoteFormCloseBtn({ onClick }) {
-  const [tip, setTip] = useState(null);
-  const btnRef = useRef(null);
-
-  const showTip = () => {
-    if (!btnRef.current) return;
-    const r = btnRef.current.getBoundingClientRect();
-    setTip({ top: r.bottom + 6, left: r.right });
-  };
-  const hideTip = () => setTip(null);
-
-  return (
-    <>
-      <button
-        ref={btnRef}
-        onClick={onClick}
-        onMouseEnter={e => { showTip(); e.currentTarget.style.background = "var(--tt-grey02)"; }}
-        onMouseLeave={e => { hideTip(); e.currentTarget.style.background = "white"; }}
-        style={{ width: 40, height: 40, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s" }}
-      >
-        <X size={16} strokeWidth={SW} />
-      </button>
-      {tip && createPortal(
-        <div style={{
-          position: "fixed", zIndex: 9999, top: tip.top, left: tip.left, transform: "translateX(-100%)",
-          background: "var(--tt-text-1)", color: "white", fontSize: 11, fontWeight: 500, whiteSpace: "nowrap",
-          padding: "4px 8px", borderRadius: 4, pointerEvents: "none",
-        }}>
-          Cancel note
-        </div>,
-        document.body
       )}
     </>
   );
@@ -1281,8 +1318,7 @@ function buildDefaultSummary(groups) {
     ? `${inProgress.length} task${inProgress.length > 1 ? "s" : ""} still in progress — ${focus.category.toLowerCase()} is the current focus. Everything else is on schedule.`
     : "All tracked tasks are complete or upcoming — nothing in progress this period.";
   const latestEntry = groups[0]?.entries[0];
-  const body = latestEntry ? latestEntry.note : "";
-  return { headline, body };
+  return latestEntry ? `${headline} ${latestEntry.note}` : headline;
 }
 
 // "Next report" nudge in the footer — a rough one-month-out estimate from
@@ -1508,11 +1544,8 @@ function ReportsTab({ demoCase }) {
   const [preview,          setPreview]          = useState(null);
   const [previewPeriodOpen, setPreviewPeriodOpen] = useState(false);
   const [previewShowCal,   setPreviewShowCal]   = useState(false);
-  const [noteDrafts,       setNoteDrafts]       = useState({}); // { [entryKey]: draftText } — one independent draft per entry
-  const [activeNoteFormKeys, setActiveNoteFormKeys] = useState({}); // { [entryKey]: true } — every entry currently showing its add/edit note input (more than one can be open at once)
+  const [activeNoteFormKeys, setActiveNoteFormKeys] = useState({}); // { [entryKey]: true } — entries currently in note-edit mode (no saved note yet)
   const [titleOverrides,   setTitleOverrides]    = useState({}); // { [entryKey]: overriddenTitle } — per-entry task name edits, this report only
-  const [editingTitleKey,  setEditingTitleKey]   = useState(null); // entryKey currently showing its inline title-edit input
-  const [renameDraft,      setRenameDraft]       = useState(""); // in-progress rename text for editingTitleKey — only committed to titleOverrides on confirm
   const [previewLoading,   setPreviewLoading]    = useState(false);
   const [previewSaved,     setPreviewSaved]      = useState(false); // footer switches from Save to Download/Copy link once true
   const [previewCopied,    setPreviewCopied]     = useState(false); // Copy link button shows "Link copied" briefly
@@ -1522,6 +1555,8 @@ function ReportsTab({ demoCase }) {
   const [saving,           setSaving]             = useState(false); // Save report button's own disabled/spinner state, before the toast appears
   const previewPeriodRef = useRef(null);
   const previewPanelRef = useRef(null);
+  const targetOpeningRef = useRef(null);
+  const [targetOpeningCalOpen, setTargetOpeningCalOpen] = useState(false);
 
   useEffect(() => {
     if (!openPeriod) return;
@@ -1548,7 +1583,7 @@ function ReportsTab({ demoCase }) {
   // Adds a report to the results list (called only once the user confirms
   // via "Save report" in the preview modal — Generate no longer does this
   // directly).
-  const pushReport = ({ includeSummary, includeNoPhotoTasks, dateRange, period, data, extraNotes, excludedPhotos, titleOverrides, summaryHeadline, summaryBody, targetOpening, clientName }) => {
+  const pushReport = ({ includeSummary, includeNoPhotoTasks, dateRange, period, data, extraNotes, excludedPhotos, titleOverrides, projectName, summary, targetOpening, clientName }) => {
     const id = Date.now();
     const newReport = {
       id,
@@ -1562,8 +1597,8 @@ function ReportsTab({ demoCase }) {
       extraNotes,
       excludedPhotos,
       titleOverrides,
-      summaryHeadline,
-      summaryBody,
+      projectName,
+      summary,
       targetOpening,
       clientName,
     };
@@ -1609,7 +1644,6 @@ function ReportsTab({ demoCase }) {
         showToast("error", "No data for this period");
         return; // don't open the modal on an empty period — just the toast
       }
-      const { headline, body } = buildDefaultSummary(data.groups);
       setPreview({
         includeSummary,
         includeNoPhotoTasks,
@@ -1620,18 +1654,16 @@ function ReportsTab({ demoCase }) {
         excludedPhotos: {},
         // System-generated starting point — freely editable from here, and
         // never regenerated for the life of this draft.
-        summaryHeadline: headline,
-        summaryBody: body,
+        projectName: PROJECT_NAME,
+        summary: buildDefaultSummary(data.groups),
         targetOpening: "",
         clientName: "",
       });
       setPreviewPeriodOpen(false);
       setPreviewShowCal(false);
+      setTargetOpeningCalOpen(false);
       setActiveNoteFormKeys({});
-      setNoteDrafts({});
       setTitleOverrides({});
-      setEditingTitleKey(null);
-      setRenameDraft("");
       setPreviewSaved(false);
       setPreviewCopied(false);
       setVisibleCount(10);
@@ -1647,11 +1679,9 @@ function ReportsTab({ demoCase }) {
     setPreview(null);
     setPreviewPeriodOpen(false);
     setPreviewShowCal(false);
+    setTargetOpeningCalOpen(false);
     setActiveNoteFormKeys({});
-    setNoteDrafts({});
     setTitleOverrides({});
-    setEditingTitleKey(null);
-    setRenameDraft("");
     setPreviewSaved(false);
     setPreviewCopied(false);
     setVisibleCount(10);
@@ -1742,36 +1772,6 @@ function ReportsTab({ demoCase }) {
     }
   };
 
-  // Each entry's add/edit note form is independent — opening one doesn't
-  // close any others already open.
-  const openNoteForm = (key, initialText = "") => {
-    setActiveNoteFormKeys(prev => ({ ...prev, [key]: true }));
-    setNoteDrafts(prev => ({ ...prev, [key]: initialText }));
-  };
-  const closeNoteForm = (key) => {
-    setActiveNoteFormKeys(prev => { const next = { ...prev }; delete next[key]; return next; });
-    setNoteDrafts(prev => { const next = { ...prev }; delete next[key]; return next; });
-  };
-  const setNoteDraftFor = (key, text) => setNoteDrafts(prev => ({ ...prev, [key]: text }));
-
-  // Renaming a task's displayed title is draft-only until confirmed — the
-  // in-progress text lives in renameDraft, and only lands in
-  // titleOverrides (which is what actually reaches Save/Download/Copy
-  // link) once the check button (or Enter) commits it. Cancel (or Escape)
-  // just closes the input, leaving titleOverrides untouched.
-  const startRenameTitle = (key, currentTitle) => {
-    setEditingTitleKey(key);
-    setRenameDraft(currentTitle);
-  };
-  const confirmRenameTitle = (key) => {
-    setTitleOverrides(prev => {
-      if (renameDraft && renameDraft.trim()) return { ...prev, [key]: renameDraft.trim() };
-      const next = { ...prev }; delete next[key]; return next;
-    });
-    setEditingTitleKey(null);
-  };
-  const cancelRenameTitle = () => setEditingTitleKey(null);
-
   // Checking a photo just marks it selected (green check) — it still shows
   // in the grid until the selection toolbar's Delete is clicked, at which
   // point selected keys move into preview.excludedPhotos (permanently
@@ -1793,10 +1793,12 @@ function ReportsTab({ demoCase }) {
   };
 
   // Rendered under every entry's photo list (and once for the empty-period
-  // state). A note is only ever committed by the main Save report button —
-  // the input just stays open (with whatever's typed so far) until then;
-  // there's no separate per-note "save" step or intermediate committed-but-
-  // editable state anymore.
+  // state). Notes commit immediately into preview.extraNotes as soon as the
+  // check icon is clicked — there's no deferred draft held until Save
+  // report anymore. Before any note exists, an "Add a note" trigger opens
+  // the EditableField straight into edit mode; once a note is saved,
+  // re-editing it is just hover (grey02) + click, same as every other
+  // EditableField on this page.
   const renderNoteSlot = (key) => {
     // Locked once saved — Download/Copy link now act on the saved snapshot.
     if (previewSaved) {
@@ -1807,36 +1809,40 @@ function ReportsTab({ demoCase }) {
       );
     }
 
-    if (activeNoteFormKeys[key]) {
+    const savedNote = preview.extraNotes[key];
+
+    if (!savedNote && !activeNoteFormKeys[key]) {
       return (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
-          <div style={{ position: "relative", flex: 1 }}>
-            <PenLine size={14} strokeWidth={SW} color="var(--tt-grey05)" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-            <input
-              autoFocus
-              type="text"
-              value={noteDrafts[key] || ""}
-              onChange={e => setNoteDraftFor(key, e.target.value)}
-              onFocus={e => e.currentTarget.style.borderColor = "var(--tt-text-1)"}
-              onBlur={e => e.currentTarget.style.borderColor = "var(--tt-grey03)"}
-              placeholder="Describe the note for this task"
-              style={{ width: "100%", height: 40, padding: "0 12px 0 36px", border: "1px solid var(--tt-grey03)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", color: "var(--tt-text-2)", outline: "none", boxSizing: "border-box" }}
-            />
-          </div>
-          <NoteFormCloseBtn onClick={() => closeNoteForm(key)} />
-        </div>
+        <button
+          onClick={() => setActiveNoteFormKeys(prev => ({ ...prev, [key]: true }))}
+          onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
+          onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", padding: 0, marginTop: 10, cursor: "pointer", fontSize: 12, fontWeight: 500, color: "var(--tt-secondary)" }}
+        >
+          <StickyNote size={13} strokeWidth={SW} /> Add a note
+        </button>
       );
     }
 
     return (
-      <button
-        onClick={() => openNoteForm(key)}
-        onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
-        onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
-        style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", padding: 0, marginTop: 10, cursor: "pointer", fontSize: 12, fontWeight: 500, color: "var(--tt-secondary)" }}
-      >
-        <StickyNote size={13} strokeWidth={SW} /> Add a note
-      </button>
+      <div style={{ marginTop: 10 }}>
+        <EditableField
+          value={savedNote || ""}
+          placeholder="Describe the note for this task"
+          autoEdit={!savedNote}
+          onSave={v => {
+            setPreview(p => {
+              const next = { ...p.extraNotes };
+              if (v) next[key] = v; else delete next[key];
+              return { ...p, extraNotes: next };
+            });
+            setActiveNoteFormKeys(prev => { const next = { ...prev }; delete next[key]; return next; });
+          }}
+          onCancel={() => setActiveNoteFormKeys(prev => { const next = { ...prev }; delete next[key]; return next; })}
+          textStyle={{ display: "block", fontSize: 12, fontStyle: "italic", color: "var(--tt-text-2)", lineHeight: "1.5", margin: 0, padding: 8, borderRadius: 8 }}
+          inputStyle={{ fontSize: 12, height: 40 }}
+        />
+      </div>
     );
   };
 
@@ -1854,14 +1860,10 @@ function ReportsTab({ demoCase }) {
 
   const handlePreviewSave = () => {
     if (saving) return;
-    // Notes are only ever committed here — fold every currently-typed
-    // draft (regardless of which entries are still "open") into the
-    // notes actually used for this snapshot.
-    const mergedNotes = { ...preview.extraNotes };
-    Object.entries(noteDrafts).forEach(([k, text]) => {
-      if (text && text.trim()) mergedNotes[k] = text.trim();
-    });
-    const finalGroups = applyExtraNotesToGroups(applyTitleOverrides(applyPhotoExclusions(previewData.groups, preview.excludedPhotos), titleOverrides), mergedNotes);
+    // Notes already live in preview.extraNotes — every EditableField note
+    // commits there the moment its check icon is clicked, so there's no
+    // draft state left to fold in here.
+    const finalGroups = applyExtraNotesToGroups(applyTitleOverrides(applyPhotoExclusions(previewData.groups, preview.excludedPhotos), titleOverrides), preview.extraNotes);
     if (!hasGroupData(finalGroups)) { showToast("error", "No data to save"); return; }
     setSaving(true);
     setTimeout(() => {
@@ -1872,16 +1874,12 @@ function ReportsTab({ demoCase }) {
         showToast("error", "Save failed. Try again.");
         return;
       }
-      pushReport({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, data: { ...previewData, groups: finalGroups }, extraNotes: mergedNotes, excludedPhotos: preview.excludedPhotos, titleOverrides, summaryHeadline: preview.summaryHeadline, summaryBody: preview.summaryBody, targetOpening: preview.targetOpening, clientName: preview.clientName });
+      pushReport({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, data: { ...previewData, groups: finalGroups }, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides, projectName: preview.projectName, summary: preview.summary, targetOpening: preview.targetOpening, clientName: preview.clientName });
       setDateRange("since_last");
       // Closing is left to the user — the footer switches to Download/Copy
       // link so they can act on the just-saved report before dismissing it.
-      setPreview(p => ({ ...p, extraNotes: mergedNotes }));
       setPreviewSaved(true);
       setActiveNoteFormKeys({});
-      setNoteDrafts({});
-      setEditingTitleKey(null);
-      setRenameDraft("");
       setPreviewPeriodOpen(false);
       setSaving(false);
       setSelectedPhotos({});
@@ -2182,7 +2180,15 @@ function ReportsTab({ demoCase }) {
                 document below, so the two line up instead of the bar
                 stretching edge-to-edge across the full screen. */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid var(--tt-grey03)", flexShrink: 0, background: "white" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: 800, width: "100%", margin: "0 auto" }}>
+              <div style={{ display: "flex", alignItems: "center", maxWidth: 800, width: "100%", margin: "0 auto" }}>
+              <button
+                onClick={closePreview}
+                onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+                onMouseLeave={e => e.currentTarget.style.background = "none"}
+                style={{ background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 4, display: "flex", color: "var(--tt-text-2)", transition: "background 0.15s", flexShrink: 0, marginRight: 8 }}
+              >
+                <ChevronLeft size={20} strokeWidth={SW} />
+              </button>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
                 {/* Borderless period dropdown — locked once the report is
                     saved, so it can't drift out of sync with what was
@@ -2196,7 +2202,7 @@ function ReportsTab({ demoCase }) {
                     style={{
                       display: "flex", alignItems: "center", gap: 4,
                       background: "none", border: "none", borderRadius: 6,
-                      margin: "0 0 0 -8px", padding: "2px 8px", cursor: previewSaved ? "default" : "pointer",
+                      margin: 0, padding: "2px 8px", cursor: previewSaved ? "default" : "pointer",
                       fontSize: 14, fontWeight: 400, color: "var(--tt-grey05)",
                       transition: "background 0.15s",
                     }}
@@ -2246,14 +2252,6 @@ function ReportsTab({ demoCase }) {
                   )}
                 </div>
               </div>
-              <button
-                onClick={closePreview}
-                onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
-                onMouseLeave={e => e.currentTarget.style.background = "none"}
-                style={{ background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 4, display: "flex", color: "var(--tt-text-2)", transition: "background 0.15s" }}
-              >
-                <X size={18} strokeWidth={SW} />
-              </button>
               </div>
             </div>
 
@@ -2296,10 +2294,11 @@ function ReportsTab({ demoCase }) {
                   // boxes with gaps between them, and with no divider line
                   // between sections either.
                   <div style={{ border: "1px solid var(--tt-grey03)", borderRadius: 12, overflow: "hidden", background: "white" }}>
-                    {/* ── Report document header — project identity, editable
-                        system-generated summary, and editable Target
-                        Opening / Prepared For fields. Locked to plain text
-                        once saved, same as everything else in this panel. */}
+                    {/* ── Report document header — project identity (name
+                        editable), editable Target Opening / Prepared For,
+                        and a small system-generated summary. Locked to
+                        plain text once saved, same as everything else in
+                        this panel. */}
                     <div style={{ padding: 28 }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
                         <img src={IMG_MAP_LOGO} alt="tasktag" style={{ height: 20, display: "block" }} />
@@ -2309,45 +2308,21 @@ function ReportsTab({ demoCase }) {
                       </div>
                       <div style={{ height: 1, background: "var(--tt-grey03)", marginBottom: 20 }} />
 
+                      {/* Row 1: address (not editable). Row 2: project name
+                          — editable the same way as a task name, and sized
+                          like the old summary headline now that it's the
+                          document's real title. */}
                       <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "0 0 4px" }}>
                         {PROJECT_ADDRESS}
                       </p>
-                      <p style={{ fontSize: 16, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 16px" }}>
-                        {PROJECT_NAME}
-                      </p>
-
-                      {/* Summary — set apart in its own grey01 box, like a
-                          project description, rather than floating directly
-                          on the card's white background. */}
-                      <div style={{ background: "var(--tt-grey01)", borderRadius: 8, padding: 16 }}>
-                        {previewSaved ? (
-                          <h2 style={{ fontFamily: "inherit", fontWeight: 400, fontSize: 24, lineHeight: 1.3, color: "var(--tt-text-1)", margin: "0 0 12px" }}>
-                            {preview.summaryHeadline}
-                          </h2>
-                        ) : (
-                          <textarea
-                            value={preview.summaryHeadline}
-                            onChange={ev => setPreview(p => ({ ...p, summaryHeadline: ev.target.value }))}
-                            rows={2}
-                            placeholder="Summarize how the project is going this period"
-                            style={{ display: "block", width: "100%", fontFamily: "inherit", fontWeight: 400, fontSize: 24, lineHeight: 1.3, color: "var(--tt-text-1)", border: "none", outline: "none", resize: "none", padding: 0, margin: "0 0 12px", background: "none" }}
-                          />
-                        )}
-
-                        {previewSaved ? (
-                          preview.summaryBody && (
-                            <p style={{ fontSize: 13, color: "var(--tt-text-2)", lineHeight: 1.6, margin: 0 }}>{preview.summaryBody}</p>
-                          )
-                        ) : (
-                          <textarea
-                            value={preview.summaryBody}
-                            onChange={ev => setPreview(p => ({ ...p, summaryBody: ev.target.value }))}
-                            rows={3}
-                            placeholder="Add more detail (optional)"
-                            style={{ display: "block", width: "100%", fontSize: 13, fontFamily: "inherit", color: "var(--tt-text-2)", lineHeight: 1.6, border: "none", outline: "none", resize: "none", padding: 0, margin: 0, background: "none" }}
-                          />
-                        )}
-                      </div>
+                      <EditableField
+                        value={preview.projectName}
+                        placeholder={PROJECT_NAME}
+                        disabled={previewSaved}
+                        onSave={v => setPreview(p => ({ ...p, projectName: v || PROJECT_NAME }))}
+                        textStyle={{ fontSize: 24, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 16px" }}
+                        inputStyle={{ fontSize: 24, fontWeight: 700 }}
+                      />
 
                       <div style={{ height: 1, background: "var(--tt-grey03)", margin: "20px 0" }} />
 
@@ -2357,29 +2332,59 @@ function ReportsTab({ demoCase }) {
                           {previewSaved ? (
                             <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", margin: 0 }}>{preview.targetOpening || "—"}</p>
                           ) : (
-                            <input
-                              type="text"
-                              value={preview.targetOpening}
-                              onChange={ev => setPreview(p => ({ ...p, targetOpening: ev.target.value }))}
-                              placeholder="Add target date"
-                              style={{ width: 150, fontSize: 14, fontWeight: 600, fontFamily: "inherit", color: "var(--tt-text-1)", border: "none", outline: "none", padding: 0, background: "none" }}
-                            />
+                            <div style={{ position: "relative" }} ref={targetOpeningRef}>
+                              <p
+                                onClick={() => setTargetOpeningCalOpen(o => !o)}
+                                onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
+                                onMouseLeave={ev => ev.currentTarget.style.background = "none"}
+                                style={{ fontSize: 14, fontWeight: 600, color: preview.targetOpening ? "var(--tt-text-1)" : "var(--tt-grey05)", margin: 0, cursor: "pointer", borderRadius: 6, transition: "background 0.15s" }}
+                              >
+                                {preview.targetOpening || "Add target date"}
+                              </p>
+                              {targetOpeningCalOpen && (
+                                <DateRangeCalendar
+                                  anchorRef={targetOpeningRef}
+                                  allowFuture
+                                  onClose={() => setTargetOpeningCalOpen(false)}
+                                  onApply={(start) => {
+                                    if (start) {
+                                      const [y, m, d] = start.split("-");
+                                      setPreview(p => ({ ...p, targetOpening: new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) }));
+                                    }
+                                    setTargetOpeningCalOpen(false);
+                                  }}
+                                />
+                              )}
+                            </div>
                           )}
                         </div>
                         <div>
                           <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "0 0 4px" }}>Prepared For</p>
-                          {previewSaved ? (
-                            <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", margin: 0 }}>{preview.clientName || "—"}</p>
-                          ) : (
-                            <input
-                              type="text"
-                              value={preview.clientName}
-                              onChange={ev => setPreview(p => ({ ...p, clientName: ev.target.value }))}
-                              placeholder="Add client name"
-                              style={{ width: 170, fontSize: 14, fontWeight: 600, fontFamily: "inherit", color: "var(--tt-text-1)", border: "none", outline: "none", padding: 0, background: "none" }}
-                            />
-                          )}
+                          <EditableField
+                            value={preview.clientName}
+                            placeholder="Add client name"
+                            disabled={previewSaved}
+                            onSave={v => setPreview(p => ({ ...p, clientName: v }))}
+                            textStyle={{ fontSize: 14, fontWeight: 600, color: preview.clientName ? "var(--tt-text-1)" : "var(--tt-grey05)", margin: 0 }}
+                            inputStyle={{ fontSize: 14, fontWeight: 600, width: 170 }}
+                          />
                         </div>
+                      </div>
+
+                      {/* Summary — small, address-sized caption (not
+                          uppercase), set apart in its own grey02 box like a
+                          project description, after Target Opening/Prepared
+                          For rather than acting as the document's headline. */}
+                      <div style={{ background: "var(--tt-grey02)", borderRadius: 8, padding: 16, marginTop: 20 }}>
+                        <EditableField
+                          value={preview.summary}
+                          placeholder="Summarize how the project is going this period"
+                          disabled={previewSaved}
+                          multiline
+                          onSave={v => setPreview(p => ({ ...p, summary: v }))}
+                          textStyle={{ display: "block", fontSize: 11, color: "var(--tt-text-2)", lineHeight: 1.6, margin: 0 }}
+                          inputStyle={{ fontSize: 11, color: "var(--tt-text-2)", lineHeight: 1.6 }}
+                        />
                       </div>
                     </div>
 
@@ -2421,7 +2426,6 @@ function ReportsTab({ demoCase }) {
                           {g.entries.map((e, i) => {
                             const entryKey = `${g.key}_${i}`;
                             const displayTitle = titleOverrides[entryKey] ?? e.note;
-                            const isEditingTitle = !previewSaved && editingTitleKey === entryKey;
                             // e.noPhotos is set once in buildReportData, before applyPhotoCap
                             // can zero out an otherwise-photographed entry's photos — an
                             // entry merely capped down to 0 photos must never be shown as
@@ -2441,68 +2445,23 @@ function ReportsTab({ demoCase }) {
                                     {fmtDate(parseDate(e.date)).toUpperCase()}
                                   </span>
 
-                                  {isEditingTitle ? (
-                                    // Same height/border chrome as the "Add a note" input below
-                                    // (no left icon this time) — draft-only until the check
-                                    // button (or Enter) commits it into titleOverrides, or the
-                                    // X (or Escape) discards it. Both sit inside the input
-                                    // itself, on the right. Sized to the text itself (capped at
-                                    // the row's full width) rather than always stretching full
-                                    // width like a normal form field.
-                                    <div style={{ position: "relative", maxWidth: "100%", minWidth: 0, flex: 1 }}>
-                                      <input
-                                        ref={el => { if (el) { el.focus(); const len = el.value.length; el.setSelectionRange(len, len); } }}
-                                        type="text"
-                                        value={renameDraft}
-                                        onChange={ev => setRenameDraft(ev.target.value)}
-                                        onKeyDown={ev => {
-                                          if (ev.key === "Enter") { ev.preventDefault(); confirmRenameTitle(entryKey); }
-                                          if (ev.key === "Escape") { ev.preventDefault(); cancelRenameTitle(); }
-                                        }}
-                                        style={{
-                                          fieldSizing: "content", width: "100%", maxWidth: "100%", minWidth: 120,
-                                          height: 32, padding: "0 76px 0 12px", border: "1px solid var(--tt-text-1)", borderRadius: 8,
-                                          fontSize: 13, fontFamily: "inherit", color: "var(--tt-text-2)", outline: "none", boxSizing: "border-box",
-                                        }}
-                                      />
-                                      <div style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center", gap: 4 }}>
-                                        <button
-                                          onClick={cancelRenameTitle}
-                                          onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
-                                          onMouseLeave={ev => ev.currentTarget.style.background = "none"}
-                                          style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "background 0.15s" }}
-                                        >
-                                          <X size={14} strokeWidth={SW} color="var(--tt-grey06)" />
-                                        </button>
-                                        <button
-                                          onClick={() => confirmRenameTitle(entryKey)}
-                                          onMouseEnter={ev => ev.currentTarget.style.opacity = "0.85"}
-                                          onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
-                                          style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, background: "var(--tt-secondary)", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "opacity 0.15s" }}
-                                        >
-                                          <Check size={14} strokeWidth={SW} color="white" />
-                                        </button>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1, minWidth: 0 }}>
-                                      <p style={{ flex: "0 1 auto", minWidth: 0, fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.4", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                        {displayTitle}
-                                      </p>
-                                      {/* Renaming here only overrides the title for this report —
-                                          the original task/entry text is never modified. */}
-                                      {!previewSaved && (
-                                        <button
-                                          onClick={() => startRenameTitle(entryKey, displayTitle)}
-                                          onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
-                                          onMouseLeave={ev => ev.currentTarget.style.background = "none"}
-                                          style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 20, height: 20, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "background 0.15s" }}
-                                        >
-                                          <Pencil size={12} strokeWidth={SW} color="var(--tt-grey05)" />
-                                        </button>
-                                      )}
-                                    </div>
-                                  )}
+                                  {/* Renaming here only overrides the title for this report —
+                                      the original task/entry text is never modified. No pencil
+                                      icon — hover shows the grey02 affordance, click edits. */}
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <EditableField
+                                      value={displayTitle}
+                                      disabled={previewSaved}
+                                      onSave={v => {
+                                        setTitleOverrides(prev => {
+                                          if (v && v.trim()) return { ...prev, [entryKey]: v.trim() };
+                                          const next = { ...prev }; delete next[entryKey]; return next;
+                                        });
+                                      }}
+                                      textStyle={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.4", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                                      inputStyle={{ fontSize: 13, height: 32 }}
+                                    />
+                                  </div>
                                 </div>
                                 {!isCompleted && (
                                   <PhotoGrid
