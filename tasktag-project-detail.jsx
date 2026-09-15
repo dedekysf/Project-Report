@@ -1461,7 +1461,6 @@ function ReportsTab({ demoCase }) {
   const [openPeriod,  setOpenPeriod]  = useState(false);
   const [toast,       setToast]       = useState(null); // { type: "success" | "error", message }
   const [deleteTarget, setDeleteTarget] = useState(null); // report pending delete confirmation
-  const [confirmDeletePhotos, setConfirmDeletePhotos] = useState(false); // whether the selected-photos delete confirmation is open
   const [lightbox, setLightbox] = useState(null); // { photos, index, caption } | null — full-screen photo viewer
   const [selectedPhotos, setSelectedPhotos] = useState({}); // { [entryKey_photoIndex]: photoKey } — in-progress checkbox selection, not yet deleted
   const periodRef     = useRef(null);
@@ -1632,25 +1631,25 @@ function ReportsTab({ demoCase }) {
   }, [preview, panelClosing]);
 
   useEffect(() => {
-    if (!preview || lightbox || confirmDeletePhotos || deleteTarget) return;
+    if (!preview || lightbox || deleteTarget) return;
     const handler = (e) => { if (e.key === "Escape") closePreview(); };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [preview, lightbox, confirmDeletePhotos, deleteTarget]);
+  }, [preview, lightbox, deleteTarget]);
 
   // Click outside the side panel closes it — there's no backdrop to catch
-  // this anymore. Suspended while the custom-date calendar, the photo
-  // lightbox, or a confirmation modal is open, since all of them render as
-  // siblings (not nested inside the panel) and would otherwise register
-  // every click inside them as "outside".
+  // this anymore. Suspended while the custom-date calendar or the photo
+  // lightbox is open, since both render as siblings (not nested inside the
+  // panel) and would otherwise register every click inside them as
+  // "outside".
   useEffect(() => {
-    if (!preview || previewShowCal || lightbox || confirmDeletePhotos || deleteTarget) return;
+    if (!preview || previewShowCal || lightbox || deleteTarget) return;
     const handler = (e) => {
       if (previewPanelRef.current && !previewPanelRef.current.contains(e.target)) closePreview();
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [preview, previewShowCal, lightbox, confirmDeletePhotos, deleteTarget]);
+  }, [preview, previewShowCal, lightbox, deleteTarget]);
 
   // Show a loading skeleton whenever the previewed data would change —
   // both on first open and whenever the period is edited. Once it resolves,
@@ -1757,7 +1756,6 @@ function ReportsTab({ demoCase }) {
   const handleDeleteSelectedPhotos = () => {
     setPreview(p => ({ ...p, excludedPhotos: { ...p.excludedPhotos, ...Object.fromEntries(Object.keys(selectedPhotos).map(k => [k, true])) } }));
     setSelectedPhotos({});
-    setConfirmDeletePhotos(false);
   };
 
   const handleDownloadSelectedPhotos = () => {
@@ -2312,50 +2310,46 @@ function ReportsTab({ demoCase }) {
                           // "Completed".
                           const isCompleted = e.noPhotos;
                           return (
-                            <div key={entryKey} style={{ marginBottom: 20, paddingBottom: 20, borderBottom: "2px solid var(--tt-grey02)" }}>
+                            <div key={entryKey} style={{ marginBottom: 20, paddingBottom: 20, borderBottom: "1px solid var(--tt-grey03)" }}>
                               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                 {isEditingTitle ? (
-                                  // Same height/border/icon-prefix chrome as the "Add a note"
-                                  // input below — draft-only until the check button (or
-                                  // Enter) commits it into titleOverrides, or cancel (or
-                                  // Escape) discards it. Sized to the text itself (capped at
+                                  // Same height/border chrome as the "Add a note" input below
+                                  // (no left icon this time) — draft-only until the check
+                                  // button (or Enter) commits it into titleOverrides, or the
+                                  // X (or Escape) discards it. Both sit inside the input
+                                  // itself, on the right. Sized to the text itself (capped at
                                   // the row's full width) rather than always stretching full
                                   // width like a normal form field.
-                                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                                    <div style={{ position: "relative", maxWidth: "100%" }}>
-                                      <Pencil size={14} strokeWidth={SW} color="var(--tt-grey05)" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-                                      <input
-                                        ref={el => { if (el) { el.focus(); const len = el.value.length; el.setSelectionRange(len, len); } }}
-                                        type="text"
-                                        value={renameDraft}
-                                        onChange={ev => setRenameDraft(ev.target.value)}
-                                        onKeyDown={ev => {
-                                          if (ev.key === "Enter") { ev.preventDefault(); confirmRenameTitle(entryKey); }
-                                          if (ev.key === "Escape") { ev.preventDefault(); cancelRenameTitle(); }
-                                        }}
-                                        style={{
-                                          fieldSizing: "content", width: "100%", maxWidth: "100%", minWidth: 80,
-                                          height: 40, padding: "0 12px 0 36px", border: "1px solid var(--tt-text-1)", borderRadius: 8,
-                                          fontSize: 13, fontFamily: "inherit", color: "var(--tt-text-2)", outline: "none", boxSizing: "border-box",
-                                        }}
-                                      />
+                                  <div style={{ position: "relative", maxWidth: "100%", minWidth: 0 }}>
+                                    <input
+                                      ref={el => { if (el) { el.focus(); const len = el.value.length; el.setSelectionRange(len, len); } }}
+                                      type="text"
+                                      value={renameDraft}
+                                      onChange={ev => setRenameDraft(ev.target.value)}
+                                      onKeyDown={ev => {
+                                        if (ev.key === "Enter") { ev.preventDefault(); confirmRenameTitle(entryKey); }
+                                        if (ev.key === "Escape") { ev.preventDefault(); cancelRenameTitle(); }
+                                      }}
+                                      style={{
+                                        fieldSizing: "content", width: "100%", maxWidth: "100%", minWidth: 120,
+                                        height: 40, padding: "0 76px 0 12px", border: "1px solid var(--tt-text-1)", borderRadius: 8,
+                                        fontSize: 13, fontFamily: "inherit", color: "var(--tt-text-2)", outline: "none", boxSizing: "border-box",
+                                      }}
+                                    />
+                                    <div style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center", gap: 4 }}>
+                                      <button
+                                        onClick={cancelRenameTitle}
+                                        style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0 }}
+                                      >
+                                        <X size={15} strokeWidth={SW} color="var(--tt-grey06)" />
+                                      </button>
+                                      <button
+                                        onClick={() => confirmRenameTitle(entryKey)}
+                                        style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "var(--tt-secondary)", border: "none", borderRadius: 6, cursor: "pointer", padding: 0 }}
+                                      >
+                                        <Check size={15} strokeWidth={SW} color="white" />
+                                      </button>
                                     </div>
-                                    <button
-                                      onClick={() => confirmRenameTitle(entryKey)}
-                                      onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-mint)"}
-                                      onMouseLeave={ev => ev.currentTarget.style.background = "none"}
-                                      style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "background 0.15s" }}
-                                    >
-                                      <Check size={16} strokeWidth={SW} color="var(--tt-secondary)" />
-                                    </button>
-                                    <button
-                                      onClick={cancelRenameTitle}
-                                      onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
-                                      onMouseLeave={ev => ev.currentTarget.style.background = "none"}
-                                      style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "background 0.15s" }}
-                                    >
-                                      <X size={16} strokeWidth={SW} color="var(--tt-grey05)" />
-                                    </button>
                                   </div>
                                 ) : (
                                   <>
@@ -2424,9 +2418,11 @@ function ReportsTab({ demoCase }) {
             </div>
 
             {/* Selection toolbar — appears above the footer once one or
-                more photos are checked; Delete moves them into
-                excludedPhotos (filtered everywhere), Download saves each
-                selected photo's original file. */}
+                more photos are checked. Delete acts immediately (no
+                confirmation modal) since the "original photo won't be
+                deleted" disclaimer is always visible right here; it moves
+                the selection into excludedPhotos (filtered everywhere).
+                Download saves each selected photo's original file. */}
             {Object.keys(selectedPhotos).length > 0 && (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", background: "var(--tt-grey06)", flexShrink: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -2436,13 +2432,18 @@ function ReportsTab({ demoCase }) {
                   >
                     <X size={13} strokeWidth={SW} />
                   </button>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: "white" }}>
-                    {Object.keys(selectedPhotos).length} item{Object.keys(selectedPhotos).length > 1 ? "s" : ""} selected
-                  </span>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: "white" }}>
+                      {Object.keys(selectedPhotos).length} item{Object.keys(selectedPhotos).length > 1 ? "s" : ""} selected
+                    </span>
+                    <span style={{ fontSize: 12, color: "var(--tt-grey05)" }}>
+                      The original photo won't be deleted.
+                    </span>
+                  </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <button
-                    onClick={() => setConfirmDeletePhotos(true)}
+                    onClick={handleDeleteSelectedPhotos}
                     onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.08)"}
                     onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                     style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: "1px solid rgba(255,255,255,0.4)", color: "white", cursor: "pointer", padding: "6px 12px", borderRadius: 8, fontSize: 13, fontWeight: 500, transition: "background 0.15s" }}
@@ -2584,46 +2585,6 @@ function ReportsTab({ demoCase }) {
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button
                 onClick={handleDeleteReport}
-                style={{ height: 40, padding: "0 20px", borderRadius: 8, border: "none", background: "var(--tt-text-1)", color: "white", fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "opacity 0.15s" }}
-                onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
-                onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete selected photos confirmation */}
-      {confirmDeletePhotos && (
-        <div
-          style={{ position: "fixed", inset: 0, zIndex: 4000, background: "rgba(10,22,41,0.45)", display: "flex", alignItems: "center", justifyContent: "center" }}
-          onClick={() => setConfirmDeletePhotos(false)}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{ width: 420, maxWidth: "calc(100vw - 32px)", background: "white", borderRadius: 16, padding: 24, boxShadow: "0 16px 48px rgba(10,22,41,0.25)" }}
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <p style={{ fontSize: 20, fontWeight: 700, color: "var(--tt-text-1)", margin: 0 }}>
-                Delete photo{Object.keys(selectedPhotos).length > 1 ? "s" : ""}
-              </p>
-              <button
-                onClick={() => setConfirmDeletePhotos(false)}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--tt-text-1)", padding: 4, display: "flex", borderRadius: 6, transition: "background 0.15s" }}
-                onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
-                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-              >
-                <X size={20} strokeWidth={SW} />
-              </button>
-            </div>
-            <p style={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, margin: "0 0 24px" }}>
-              {Object.keys(selectedPhotos).length} item{Object.keys(selectedPhotos).length > 1 ? "s" : ""} will be removed from this draft — the original photo won't be deleted.
-            </p>
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              <button
-                onClick={handleDeleteSelectedPhotos}
                 style={{ height: 40, padding: "0 20px", borderRadius: 8, border: "none", background: "var(--tt-text-1)", color: "white", fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "opacity 0.15s" }}
                 onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
                 onMouseLeave={e => e.currentTarget.style.opacity = "1"}
