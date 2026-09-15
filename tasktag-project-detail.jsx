@@ -2001,8 +2001,10 @@ function ReportsTab({ demoCase }) {
           </div>
 
           {/* Task summary / no-photo-tasks checkboxes, grouped under one
-              "Include" label — same label treatment as Period above. */}
-          <div style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
+              "Include" label — same label treatment as Period above.
+              marginLeft tops up the row's 12px gap to the requested 16px
+              gap specifically between Period and this group. */}
+          <div style={{ display: "flex", flexDirection: "column", flexShrink: 0, marginLeft: 4 }}>
             <Label style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)", marginBottom: 6, display: "block" }}>Include</Label>
             <div style={{ display: "flex", alignItems: "center", gap: 20, height: 40 }}>
               <ReportCheckbox active={includeSummary} label="Task summary" onClick={() => setIncludeSummary(v => !v)} />
