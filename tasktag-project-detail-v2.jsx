@@ -2302,13 +2302,17 @@ function ReportsTab({ demoCase }) {
                                     <div style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center", gap: 4 }}>
                                       <button
                                         onClick={cancelRenameTitle}
-                                        style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0 }}
+                                        onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
+                                        onMouseLeave={ev => ev.currentTarget.style.background = "none"}
+                                        style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "background 0.15s" }}
                                       >
                                         <X size={15} strokeWidth={SW} color="var(--tt-grey06)" />
                                       </button>
                                       <button
                                         onClick={() => confirmRenameTitle(entryKey)}
-                                        style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "var(--tt-secondary)", border: "none", borderRadius: 6, cursor: "pointer", padding: 0 }}
+                                        onMouseEnter={ev => ev.currentTarget.style.opacity = "0.85"}
+                                        onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
+                                        style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "var(--tt-secondary)", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "opacity 0.15s" }}
                                       >
                                         <Check size={15} strokeWidth={SW} color="white" />
                                       </button>
@@ -2342,7 +2346,7 @@ function ReportsTab({ demoCase }) {
                                 )}
                               </div>
                               {!isCompleted && (
-                                <p style={{ fontSize: 11, fontWeight: 600, color: "var(--tt-grey05)", letterSpacing: "0.04em", textTransform: "uppercase", margin: "2px 0 0" }}>
+                                <p style={{ fontSize: 11, fontWeight: 600, color: "var(--tt-grey05)", letterSpacing: "0.04em", textTransform: "uppercase", margin: isEditingTitle ? "8px 0 0" : "2px 0 0" }}>
                                   {previewData.grouping === "day" && `${fmtDate(parseDate(e.date))} · `}
                                   {e.photos.length} photo{e.photos.length > 1 ? "s" : ""}
                                 </p>
@@ -2403,7 +2407,7 @@ function ReportsTab({ demoCase }) {
                     <span style={{ fontSize: 13, fontWeight: 500, color: "white" }}>
                       {Object.keys(selectedPhotos).length} item{Object.keys(selectedPhotos).length > 1 ? "s" : ""} selected
                     </span>
-                    <span style={{ fontSize: 12, color: "var(--tt-grey05)" }}>
+                    <span style={{ fontSize: 12, color: "white" }}>
                       The original photo won't be deleted.
                     </span>
                   </div>
