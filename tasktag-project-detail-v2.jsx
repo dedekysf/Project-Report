@@ -10,7 +10,7 @@ import {
   Activity, Users, BarChart2, SlidersHorizontal,
   ArrowUpDown, Calendar, AlignJustify, Clock,
   UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, Crown, AlertTriangle, PenLine,
-  RotateCw, ZoomIn, ZoomOut, Folder, ArrowLeft, ArrowRight, Info,
+  RotateCw, ZoomIn, ZoomOut, Folder, ArrowLeft, ArrowRight, Info, StickyNote,
 } from "lucide-react";
 
 import logoImg from "./src/Img/tasktag-logo.13f1babda8fdbb1b7251572a0fe11f9e.png";
@@ -1257,6 +1257,23 @@ function applyPhotoExclusions(groups, excludedPhotos) {
   }));
 }
 
+// Task names edited via the pencil icon in the draft only override the
+// entry's displayed name for this report — the underlying DUMMY_ENTRIES
+// "original" task is never touched. Keyed the same way as excludedPhotos
+// and applied at the same point (before notes are spliced in and shift
+// entry positions).
+function applyTitleOverrides(groups, titleOverrides) {
+  if (!titleOverrides || Object.keys(titleOverrides).length === 0) return groups;
+  return groups.map(g => ({
+    ...g,
+    entries: g.entries.map((e, i) => {
+      const entryKey = `${g.key}_${i}`;
+      const override = titleOverrides[entryKey];
+      return override && override.trim() ? { ...e, note: override.trim() } : e;
+    }),
+  }));
+}
+
 // A manually-added note is tied to the specific entry (photo list) it was
 // added under, not to a date — so it's kept out of buildReportData entirely
 // and spliced into the finalized groups only when producing real output
@@ -1440,6 +1457,8 @@ function ReportsTab({ demoCase }) {
   const [previewShowCal,   setPreviewShowCal]   = useState(false);
   const [noteDrafts,       setNoteDrafts]       = useState({}); // { [entryKey]: draftText } — one independent draft per entry
   const [activeNoteFormKeys, setActiveNoteFormKeys] = useState({}); // { [entryKey]: true } — every entry currently showing its add/edit note input (more than one can be open at once)
+  const [titleOverrides,   setTitleOverrides]    = useState({}); // { [entryKey]: overriddenTitle } — per-entry task name edits, this report only
+  const [editingTitleKey,  setEditingTitleKey]   = useState(null); // entryKey currently showing its inline title-edit input
   const [previewLoading,   setPreviewLoading]    = useState(false);
   const [visibleCount,     setVisibleCount]      = useState(10); // infinite scroll — entries revealed so far
   const [loadingMore,      setLoadingMore]       = useState(false);
@@ -1472,7 +1491,7 @@ function ReportsTab({ demoCase }) {
   // Adds a report to the results list (called only once the user confirms
   // via "Save report" in the preview modal — Generate no longer does this
   // directly).
-  const pushReport = ({ includeSummary, includeNoPhotoTasks, dateRange, period, data, extraNotes, excludedPhotos }) => {
+  const pushReport = ({ includeSummary, includeNoPhotoTasks, dateRange, period, data, extraNotes, excludedPhotos, titleOverrides }) => {
     const id = Date.now();
     const newReport = {
       id,
@@ -1485,6 +1504,7 @@ function ReportsTab({ demoCase }) {
       data,
       extraNotes,
       excludedPhotos,
+      titleOverrides,
     };
     setReports(prev => [newReport, ...prev]);
     setLastSavedId(id);
@@ -1541,6 +1561,8 @@ function ReportsTab({ demoCase }) {
       setPreviewShowCal(false);
       setActiveNoteFormKeys({});
       setNoteDrafts({});
+      setTitleOverrides({});
+      setEditingTitleKey(null);
       setVisibleCount(10);
       setLoadingMore(false);
       setGenerating(false);
@@ -1556,6 +1578,8 @@ function ReportsTab({ demoCase }) {
     setPreviewShowCal(false);
     setActiveNoteFormKeys({});
     setNoteDrafts({});
+    setTitleOverrides({});
+    setEditingTitleKey(null);
     setVisibleCount(10);
     setLoadingMore(false);
     setSelectedPhotos({});
@@ -1594,7 +1618,7 @@ function ReportsTab({ demoCase }) {
   // notes spliced in at their entry — what actually gets downloaded /
   // copy-linked / saved.
   const previewFinalGroups = previewData
-    ? applyExtraNotesToGroups(applyPhotoExclusions(previewData.groups, preview.excludedPhotos), preview.extraNotes)
+    ? applyExtraNotesToGroups(applyTitleOverrides(applyPhotoExclusions(previewData.groups, preview.excludedPhotos), titleOverrides), preview.extraNotes)
     : [];
 
   // Infinite scroll over the *displayed* groups (not previewFinalGroups —
@@ -1716,9 +1740,9 @@ function ReportsTab({ demoCase }) {
         onClick={() => openNoteForm(key)}
         onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
         onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
-        style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", padding: 0, marginTop: 10, cursor: "pointer", fontSize: 12, fontWeight: 500, color: "var(--tt-text-2)" }}
+        style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", padding: 0, marginTop: 10, cursor: "pointer", fontSize: 12, fontWeight: 500, color: "var(--tt-secondary)" }}
       >
-        <Plus size={12} strokeWidth={SW} /> Add note
+        <StickyNote size={13} strokeWidth={SW} /> Add a note
       </button>
     );
   };
@@ -1735,7 +1759,7 @@ function ReportsTab({ demoCase }) {
     Object.entries(noteDrafts).forEach(([k, text]) => {
       if (text && text.trim()) mergedNotes[k] = text.trim();
     });
-    const finalGroups = applyExtraNotesToGroups(applyPhotoExclusions(previewData.groups, preview.excludedPhotos), mergedNotes);
+    const finalGroups = applyExtraNotesToGroups(applyTitleOverrides(applyPhotoExclusions(previewData.groups, preview.excludedPhotos), titleOverrides), mergedNotes);
     if (!hasGroupData(finalGroups)) { showToast("error", "No data to save"); return; }
     setSaving(true);
     setTimeout(() => {
@@ -1746,7 +1770,7 @@ function ReportsTab({ demoCase }) {
         showToast("error", "Save failed. Try again.");
         return;
       }
-      pushReport({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, data: { ...previewData, groups: finalGroups }, extraNotes: mergedNotes, excludedPhotos: preview.excludedPhotos });
+      pushReport({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, data: { ...previewData, groups: finalGroups }, extraNotes: mergedNotes, excludedPhotos: preview.excludedPhotos, titleOverrides });
       setDateRange("since_last");
       setSaving(false);
       closePreview();
@@ -1797,6 +1821,12 @@ function ReportsTab({ demoCase }) {
     const excludedKeys = Object.keys(report.excludedPhotos || {}).filter(k => report.excludedPhotos[k]);
     if (excludedKeys.length > 0) {
       params.set("excluded", JSON.stringify(excludedKeys));
+    }
+    // Same reasoning again — an edited task name only lives in this
+    // report's draft state, not in DUMMY_ENTRIES, so it has to ride along
+    // too or the shared link would silently revert to the original name.
+    if (report.titleOverrides && Object.keys(report.titleOverrides).some(k => report.titleOverrides[k]?.trim())) {
+      params.set("titles", JSON.stringify(report.titleOverrides));
     }
     const url = `${window.location.href.split("?")[0]}?${params.toString()}`;
     try { await navigator.clipboard.writeText(url); }
@@ -2200,12 +2230,59 @@ function ReportsTab({ demoCase }) {
                         </p>
                         {g.entries.map((e, i) => {
                           const entryKey = `${g.key}_${i}`;
+                          const displayTitle = titleOverrides[entryKey] ?? e.note;
+                          const isEditingTitle = editingTitleKey === entryKey;
+                          const isCompleted = e.photos.length === 0;
                           return (
                             <div key={entryKey} style={{ marginBottom: 20 }}>
-                              <p style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.5", margin: 0 }}>{e.note}</p>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                {isEditingTitle ? (
+                                  <input
+                                    autoFocus
+                                    type="text"
+                                    value={displayTitle}
+                                    onChange={ev => setTitleOverrides(prev => ({ ...prev, [entryKey]: ev.target.value }))}
+                                    onBlur={() => {
+                                      setTitleOverrides(prev => {
+                                        if (prev[entryKey] && prev[entryKey].trim()) return prev;
+                                        const next = { ...prev }; delete next[entryKey]; return next;
+                                      });
+                                      setEditingTitleKey(null);
+                                    }}
+                                    onKeyDown={ev => { if (ev.key === "Enter") ev.currentTarget.blur(); }}
+                                    style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.5", fontFamily: "inherit", border: "1px solid var(--tt-text-1)", borderRadius: 6, padding: "1px 6px", outline: "none" }}
+                                  />
+                                ) : (
+                                  <p style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.5", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {displayTitle}
+                                  </p>
+                                )}
+                                {/* Renaming here only overrides the title for this report —
+                                    the original task/entry text is never modified. */}
+                                {!isEditingTitle && (
+                                  <button
+                                    onClick={() => setEditingTitleKey(entryKey)}
+                                    onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
+                                    onMouseLeave={ev => ev.currentTarget.style.background = "none"}
+                                    style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "background 0.15s" }}
+                                  >
+                                    <Pencil size={13} strokeWidth={SW} color="var(--tt-grey05)" />
+                                  </button>
+                                )}
+                                {isCompleted && !isEditingTitle && (
+                                  <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: "var(--tt-secondary)", background: "var(--tt-mint)", borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap" }}>
+                                    Completed
+                                  </span>
+                                )}
+                              </div>
+                              {!isCompleted && (
+                                <p style={{ fontSize: 11, fontWeight: 600, color: "var(--tt-grey05)", letterSpacing: "0.04em", textTransform: "uppercase", margin: "2px 0 0" }}>
+                                  {e.photos.length} photo{e.photos.length > 1 ? "s" : ""} · {fmtDate(parseDate(e.date))}
+                                </p>
+                              )}
                               <PhotoGrid
                                 photos={e.photos}
-                                onOpen={(photos, idx) => setLightbox({ photos, index: idx, entryDate: e.date, taskName: e.note })}
+                                onOpen={(photos, idx) => setLightbox({ photos, index: idx, entryDate: e.date, taskName: displayTitle })}
                                 excludedPhotos={preview.excludedPhotos}
                                 entryKey={entryKey}
                                 selectedPhotos={selectedPhotos}
@@ -2476,7 +2553,7 @@ function ReportPaywall() {
 // period, included sections, excluded photos, and any manually-added
 // notes) — rebuilt on the fly rather than fetched from storage, so a
 // shared link works on any device/browser and can never 404.
-function ReportPage({ dateRange, period, includeSummary, includeNoPhotoTasks, notesParam, excludedParam }) {
+function ReportPage({ dateRange, period, includeSummary, includeNoPhotoTasks, notesParam, excludedParam, titlesParam }) {
   let data = buildReportData(dateRange, period, null, includeNoPhotoTasks);
   let groups = data.groups;
   if (excludedParam) {
@@ -2484,6 +2561,12 @@ function ReportPage({ dateRange, period, includeSummary, includeNoPhotoTasks, no
       const excludedPhotos = {};
       JSON.parse(excludedParam).forEach(k => { excludedPhotos[k] = true; });
       groups = applyPhotoExclusions(groups, excludedPhotos);
+    } catch { /* malformed/tampered param — ignore */ }
+  }
+  if (titlesParam) {
+    try {
+      const titleOverrides = JSON.parse(titlesParam);
+      groups = applyTitleOverrides(groups, titleOverrides);
     } catch { /* malformed/tampered param — ignore */ }
   }
   if (notesParam) {
@@ -2516,6 +2599,7 @@ export default function ProjectDetail() {
       includeNoPhotoTasks={params.get("nophotos") !== "0"}
       notesParam={params.get("notes")}
       excludedParam={params.get("excluded")}
+      titlesParam={params.get("titles")}
     />
   );
 
