@@ -2244,7 +2244,7 @@ function ReportsTab({ demoCase }) {
                           const isEditingTitle = editingTitleKey === entryKey;
                           const isCompleted = e.photos.length === 0;
                           return (
-                            <div key={entryKey} style={{ marginBottom: 20 }}>
+                            <div key={entryKey} style={{ marginBottom: 20, paddingBottom: 20, borderBottom: "1px solid var(--tt-grey02)" }}>
                               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1, minWidth: 0 }}>
                                   {isEditingTitle ? (
