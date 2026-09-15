@@ -1515,8 +1515,6 @@ function ReportsTab({ demoCase }) {
   const [previewLoading,   setPreviewLoading]    = useState(false);
   const [previewSaved,     setPreviewSaved]      = useState(false); // footer switches from Save to Download/Copy link once true
   const [previewCopied,    setPreviewCopied]     = useState(false); // Copy link button shows "Link copied" briefly
-  const [panelClosing,     setPanelClosing]      = useState(false); // panel stays mounted during its exit slide
-  const [panelEntered,     setPanelEntered]      = useState(false); // flips true a tick after mount to animate in
   const [visibleCount,     setVisibleCount]      = useState(10); // infinite scroll — entries revealed so far
   const [loadingMore,      setLoadingMore]       = useState(false);
   const [generating,       setGenerating]        = useState(false); // Generate button's own disabled/spinner state, before the panel appears
@@ -1626,8 +1624,6 @@ function ReportsTab({ demoCase }) {
         targetOpening: "",
         clientName: "",
       });
-      setPanelClosing(false);
-      setPanelEntered(false); // starts off-screen; the mount effect below slides it in
       setPreviewPeriodOpen(false);
       setPreviewShowCal(false);
       setActiveNoteFormKeys({});
@@ -1644,37 +1640,23 @@ function ReportsTab({ demoCase }) {
     }, 900);
   };
 
-  // Slides the panel back out first; the actual unmount (setPreview(null))
-  // is deferred until the exit transition finishes, so closing animates
-  // just as smoothly as opening does.
+  // A full-screen takeover (like the photo lightbox) rather than a docked,
+  // animated panel — closing is just an unmount, no exit transition to wait on.
   const closePreview = () => {
-    setPanelClosing(true);
-    setPanelEntered(false);
+    setPreview(null);
     setPreviewPeriodOpen(false);
     setPreviewShowCal(false);
-    setTimeout(() => {
-      setPreview(null);
-      setPanelClosing(false);
-      setActiveNoteFormKeys({});
-      setNoteDrafts({});
-      setTitleOverrides({});
-      setEditingTitleKey(null);
-      setRenameDraft("");
-      setPreviewSaved(false);
-      setPreviewCopied(false);
-      setVisibleCount(10);
-      setLoadingMore(false);
-      setSelectedPhotos({});
-    }, 260);
+    setActiveNoteFormKeys({});
+    setNoteDrafts({});
+    setTitleOverrides({});
+    setEditingTitleKey(null);
+    setRenameDraft("");
+    setPreviewSaved(false);
+    setPreviewCopied(false);
+    setVisibleCount(10);
+    setLoadingMore(false);
+    setSelectedPhotos({});
   };
-
-  // Slide the panel in a tick after it mounts (so the browser paints the
-  // off-screen starting position first, letting the transition actually run).
-  useEffect(() => {
-    if (!preview || panelClosing) return;
-    const raf = requestAnimationFrame(() => setPanelEntered(true));
-    return () => cancelAnimationFrame(raf);
-  }, [preview, panelClosing]);
 
   useEffect(() => {
     if (!preview || lightbox || deleteTarget) return;
@@ -1682,20 +1664,6 @@ function ReportsTab({ demoCase }) {
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [preview, lightbox, deleteTarget]);
-
-  // Click outside the side panel closes it — there's no backdrop to catch
-  // this anymore. Suspended while the custom-date calendar or the photo
-  // lightbox is open, since both render as siblings (not nested inside the
-  // panel) and would otherwise register every click inside them as
-  // "outside".
-  useEffect(() => {
-    if (!preview || previewShowCal || lightbox || deleteTarget) return;
-    const handler = (e) => {
-      if (previewPanelRef.current && !previewPanelRef.current.contains(e.target)) closePreview();
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [preview, previewShowCal, lightbox, deleteTarget]);
 
   // Show a loading skeleton whenever the previewed data would change —
   // both on first open and whenever the period is edited. Once it resolves,
@@ -2185,32 +2153,25 @@ function ReportsTab({ demoCase }) {
         </>
       )}
 
-      {/* ── Generate preview side panel ── */}
-      {/* No backdrop — the page stays interactive. The panel docks to the
-          right edge *within* the centered maxWidth:1114 content wrapper
-          (not the browser viewport) — an absolute-positioned element,
-          right:0 inside a same-width invisible container. */}
-      {(preview || panelClosing) && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 2000, pointerEvents: "none" }}>
-          <div style={{ maxWidth: 1114, height: "100%", margin: "0 auto", position: "relative", overflow: "hidden" }}>
+      {/* ── Generate preview — a full-screen takeover, same as the photo
+          lightbox, not a docked panel over the still-visible page. ── */}
+      {preview && (
           <div
             ref={previewPanelRef}
             style={{
-            position: "absolute", top: 0, right: 0, height: "100%", width: 580,
-            background: "white",
-            // Negative spread pulls the shadow rect in vertically so the blur
-            // reads as a left-edge-only shadow instead of wrapping top/bottom.
-            boxShadow: "-8px 0 24px -6px rgba(10, 22, 41, 0.25)",
-            display: "flex", flexDirection: "column", overflow: "hidden",
-            pointerEvents: "auto",
-            transform: panelEntered ? "translateX(0)" : "translateX(100%)",
-            transition: "transform 0.25s ease",
+            position: "fixed", inset: 0, zIndex: 2000,
+            background: "var(--tt-grey01)",
+            display: "flex", flexDirection: "column",
           }}>
 
             {/* Modal chrome — just the period control + close now. The
                 document itself (below) carries its own title/branding, so
-                this bar is app chrome, not part of the "report". */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid var(--tt-grey03)", flexShrink: 0 }}>
+                this bar is app chrome, not part of the "report". Its
+                content is capped to the same reading width as the
+                document below, so the two line up instead of the bar
+                stretching edge-to-edge across the full screen. */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid var(--tt-grey03)", flexShrink: 0, background: "white" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: 800, width: "100%", margin: "0 auto" }}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
                 {/* Borderless period dropdown — locked once the report is
                     saved, so it can't drift out of sync with what was
@@ -2282,11 +2243,14 @@ function ReportsTab({ demoCase }) {
               >
                 <X size={18} strokeWidth={SW} />
               </button>
+              </div>
             </div>
 
-            {/* Scrollable body */}
+            {/* Scrollable body — the document itself is capped to a
+                comfortable reading width and centered, rather than
+                stretching edge-to-edge across the full screen. */}
             <div style={{ overflowY: "auto", flex: 1 }} onScroll={handleModalScroll}>
-              <div style={{ padding: 20 }}>
+              <div style={{ maxWidth: 800, margin: "0 auto", padding: "24px 20px" }}>
                 {previewLoading ? (
                   <>
                     <div style={{ border: "1px solid var(--tt-grey03)", borderRadius: 12, padding: 28, marginBottom: 16 }}>
@@ -2609,7 +2573,8 @@ function ReportsTab({ demoCase }) {
                 deleted" disclaimer is always visible right here; it moves
                 the selection into excludedPhotos (filtered everywhere). */}
             {Object.keys(selectedPhotos).length > 0 && (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", background: "var(--tt-grey06)", flexShrink: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "12px 20px", background: "var(--tt-grey06)", flexShrink: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: 800, width: "100%" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <button
                     onClick={clearPhotoSelection}
@@ -2637,11 +2602,13 @@ function ReportsTab({ demoCase }) {
                   </button>
                 </div>
               </div>
+              </div>
             )}
 
             {/* Footer CTAs — defaults to just "Save report"; once saved,
                 switches to Download/Copy link (closing is left to the user) */}
-            <div style={{ display: "flex", gap: 8, padding: "16px 20px", borderTop: "1px solid var(--tt-grey03)", flexShrink: 0 }}>
+            <div style={{ display: "flex", justifyContent: "center", padding: "16px 20px", borderTop: "1px solid var(--tt-grey03)", flexShrink: 0, background: "white" }}>
+              <div style={{ display: "flex", gap: 8, maxWidth: 800, width: "100%" }}>
               {previewSaved ? (
                 <>
                   <button
@@ -2684,32 +2651,31 @@ function ReportsTab({ demoCase }) {
                     : "Save report"}
                 </button>
               )}
+              </div>
             </div>
-          </div>
-          </div>
 
-          {/* Custom date calendar for editing the period inside the modal.
-              dateRange/period are only touched on a successful Apply — closing
-              or applying with nothing picked leaves the preview exactly as it
-              was, so no data reload happens for an incomplete filter. */}
-          {previewShowCal && (
-            <DateRangeCalendar
-              anchorRef={previewPeriodRef}
-              onClose={() => setPreviewShowCal(false)}
-              onApply={(start, end) => {
-                if (start && end) {
-                  const fmt = (s) => {
-                    const [y, m, d] = s.split("-");
-                    return new Date(y, m-1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-                  };
-                  const cr = { start: fmt(start), end: fmt(end) };
-                  setPreview(p => ({ ...p, dateRange: "custom", customRange: cr, period: getPeriodRange("custom", cr) }));
-                }
-                setPreviewShowCal(false);
-              }}
-            />
-          )}
-        </div>
+            {/* Custom date calendar for editing the period inside the modal.
+                dateRange/period are only touched on a successful Apply — closing
+                or applying with nothing picked leaves the preview exactly as it
+                was, so no data reload happens for an incomplete filter. */}
+            {previewShowCal && (
+              <DateRangeCalendar
+                anchorRef={previewPeriodRef}
+                onClose={() => setPreviewShowCal(false)}
+                onApply={(start, end) => {
+                  if (start && end) {
+                    const fmt = (s) => {
+                      const [y, m, d] = s.split("-");
+                      return new Date(y, m-1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                    };
+                    const cr = { start: fmt(start), end: fmt(end) };
+                    setPreview(p => ({ ...p, dateRange: "custom", customRange: cr, period: getPeriodRange("custom", cr) }));
+                  }
+                  setPreviewShowCal(false);
+                }}
+              />
+            )}
+          </div>
       )}
 
       {/* Toast — success (secondary green accent + check) / error (red accent + cross) */}

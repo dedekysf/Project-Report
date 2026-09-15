@@ -1514,14 +1514,7 @@ function ReportsTab({ demoCase }) {
   const [generating,       setGenerating]        = useState(false); // Generate button's own disabled/spinner state, before the inline view appears
   const [saving,           setSaving]             = useState(false); // Save report button's own disabled/spinner state, before the toast appears
   const previewPeriodRef = useRef(null);
-  const chromeRef = useRef(null);
-  const [chromeHeight, setChromeHeight] = useState(0); // measured height of the sticky chrome header, so week/month group headers can stick right below it instead of under it
-
-  // Re-measure whenever the chrome's own content could change height (the
-  // title/period text wrapping differently, or the draft just opening).
-  useLayoutEffect(() => {
-    if (chromeRef.current) setChromeHeight(chromeRef.current.getBoundingClientRect().height);
-  }, [preview?.period, preview?.dateRange]);
+  const previewPanelRef = useRef(null);
 
   useEffect(() => {
     if (!openPeriod) return;
@@ -1721,25 +1714,17 @@ function ReportsTab({ demoCase }) {
   // generic guess.
   const nextEntry = previewData ? previewData.groups.flatMap(g => g.entries)[visibleCount] : null;
 
-  // Inline content scrolls with the page itself now (not an independently
-  // scrollable panel), so infinite scroll is driven off window scroll
-  // instead of a container's own scrollTop.
-  useEffect(() => {
-    if (!preview) return;
-    const handler = () => {
-      if (previewLoading || loadingMore || !hasMoreEntries) return;
-      const distanceFromBottom = document.documentElement.scrollHeight - window.scrollY - window.innerHeight;
-      if (distanceFromBottom < 150) {
-        setLoadingMore(true);
-        setTimeout(() => {
-          setVisibleCount(v => v + 10);
-          setLoadingMore(false);
-        }, 600);
-      }
-    };
-    window.addEventListener("scroll", handler);
-    return () => window.removeEventListener("scroll", handler);
-  }, [preview, previewLoading, loadingMore, hasMoreEntries]);
+  const handleModalScroll = (e) => {
+    if (previewLoading || loadingMore || !hasMoreEntries) return;
+    const el = e.currentTarget;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 150) {
+      setLoadingMore(true);
+      setTimeout(() => {
+        setVisibleCount(v => v + 10);
+        setLoadingMore(false);
+      }, 600);
+    }
+  };
 
   // Each entry's add/edit note form is independent — opening one doesn't
   // close any others already open.
@@ -2140,27 +2125,31 @@ function ReportsTab({ demoCase }) {
       </>
       )}
 
-      {/* ── Inline generate view — replaces the "Choose what this report
-          includes" card and results table until the report is saved or the
-          draft is discarded ── */}
+      {/* ── Generate preview — a full-screen takeover, same as the photo
+          lightbox, not inline content within the tab. ── */}
       {preview && (
-        <>
-        <div style={{ border: "1px solid var(--tt-grey03)", borderRadius: 16, background: "white", display: "flex", flexDirection: "column" }}>
+          <div
+            ref={previewPanelRef}
+            style={{
+              position: "fixed", inset: 0, zIndex: 2000,
+              background: "var(--tt-grey01)",
+              display: "flex", flexDirection: "column",
+            }}
+          >
 
-            {/* Modal chrome — sticky so it stays visible while the entries
-                below scroll past (the card no longer clips its own
-                overflow, since that would break position:sticky). Its
-                measured height is used to offset the sticky week/month
-                group headers further down, so they stack right below the
-                chrome instead of scrolling underneath it. */}
+            {/* Modal chrome — just app controls (period + cancel/save). The
+                document itself (below) carries its own title/branding, so
+                this bar isn't part of the "report". Its content is capped
+                to the same reading width as the document below, so the two
+                line up instead of the bar stretching edge-to-edge across
+                the full screen. */}
             <div
-              ref={chromeRef}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px",
-                borderBottom: "1px solid var(--tt-grey03)", borderRadius: "16px 16px 0 0", flexShrink: 0,
-                position: "sticky", top: 0, zIndex: 10, background: "white",
+                borderBottom: "1px solid var(--tt-grey03)", flexShrink: 0, background: "white",
               }}
             >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: 800, width: "100%", margin: "0 auto" }}>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
                 {/* Borderless period dropdown — the document itself (below)
                     carries its own title/branding, so this bar is app
@@ -2259,16 +2248,18 @@ function ReportsTab({ demoCase }) {
                     : "Save report"}
                 </button>
               </div>
+              </div>
             </div>
 
             {/* Body — flows with the page (no fixed height/own scrollbar).
-                No overflow:hidden here either — same reason as the card
-                itself above: an overflow other than visible on any
-                ancestor would make it (not the page) the sticky
-                containing block, breaking the week/month group headers'
-                position:sticky further down. */}
-            <div style={{ borderRadius: "0 0 16px 16px" }}>
-              <div style={{ padding: 20 }}>
+                This is now a real full-screen overlay with its own scroll
+                container, so infinite scroll is driven off this
+                container's own scrollTop (handleModalScroll) instead of
+                window scroll. The document itself is capped to a
+                comfortable reading width and centered, rather than
+                stretching edge-to-edge across the full screen. */}
+            <div style={{ overflowY: "auto", flex: 1 }} onScroll={handleModalScroll}>
+              <div style={{ maxWidth: 800, margin: "0 auto", padding: "24px 20px" }}>
                 {previewLoading ? (
                   // Mirrors the real entries about to appear (group count
                   // and note-line count come from the actual data —
@@ -2396,7 +2387,7 @@ function ReportsTab({ demoCase }) {
                             <p style={{
                               fontSize: 11, fontWeight: 600, color: "var(--tt-grey05)",
                               letterSpacing: "0.06em", textTransform: "uppercase",
-                              position: "sticky", top: chromeHeight, zIndex: 2, background: "white",
+                              position: "sticky", top: 0, zIndex: 2, background: "white",
                               padding: "8px 0", margin: 0,
                             }}>
                               {formatGroupLabel(g, previewData.grouping).toUpperCase()}
@@ -2578,20 +2569,22 @@ function ReportsTab({ demoCase }) {
                   </>
                 )}
               </div>
+            </div>
 
-            {/* Selection toolbar — fixed to the bottom of the viewport
-                (not inline) once one or more photos are checked, so it
-                stays reachable regardless of scroll position now that
-                this content flows with the page. Delete acts immediately
-                (no confirmation modal) since the "original photo won't be
-                deleted" disclaimer is always visible right here; it moves
-                the selection into excludedPhotos (filtered everywhere). */}
+            {/* Selection toolbar — fixed to the bottom of the viewport,
+                pinned there (not part of the scroll flow) so it stays
+                reachable without scrolling all the way down. Delete acts
+                immediately (no confirmation modal) since the "original
+                photo won't be deleted" disclaimer is always visible right
+                here; it moves the selection into excludedPhotos (filtered
+                everywhere). */}
             {Object.keys(selectedPhotos).length > 0 && (
               <div style={{
-                position: "fixed", bottom: 0, left: 0, right: 0, maxWidth: 1114, margin: "0 auto", zIndex: 100,
-                display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px",
+                position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 100,
+                display: "flex", alignItems: "center", justifyContent: "center", padding: "12px 20px",
                 background: "var(--tt-grey06)",
               }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: 800, width: "100%" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <button
                     onClick={clearPhotoSelection}
@@ -2618,34 +2611,32 @@ function ReportsTab({ demoCase }) {
                     <Trash2 size={14} strokeWidth={SW} /> Delete
                   </button>
                 </div>
+                </div>
               </div>
             )}
-            </div>
 
+            {/* Custom date calendar for editing the period inside the modal.
+                dateRange/period are only touched on a successful Apply — closing
+                or applying with nothing picked leaves the preview exactly as it
+                was, so no data reload happens for an incomplete filter. */}
+            {previewShowCal && (
+              <DateRangeCalendar
+                anchorRef={previewPeriodRef}
+                onClose={() => setPreviewShowCal(false)}
+                onApply={(start, end) => {
+                  if (start && end) {
+                    const fmt = (s) => {
+                      const [y, m, d] = s.split("-");
+                      return new Date(y, m-1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                    };
+                    const cr = { start: fmt(start), end: fmt(end) };
+                    setPreview(p => ({ ...p, dateRange: "custom", customRange: cr, period: getPeriodRange("custom", cr) }));
+                  }
+                  setPreviewShowCal(false);
+                }}
+              />
+            )}
           </div>
-
-          {/* Custom date calendar for editing the period inside the modal.
-              dateRange/period are only touched on a successful Apply — closing
-              or applying with nothing picked leaves the preview exactly as it
-              was, so no data reload happens for an incomplete filter. */}
-          {previewShowCal && (
-            <DateRangeCalendar
-              anchorRef={previewPeriodRef}
-              onClose={() => setPreviewShowCal(false)}
-              onApply={(start, end) => {
-                if (start && end) {
-                  const fmt = (s) => {
-                    const [y, m, d] = s.split("-");
-                    return new Date(y, m-1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-                  };
-                  const cr = { start: fmt(start), end: fmt(end) };
-                  setPreview(p => ({ ...p, dateRange: "custom", customRange: cr, period: getPeriodRange("custom", cr) }));
-                }
-                setPreviewShowCal(false);
-              }}
-            />
-          )}
-        </>
       )}
 
       {/* Toast — success (secondary green accent + check) / error (red accent + cross) */}
