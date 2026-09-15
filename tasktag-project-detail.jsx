@@ -840,6 +840,10 @@ function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onCl
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0, justifySelf: "end" }}>
+          <LightboxIconBtn label="Delete" onClick={() => onDeleteSelected && onDeleteSelected([index])}>
+            <Trash2 size={16} strokeWidth={SW} />
+          </LightboxIconBtn>
+          <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.15)", margin: "0 6px" }} />
           <LightboxIconBtn label="Rotate" onClick={() => setRotation(r => (r + 90) % 360)}>
             <RotateCw size={16} strokeWidth={SW} />
           </LightboxIconBtn>
