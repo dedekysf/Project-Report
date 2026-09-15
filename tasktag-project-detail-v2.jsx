@@ -608,7 +608,7 @@ function PhotoThumb({ src, onClick }) {
   return (
     <div
       onClick={onClick}
-      style={{ position: "relative", width: "100%", aspectRatio: "4/3", borderRadius: 8, overflow: "hidden", cursor: onClick ? "pointer" : "default" }}
+      style={{ position: "relative", width: "100%", aspectRatio: "4/3", borderRadius: 2, overflow: "hidden", cursor: onClick ? "pointer" : "default" }}
     >
       {!loaded && <div className="tt-skeleton" style={{ position: "absolute", inset: 0, borderRadius: 0 }} />}
       <img
@@ -623,16 +623,17 @@ function PhotoThumb({ src, onClick }) {
 }
 
 // Photo grid capped to 6 per row — beyond that, the last visible cell
-// becomes a "+N more" overlay that opens the lightbox (with the full,
-// uncapped photo list for that entry so the rest are still reachable via
-// the filmstrip). Each visible photo also carries a select checkbox in its
-// top-right corner; checking one or more surfaces a selection toolbar
-// (rendered by the caller) with a Delete action. Deleted photos
-// are filtered out here by their *original* index (excludedPhotos), so
-// remaining photos keep the same index-based keys even after some are
-// removed. An entry with zero visible photos renders nothing.
+// becomes a "+N more" overlay that expands the grid in place to show every
+// photo (no cap), rather than jumping into the lightbox. Each visible photo
+// also carries a select checkbox in its top-right corner; checking one or
+// more surfaces a selection toolbar (rendered by the caller) with a Delete
+// action. Deleted photos are filtered out here by their *original* index
+// (excludedPhotos), so remaining photos keep the same index-based keys
+// even after some are removed. An entry with zero visible photos renders
+// nothing.
 function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, onToggleSelect }) {
   const CAP = 6;
+  const [expanded, setExpanded] = useState(false);
   const items = (photos || [])
     .map((k, i) => ({ k, i }))
     .filter(({ i }) => !(excludedPhotos && excludedPhotos[`${entryKey}_${i}`]));
@@ -640,7 +641,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
   if (items.length === 0) return null;
 
   const remaining = items.length - CAP;
-  const visibleItems = remaining > 0 ? items.slice(0, CAP) : items;
+  const visibleItems = (expanded || remaining <= 0) ? items : items.slice(0, CAP);
   const visiblePhotoKeys = items.map(it => it.k);
   // Original (pre-filter) indices for each visible photo, in the same
   // order as visiblePhotoKeys — lets the lightbox map a filmstrip
@@ -648,10 +649,10 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
   const visibleOriginalIndices = items.map(it => it.i);
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 8, marginTop: 10 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 2, marginTop: 10 }}>
       {visibleItems.map(({ k, i }, viewIdx) => {
         const selected = !!(selectedPhotos && selectedPhotos[`${entryKey}_${i}`]);
-        const isCapCell = remaining > 0 && viewIdx === visibleItems.length - 1;
+        const isCapCell = !expanded && remaining > 0 && viewIdx === visibleItems.length - 1;
         const canOpen = !!(IMG_MAP[k] && onOpen) && !isCapCell;
         return (
           <div
@@ -678,14 +679,14 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
               </button>
             )}
             {canOpen && (
-              <div style={{ position: "absolute", inset: 0, borderRadius: 8, background: "rgba(10,22,41,0.25)", opacity: 0, transition: "opacity 0.15s", pointerEvents: "none" }} />
+              <div style={{ position: "absolute", inset: 0, borderRadius: 2, background: "rgba(10,22,41,0.25)", opacity: 0, transition: "opacity 0.15s", pointerEvents: "none" }} />
             )}
             {isCapCell && (
               <button
-                onClick={() => onOpen && onOpen(visiblePhotoKeys, 0, visibleOriginalIndices)}
+                onClick={() => setExpanded(true)}
                 style={{
                   position: "absolute", inset: 0, background: "rgba(10,22,41,0.55)",
-                  border: "none", borderRadius: 8, color: "white",
+                  border: "none", borderRadius: 2, color: "white",
                   fontSize: 13, fontWeight: 600, cursor: "pointer",
                 }}
               >
@@ -1655,6 +1656,16 @@ function ReportsTab({ demoCase }) {
     return () => document.removeEventListener("keydown", handler);
   }, [preview, lightbox, deleteTarget]);
 
+  // This screen is a full-screen takeover with its own scroll container —
+  // the page behind it has no reason to scroll (or show its own scrollbar)
+  // while it's open.
+  useEffect(() => {
+    if (!preview) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [preview]);
+
   // Show a loading skeleton whenever the previewed data would change —
   // both on first open and whenever the period is edited. Once it resolves,
   // proactively flag an empty period instead of waiting for the user to hit
@@ -2257,9 +2268,14 @@ function ReportsTab({ demoCase }) {
                 container's own scrollTop (handleModalScroll) instead of
                 window scroll. The document itself is capped to a
                 comfortable reading width and centered, rather than
-                stretching edge-to-edge across the full screen. */}
+                stretching edge-to-edge across the full screen. Horizontal
+                padding lives on the outer wrapper (matching the chrome's
+                own padding) rather than on the maxWidth:800 box itself, so
+                the document's left/right edges line up exactly with the
+                chrome's period control and Cancel/Save buttons above. */}
             <div style={{ overflowY: "auto", flex: 1 }} onScroll={handleModalScroll}>
-              <div style={{ maxWidth: 800, margin: "0 auto", padding: "24px 20px" }}>
+              <div style={{ padding: "24px 20px" }}>
+              <div style={{ maxWidth: 800, margin: "0 auto" }}>
                 {previewLoading ? (
                   // Mirrors the real entries about to appear (group count
                   // and note-line count come from the actual data —
@@ -2268,14 +2284,14 @@ function ReportsTab({ demoCase }) {
                   // photo skeleton is capped to a full row (6, matching the
                   // grid's column count) rather than that entry's real
                   // photo count, which may be more or fewer.
-                  <>
-                    <div style={{ border: "1px solid var(--tt-grey03)", borderRadius: 12, padding: 28, marginBottom: 16 }}>
+                  <div style={{ border: "1px solid var(--tt-grey03)", borderRadius: 12, overflow: "hidden", background: "white" }}>
+                    <div style={{ padding: 28 }}>
                       <div className="tt-skeleton" style={{ width: 100, height: 20, marginBottom: 20 }} />
                       <div className="tt-skeleton" style={{ width: 180, height: 11, marginBottom: 16 }} />
                       <div className="tt-skeleton" style={{ width: "90%", height: 26, marginBottom: 8 }} />
                       <div className="tt-skeleton" style={{ width: "55%", height: 26 }} />
                     </div>
-                    <div style={{ border: "1px solid var(--tt-grey03)", borderRadius: 12, padding: 24 }}>
+                    <div style={{ padding: 24 }}>
                       <div className="tt-skeleton" style={{ width: 150, height: 13, marginBottom: 16 }} />
                       {visibleGroups.map(g => (
                         <div key={g.key} style={{ marginBottom: 20 }}>
@@ -2294,16 +2310,21 @@ function ReportsTab({ demoCase }) {
                         </div>
                       ))}
                     </div>
-                  </>
+                  </div>
                 ) : (
-                  <>
+                  // One continuous document wrapper — header, Site Activity,
+                  // Work Status, and the Point of Contact footer are all
+                  // sections of the same card now, not separate bordered
+                  // boxes with gaps between them, and with no divider line
+                  // between sections either.
+                  <div style={{ border: "1px solid var(--tt-grey03)", borderRadius: 12, overflow: "hidden", background: "white" }}>
                     {/* ── Report document header — project identity, editable
                         system-generated summary, and editable Target
                         Opening / Prepared For fields. Unlike v1, this
                         preview never enters a "saved, read-only" state
                         (Save closes it immediately), so everything below
                         is always editable while the draft is open. */}
-                    <div style={{ border: "1px solid var(--tt-grey03)", borderRadius: 12, padding: 28, marginBottom: 16 }}>
+                    <div style={{ padding: 28 }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
                         <img src={IMG_MAP_LOGO} alt="tasktag" style={{ height: 20, display: "block" }} />
                         <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)" }}>
@@ -2369,7 +2390,7 @@ function ReportsTab({ demoCase }) {
                     {/* ── Site Activity — the dated photo/note log, same
                         rename/note/photo-select editing as before, just
                         restyled to sit inside the document card. ── */}
-                    <div style={{ border: "1px solid var(--tt-grey03)", borderRadius: 12, padding: 24, marginBottom: 16 }}>
+                    <div style={{ padding: 24 }}>
                       {previewData && (
                         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", borderBottom: "1px solid var(--tt-grey03)", paddingBottom: 10, marginBottom: 16 }}>
                           <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-text-1)" }}>
@@ -2383,7 +2404,7 @@ function ReportsTab({ demoCase }) {
 
                       {/* No inline "no data" message here — the proactive toast already covers it */}
                       {previewData && previewData.groups.length === 0 && renderNoteSlot("empty")}
-                      {previewData && visibleGroups.map((g, gIdx) => (
+                      {previewData && visibleGroups.map(g => (
                         <div key={g.key}>
                           {/* "Day" grouping never bundles more than one entry under the
                               same label in practice, so each entry's own date badge
@@ -2410,9 +2431,8 @@ function ReportsTab({ demoCase }) {
                             // entry merely capped down to 0 photos must never be shown as
                             // completed here.
                             const isCompleted = e.noPhotos;
-                            const isLastEntry = gIdx === visibleGroups.length - 1 && i === g.entries.length - 1;
                             return (
-                              <div key={entryKey} style={{ marginBottom: 20, paddingBottom: 20, borderBottom: isLastEntry ? "none" : "1px solid var(--tt-grey03)" }}>
+                              <div key={entryKey} style={{ marginBottom: 20 }}>
                                 <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                                   {/* Date badge in place of the old "date · N photos" meta
                                       line, matching the document's own visual language. */}
@@ -2523,7 +2543,7 @@ function ReportsTab({ demoCase }) {
                         an activity summary. Gated by the "Task summary"
                         checkbox, same as the old progress bar it replaces. ── */}
                     {preview.includeSummary && (
-                      <div style={{ border: "1px solid var(--tt-grey03)", borderRadius: 12, padding: 24, marginBottom: 16 }}>
+                      <div style={{ padding: 24 }}>
                         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", borderBottom: "1px solid var(--tt-grey03)", paddingBottom: 10, marginBottom: 8 }}>
                           <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-text-1)" }}>Work Status</span>
                           <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)" }}>
@@ -2559,7 +2579,7 @@ function ReportsTab({ demoCase }) {
                     )}
 
                     {/* ── Point of contact footer — closes out the document. ── */}
-                    <div style={{ background: "var(--tt-text-1)", borderRadius: 12, padding: 20 }}>
+                    <div style={{ background: "var(--tt-text-1)", padding: 20 }}>
                       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
                         <div>
                           <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "rgba(255,255,255,0.55)", margin: "0 0 4px" }}>
@@ -2574,8 +2594,9 @@ function ReportsTab({ demoCase }) {
                         </p>
                       </div>
                     </div>
-                  </>
+                  </div>
                 )}
+              </div>
               </div>
             </div>
 
