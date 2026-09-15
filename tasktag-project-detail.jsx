@@ -2102,8 +2102,8 @@ function ReportsTab({ demoCase }) {
             onApply={formatted => setPreview(p => ({ ...p, targetOpening: formatted }))}
           />
         </div>
-        <div style={{ flex: "1 1 0" }}>
-          <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "0 0 4px" }}>Prepared For</p>
+        <div style={{ flex: "1 1 0", display: "flex", alignItems: "center", gap: 8 }}>
+          <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: 0, flexShrink: 0 }}>Prepared For</p>
           <EditableField
             value={preview.clientName}
             placeholder="Add client name"
