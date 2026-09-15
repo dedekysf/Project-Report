@@ -182,6 +182,8 @@ const PROJECT_ADDRESS = "11 North Raintree Hollow Court, Sienna Plantation, Miss
 const POINT_OF_CONTACT_NAME = "Jordan Blake";
 const POINT_OF_CONTACT_ROLE = "Project Manager";
 const POINT_OF_CONTACT_COMPANY = "Reynolds Construction Co.";
+// TODO(BE): replace with the firm's actual office address from the API
+const COMPANY_ADDRESS = "4500 Industrial Blvd, Houston, TX 77004";
 const initialsOf = (name) => name.split(" ").map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
 // TODO(BE): replace with the actual report ID from the API
 const REPORT_ID = `TX-1520-${APP_TODAY.getFullYear()}-${String(APP_TODAY.getMonth() + 1).padStart(2, "0")}`;
@@ -666,6 +668,89 @@ function EditableField({ value, placeholder, onSave, onCancel, multiline, disabl
   );
 }
 
+// ── Company logo upload box ──
+// Click opens a hidden file input; the chosen image is read as a data URL
+// (no upload endpoint yet) and handed back via onChange. Each instance
+// keeps its own input ref, since the same header (and this box with it)
+// renders once per page — a single shared ref would only ever point at
+// whichever page's copy mounted last.
+function LogoUploadBox({ src, onChange, disabled }) {
+  const inputRef = useRef(null);
+  return (
+    <div
+      onClick={() => !disabled && inputRef.current?.click()}
+      style={{
+        width: 48, height: 48, borderRadius: 8, flexShrink: 0, overflow: "hidden",
+        border: `1px dashed var(--tt-grey04)`, background: "var(--tt-grey01)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        cursor: disabled ? "default" : "pointer",
+      }}
+    >
+      {src
+        ? <img src={src} alt="Company logo" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+        : <FileImage size={18} strokeWidth={SW} color="var(--tt-grey05)" />}
+      {!disabled && (
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          onChange={ev => {
+            const file = ev.target.files?.[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = () => onChange(reader.result);
+            reader.readAsDataURL(file);
+            ev.target.value = "";
+          }}
+          style={{ display: "none" }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Target Opening — single-date field ──
+// Its own component (not just inline JSX) so the calendar's anchor ref
+// and open/closed state are per-instance — needed now that the full
+// header (this field included) renders once per page rather than once
+// for the whole document.
+function TargetOpeningField({ value, disabled, onApply }) {
+  const anchorRef = useRef(null);
+  const [open, setOpen] = useState(false);
+
+  if (disabled) {
+    return <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", margin: 0 }}>{value || "—"}</p>;
+  }
+
+  return (
+    <div style={{ position: "relative" }} ref={anchorRef}>
+      <p
+        onClick={() => setOpen(o => !o)}
+        onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
+        onMouseLeave={ev => ev.currentTarget.style.background = "none"}
+        style={{ fontSize: 14, fontWeight: 600, color: value ? "var(--tt-text-1)" : "var(--tt-grey05)", margin: 0, cursor: "pointer", borderRadius: 6, transition: "background 0.15s" }}
+      >
+        {value || "Add target date"}
+      </p>
+      {open && (
+        <DateRangeCalendar
+          anchorRef={anchorRef}
+          allowFuture
+          singleDate
+          onClose={() => setOpen(false)}
+          onApply={(start) => {
+            if (start) {
+              const [y, m, d] = start.split("-");
+              onApply(new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }));
+            }
+            setOpen(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
 // ── Fixed-position tooltip button ──
 // Renders tooltip via a fixed div that escapes overflow clipping
 function FixedTooltipBtn({ children, label, onAction }) {
@@ -719,7 +804,7 @@ function PhotoThumb({ src, onClick }) {
   return (
     <div
       onClick={onClick}
-      style={{ position: "relative", width: "100%", aspectRatio: "4/3", borderRadius: 2, overflow: "hidden", cursor: onClick ? "pointer" : "default" }}
+      style={{ position: "relative", width: "100%", aspectRatio: "4/3", borderRadius: 4, overflow: "hidden", cursor: onClick ? "pointer" : "default" }}
     >
       {!loaded && <div className="tt-skeleton" style={{ position: "absolute", inset: 0, borderRadius: 0 }} />}
       <img
@@ -760,7 +845,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
   const visibleOriginalIndices = items.map(it => it.i);
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 2, marginTop: 10 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 4, marginTop: 10 }}>
       {visibleItems.map(({ k, i }, viewIdx) => {
         const selected = !!(selectedPhotos && selectedPhotos[`${entryKey}_${i}`]);
         const isCapCell = !expanded && remaining > 0 && viewIdx === visibleItems.length - 1;
@@ -790,14 +875,14 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
               </button>
             )}
             {canOpen && (
-              <div style={{ position: "absolute", inset: 0, borderRadius: 2, background: "rgba(10,22,41,0.25)", opacity: 0, transition: "opacity 0.15s", pointerEvents: "none" }} />
+              <div style={{ position: "absolute", inset: 0, borderRadius: 4, background: "rgba(10,22,41,0.25)", opacity: 0, transition: "opacity 0.15s", pointerEvents: "none" }} />
             )}
             {isCapCell && (
               <button
                 onClick={() => setExpanded(true)}
                 style={{
                   position: "absolute", inset: 0, background: "rgba(10,22,41,0.55)",
-                  border: "none", borderRadius: 2, color: "white",
+                  border: "none", borderRadius: 4, color: "white",
                   fontSize: 13, fontWeight: 600, cursor: "pointer",
                 }}
               >
@@ -1620,8 +1705,6 @@ function ReportsTab({ demoCase }) {
   const [saving,           setSaving]             = useState(false); // Save report button's own disabled/spinner state, before the toast appears
   const previewPeriodRef = useRef(null);
   const previewPanelRef = useRef(null);
-  const targetOpeningRef = useRef(null);
-  const [targetOpeningCalOpen, setTargetOpeningCalOpen] = useState(false);
 
   useEffect(() => {
     if (!openPeriod) return;
@@ -1648,7 +1731,7 @@ function ReportsTab({ demoCase }) {
   // Adds a report to the results list (called only once the user confirms
   // via "Save report" in the preview modal — Generate no longer does this
   // directly).
-  const pushReport = ({ includeSummary, includeNoPhotoTasks, dateRange, period, data, extraNotes, excludedPhotos, titleOverrides, projectName, address, summary, targetOpening, clientName }) => {
+  const pushReport = ({ includeSummary, includeNoPhotoTasks, dateRange, period, data, extraNotes, excludedPhotos, titleOverrides, projectName, address, logo, companyName, companyAddress, summary, targetOpening, clientName }) => {
     const id = Date.now();
     const newReport = {
       id,
@@ -1664,6 +1747,9 @@ function ReportsTab({ demoCase }) {
       titleOverrides,
       projectName,
       address,
+      logo,
+      companyName,
+      companyAddress,
       summary,
       targetOpening,
       clientName,
@@ -1722,13 +1808,15 @@ function ReportsTab({ demoCase }) {
         // never regenerated for the life of this draft.
         projectName: PROJECT_NAME,
         address: PROJECT_ADDRESS,
+        logo: null,
+        companyName: POINT_OF_CONTACT_COMPANY,
+        companyAddress: COMPANY_ADDRESS,
         summary: buildDefaultSummary(data.groups),
         targetOpening: "",
         clientName: "",
       });
       setPreviewPeriodOpen(false);
       setPreviewShowCal(false);
-      setTargetOpeningCalOpen(false);
       setActiveNoteFormKeys({});
       setTitleOverrides({});
       setVisibleCount(10);
@@ -1744,7 +1832,6 @@ function ReportsTab({ demoCase }) {
     setPreview(null);
     setPreviewPeriodOpen(false);
     setPreviewShowCal(false);
-    setTargetOpeningCalOpen(false);
     setActiveNoteFormKeys({});
     setTitleOverrides({});
     setVisibleCount(10);
@@ -1900,12 +1987,36 @@ function ReportsTab({ demoCase }) {
 
   const renderBlock = (block) => block.type === "label" ? renderGroupLabelBlock(block.g) : renderEntryBlock(block);
 
-  // Full header — page 1 only: logo/label, editable project identity,
-  // summary + progress, and Target Opening/Prepared For.
+  // Full header — renders identically on every page (this is now the
+  // *only* header variant; there's no separate lightweight running
+  // header for later pages). Logo/company identity, editable project
+  // identity, summary + progress, and Target Opening/Prepared For.
   const renderFullHeader = () => (
     <div style={{ padding: PAGE_PAD }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-        <img src={IMG_MAP_LOGO} alt="tasktag" style={{ height: 20, display: "block" }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <LogoUploadBox
+            src={preview.logo}
+            onChange={url => setPreview(p => ({ ...p, logo: url }))}
+          />
+          <div>
+            {/* TODO(BE): replace with the firm's actual name from the API */}
+            <EditableField
+              value={preview.companyName}
+              placeholder={POINT_OF_CONTACT_COMPANY}
+              onSave={v => setPreview(p => ({ ...p, companyName: v }))}
+              textStyle={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: 0 }}
+              inputStyle={{ fontSize: 14, fontWeight: 700 }}
+            />
+            <EditableField
+              value={preview.companyAddress}
+              placeholder={COMPANY_ADDRESS}
+              onSave={v => setPreview(p => ({ ...p, companyAddress: v }))}
+              textStyle={{ fontSize: 11, fontWeight: 400, color: "var(--tt-grey05)", margin: 0 }}
+              inputStyle={{ fontSize: 11, fontWeight: 400 }}
+            />
+          </div>
+        </div>
         <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)" }}>
           Report by TaskTag
         </span>
@@ -1927,8 +2038,8 @@ function ReportsTab({ demoCase }) {
         value={preview.projectName}
         placeholder={PROJECT_NAME}
         onSave={v => setPreview(p => ({ ...p, projectName: v }))}
-        textStyle={{ fontSize: 24, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 4px" }}
-        inputStyle={{ fontSize: 24, fontWeight: 700 }}
+        textStyle={{ fontSize: 28, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 4px" }}
+        inputStyle={{ fontSize: 28, fontWeight: 700 }}
       />
       <EditableField
         value={preview.address}
@@ -1975,31 +2086,10 @@ function ReportsTab({ demoCase }) {
       <div style={{ display: "flex", flexWrap: "nowrap", gap: 32 }}>
         <div style={{ flex: "1 1 0", display: "flex", alignItems: "center", gap: 8 }}>
           <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: 0, flexShrink: 0 }}>Target Opening</p>
-          <div style={{ position: "relative" }} ref={targetOpeningRef}>
-            <p
-              onClick={() => setTargetOpeningCalOpen(o => !o)}
-              onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
-              onMouseLeave={ev => ev.currentTarget.style.background = "none"}
-              style={{ fontSize: 14, fontWeight: 600, color: preview.targetOpening ? "var(--tt-text-1)" : "var(--tt-grey05)", margin: 0, cursor: "pointer", borderRadius: 6, transition: "background 0.15s" }}
-            >
-              {preview.targetOpening || "Add target date"}
-            </p>
-            {targetOpeningCalOpen && (
-              <DateRangeCalendar
-                anchorRef={targetOpeningRef}
-                allowFuture
-                singleDate
-                onClose={() => setTargetOpeningCalOpen(false)}
-                onApply={(start) => {
-                  if (start) {
-                    const [y, m, d] = start.split("-");
-                    setPreview(p => ({ ...p, targetOpening: new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) }));
-                  }
-                  setTargetOpeningCalOpen(false);
-                }}
-              />
-            )}
-          </div>
+          <TargetOpeningField
+            value={preview.targetOpening}
+            onApply={formatted => setPreview(p => ({ ...p, targetOpening: formatted }))}
+          />
         </div>
         <div style={{ flex: "1 1 0" }}>
           <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "0 0 4px" }}>Prepared For</p>
@@ -2012,24 +2102,6 @@ function ReportsTab({ demoCase }) {
           />
         </div>
       </div>
-    </div>
-  );
-
-  // Running header — pages 2+: a lightweight recap (no editing, no
-  // summary/progress) just for orientation when flipping through pages.
-  const renderRunningHeader = () => (
-    <div style={{ padding: `${PAGE_PAD}px ${PAGE_PAD}px 0` }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-        <img src={IMG_MAP_LOGO} alt="tasktag" style={{ height: 16, display: "block" }} />
-        <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)" }}>
-          Report by TaskTag
-        </span>
-      </div>
-      <p style={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 2px" }}>
-        {preview.projectName || PROJECT_NAME}
-      </p>
-      <p style={{ fontSize: 11, fontWeight: 400, color: "var(--tt-grey05)", margin: 0 }}>{preview.address || PROJECT_ADDRESS}</p>
-      <div style={{ height: 1, background: "var(--tt-grey03)", marginTop: 16 }} />
     </div>
   );
 
@@ -2069,38 +2141,51 @@ function ReportsTab({ demoCase }) {
     </div>
   );
 
-  // Measure the header/footer variants and every block once (off-screen,
-  // at the real page content width) and greedily pack them onto A4 pages —
-  // the same technique a real paginated document layout engine uses,
-  // just done in JS against actual rendered heights instead of a print
-  // engine's own reflow.
+  // Measure the header/footer and every block once (off-screen, at the
+  // real page content width) and greedily pack them onto A4 pages — the
+  // same technique a real paginated document layout engine uses, just
+  // done in JS against actual rendered heights instead of a print
+  // engine's own reflow. The header is now identical on every page (no
+  // more separate running-header variant), so every page reserves the
+  // same headerH.
   const headerMeasureRef = useRef(null);
-  const runningHeaderMeasureRef = useRef(null);
   const footerMeasureRef = useRef(null);
   const blockMeasureRefs = useRef({});
   const [pageLayout, setPageLayout] = useState(null); // { pages: [[block,...],...] } | null while (re)measuring
+
+  // Recomputing pagination forces a synchronous layout read (offsetHeight)
+  // per block — cheap once, but expensive if it reran on every render (it
+  // used to, with no dependency array at all, which is what made scrolling
+  // feel sluggish: any unrelated state update anywhere in this component
+  // re-triggered a full remeasure). This key changes only when something
+  // that actually affects rendered heights changes, so the effect below
+  // skips everything else. preview.logo is a data URL and can be large, so
+  // it's swapped for its length instead of being fully re-stringified.
+  const layoutDepsKey = preview
+    ? JSON.stringify({ ...preview, logo: preview.logo ? preview.logo.length : 0 })
+      + "|" + JSON.stringify(titleOverrides)
+      + "|" + JSON.stringify(activeNoteFormKeys)
+      + "|" + flatBlocks.map(b => b.key).join(",")
+    : "";
 
   useLayoutEffect(() => {
     if (!preview || !previewData) {
       if (pageLayout !== null) setPageLayout(null);
       return;
     }
-    const headerH        = headerMeasureRef.current?.offsetHeight || 0;
-    const runningHeaderH  = runningHeaderMeasureRef.current?.offsetHeight || 0;
-    const footerH        = footerMeasureRef.current?.offsetHeight || 0;
+    const headerH = headerMeasureRef.current?.offsetHeight || 0;
+    const footerH = footerMeasureRef.current?.offsetHeight || 0;
 
     const pages = [];
     let current = [];
     let used = 0;
-    let isFirstPage = true;
     flatBlocks.forEach(block => {
       const h = blockMeasureRefs.current[block.key]?.offsetHeight || 0;
-      const available = PAGE_H - PAGE_PAD * 2 - (isFirstPage ? headerH : runningHeaderH) - footerH;
+      const available = PAGE_H - PAGE_PAD * 2 - headerH - footerH;
       if (current.length > 0 && used + h > available) {
         pages.push(current);
         current = [];
         used = 0;
-        isFirstPage = false;
       }
       current.push(block);
       used += h;
@@ -2112,7 +2197,8 @@ function ReportsTab({ demoCase }) {
       const prevKey = prev?.pages?.map(p => p.map(b => b.key).join(",")).join("|");
       return prevKey === nextKey ? prev : { pages };
     });
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layoutDepsKey]);
 
   const handleModalScroll = (e) => {
     if (previewLoading || loadingMore || !hasMoreEntries) return;
@@ -2210,7 +2296,7 @@ function ReportsTab({ demoCase }) {
         showToast("error", "Save failed. Try again.");
         return;
       }
-      pushReport({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, data: { ...previewData, groups: finalGroups }, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides, projectName: preview.projectName, address: preview.address, summary: preview.summary, targetOpening: preview.targetOpening, clientName: preview.clientName });
+      pushReport({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, data: { ...previewData, groups: finalGroups }, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides, projectName: preview.projectName, address: preview.address, logo: preview.logo, companyName: preview.companyName, companyAddress: preview.companyAddress, summary: preview.summary, targetOpening: preview.targetOpening, clientName: preview.clientName });
       setDateRange("since_last");
       setSaving(false);
       closePreview();
@@ -2663,9 +2749,9 @@ function ReportsTab({ demoCase }) {
                               <div className="tt-skeleton" style={{ width: "60%", height: 18, marginBottom: 8 }} />
                               <div className="tt-skeleton" style={{ width: 160, height: 11, marginBottom: 10 }} />
                               {e.photos.length > 0 && (
-                                <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 2 }}>
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 4 }}>
                                   {[0, 1, 2, 3].map(pi => (
-                                    <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "4/3" }} />
+                                    <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "4/3", borderRadius: 4 }} />
                                   ))}
                                 </div>
                               )}
@@ -2687,17 +2773,16 @@ function ReportsTab({ demoCase }) {
                 ) : (
                   <>
                     {/* Hidden measuring scaffold — off-screen copies of the
-                        header/footer variants and every content block, at
-                        the real page content width, so their rendered
-                        heights can be read via ref and packed into pages
-                        (see the useLayoutEffect above). height:0 + overflow
-                        hidden on the outer wrapper keeps it from affecting
+                        header/footer and every content block, at the real
+                        page content width, so their rendered heights can be
+                        read via ref and packed into pages (see the
+                        useLayoutEffect above). height:0 + overflow hidden on
+                        the outer wrapper keeps it from affecting
                         scroll/layout while its children still get a normal,
                         measurable layout pass underneath. */}
                     <div aria-hidden="true" style={{ visibility: "hidden", height: 0, overflow: "hidden" }}>
                       <div style={{ width: PAGE_W }}>
                         <div ref={headerMeasureRef}>{renderFullHeader()}</div>
-                        <div ref={runningHeaderMeasureRef}>{renderRunningHeader()}</div>
                         <div ref={footerMeasureRef}>{renderPageFooter(1, 1)}</div>
                         {flatBlocks.map(block => (
                           <div key={block.key} ref={el => { blockMeasureRefs.current[block.key] = el; }} style={{ width: PAGE_W - PAGE_PAD * 2 }}>
@@ -2709,7 +2794,15 @@ function ReportsTab({ demoCase }) {
 
                     {/* Real, visible pages — stacked A4 sheets, each with
                         its own header/footer, so the preview reads like a
-                        real paginated report instead of one long scroll. */}
+                        real paginated report instead of one long scroll.
+                        content-visibility lets the browser skip layout/paint
+                        for pages currently off-screen, which matters once
+                        there are more than a couple of these (each one is a
+                        fairly heavy subtree — full header, entries, photo
+                        grids) — without it, scrolling a long report got
+                        noticeably janky. containIntrinsicSize keeps the
+                        scrollbar/scroll position stable while a page is
+                        skipped. */}
                     {pageLayout && pageLayout.pages.map((pageBlocks, pi) => {
                       const isFirst = pi === 0;
                       return (
@@ -2721,9 +2814,11 @@ function ReportsTab({ demoCase }) {
                             background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 12,
                             boxShadow: "0 1px 3px rgba(10,22,41,0.08)",
                             display: "flex", flexDirection: "column",
+                            contentVisibility: "auto",
+                            containIntrinsicSize: `${PAGE_W}px ${PAGE_H}px`,
                           }}
                         >
-                          {isFirst ? renderFullHeader() : renderRunningHeader()}
+                          {renderFullHeader()}
                           <div style={{ padding: `0 ${PAGE_PAD}px`, flex: 1 }}>
                             {isFirst && previewData.groups.length === 0 && renderNoteSlot("empty")}
                             {pageBlocks.map(block => <div key={block.key}>{renderBlock(block)}</div>)}
@@ -2738,9 +2833,9 @@ function ReportsTab({ demoCase }) {
                       <div style={{ width: PAGE_W, margin: "24px 0 0" }}>
                         <div className="tt-skeleton" style={{ width: "85%", height: 16, marginBottom: 10 }} />
                         {nextEntry && nextEntry.photos.length > 0 && (
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 4 }}>
                             {[0, 1, 2].map(pi => (
-                              <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "4/3" }} />
+                              <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "4/3", borderRadius: 4 }} />
                             ))}
                           </div>
                         )}
