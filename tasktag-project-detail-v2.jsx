@@ -1379,6 +1379,7 @@ function ReportsTab({ demoCase }) {
   const [customRange, setCustomRange] = useState(null); // { start, end } date strings
   const prevDateRangeRef = useRef("last_7"); // dateRange to fall back to if custom is opened but no date is picked
   const [reports,     setReports]     = useState([]);
+  const [lastSavedId, setLastSavedId] = useState(null); // highlights the most recently saved row in the results table
   const [openType,    setOpenType]    = useState(false);
   const [openPeriod,  setOpenPeriod]  = useState(false);
   const [toast,       setToast]       = useState(null); // { type: "success" | "error", message }
@@ -1456,6 +1457,7 @@ function ReportsTab({ demoCase }) {
       excludedPhotos,
     };
     setReports(prev => [newReport, ...prev]);
+    setLastSavedId(id);
     setTimeout(() => {
       setReports(prev => prev.map(r => r.id === id ? { ...r, status: "done" } : r));
     }, 3000);
@@ -1986,6 +1988,7 @@ function ReportsTab({ demoCase }) {
           </p>
         </div>
       ) : (
+        <>
         <div style={{ marginTop: 24, border: "1px solid var(--tt-grey03)", borderRadius: 12, overflow: "hidden" }}>
           <div style={{ maxHeight: 556, overflowY: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
@@ -1999,7 +2002,7 @@ function ReportsTab({ demoCase }) {
             </thead>
             <tbody>
               {reports.map((r, i) => (
-                <tr key={r.id} style={{ background: "white", borderTop: i > 0 ? `1px solid var(--tt-grey03)` : "none" }}>
+                <tr key={r.id} style={{ background: r.id === lastSavedId ? "var(--tt-mint)" : "white", borderTop: i > 0 ? `1px solid var(--tt-grey03)` : "none" }}>
                   <td style={{ padding: "0 16px", fontSize: 13, color: "var(--tt-text-2)", whiteSpace: "nowrap", height: 52, verticalAlign: "middle" }}>{r.date}</td>
                   <td style={{ padding: "0 16px", fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", height: 52, verticalAlign: "middle" }}>{r.period}</td>
                   <td style={{ padding: "0 14px 0 16px", textAlign: "right", height: 52, verticalAlign: "middle", width: 160 }}>
@@ -2022,6 +2025,10 @@ function ReportsTab({ demoCase }) {
           </table>
           </div>
         </div>
+        <p style={{ fontSize: 12, color: "var(--tt-grey05)", marginTop: 8 }}>
+          Saved reports are read-only. To make changes, generate a new report for the range you need.
+        </p>
+        </>
       )}
       </>
       )}
