@@ -645,7 +645,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
             )}
             {isCapCell && (
               <button
-                onClick={() => onOpen && onOpen(visiblePhotoKeys, viewIdx)}
+                onClick={() => onOpen && onOpen(visiblePhotoKeys, 0)}
                 style={{
                   position: "absolute", inset: 0, background: "rgba(10,22,41,0.55)",
                   border: "none", borderRadius: 8, color: "white",
