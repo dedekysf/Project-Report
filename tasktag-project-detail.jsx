@@ -1079,13 +1079,13 @@ const PERIOD_RANGE = {
 // ── Dummy data ──
 const DUMMY_ENTRIES = [
   { date: "2026-09-10", note: "Flooring installation started on the ground floor.", photos: ["img5", "img1", "img6", "img2", "img3", "img7", "img4", "img8"] },
-  { date: "2026-09-09", note: "Exterior siding repairs completed on the south wall.", photos: ["img9", "img2", "img3", "img7", "img4"] },
+  { date: "2026-09-09", note: "Exterior siding repairs completed on the south wall.", photos: ["img9", "img2", "img3", "img7", "img4", "img5", "img6"] },
   { date: "2026-09-08", note: "Final electrical connections completed in the main panel.", photos: ["img9", "img8"] },
-  { date: "2026-09-07", note: "Plumbing fixtures installed in all bathrooms.", photos: ["img7"] },
+  { date: "2026-09-07", note: "Plumbing fixtures installed in all bathrooms.", photos: [] },
   { date: "2026-09-06", note: "Ceiling lights installed and tested.", photos: ["img8", "img7"] },
   { date: "2026-09-06", note: "Final walkthrough completed with the client — no issues noted.", photos: [] },
-  { date: "2026-09-05", note: "Bathroom tile installation completed on the second floor.", photos: ["img3", "img8"] },
-  { date: "2026-09-04", note: "Kitchen cabinet hardware installed.", photos: ["img6", "img1", "img9"] },
+  { date: "2026-09-05", note: "Bathroom tile installation completed on the second floor.", photos: [] },
+  { date: "2026-09-04", note: "Kitchen cabinet hardware installed.", photos: ["img6", "img1", "img9", "img2", "img3", "img4", "img8"] },
   { date: "2026-09-03", note: "Interior door hardware fitted — knobs and locks in place.", photos: ["img6", "img7"] },
   { date: "2026-09-02", note: "Drywall patching completed in the hallway.", photos: ["img4"] },
   { date: "2026-09-01", note: "Exterior paint touch-ups finished on the west elevation.", photos: ["img2", "img5", "img7", "img1"] },
@@ -1477,6 +1477,7 @@ function ReportsTab({ demoCase }) {
   const [activeNoteFormKeys, setActiveNoteFormKeys] = useState({}); // { [entryKey]: true } — every entry currently showing its add/edit note input (more than one can be open at once)
   const [titleOverrides,   setTitleOverrides]    = useState({}); // { [entryKey]: overriddenTitle } — per-entry task name edits, this report only
   const [editingTitleKey,  setEditingTitleKey]   = useState(null); // entryKey currently showing its inline title-edit input
+  const [renameDraft,      setRenameDraft]       = useState(""); // in-progress rename text for editingTitleKey — only committed to titleOverrides on confirm
   const [previewLoading,   setPreviewLoading]    = useState(false);
   const [previewSaved,     setPreviewSaved]      = useState(false); // footer switches from Save to Download/Copy link once true
   const [previewCopied,    setPreviewCopied]     = useState(false); // Copy link button shows "Link copied" briefly
@@ -1588,6 +1589,7 @@ function ReportsTab({ demoCase }) {
       setNoteDrafts({});
       setTitleOverrides({});
       setEditingTitleKey(null);
+      setRenameDraft("");
       setPreviewSaved(false);
       setPreviewCopied(false);
       setVisibleCount(10);
@@ -1612,6 +1614,7 @@ function ReportsTab({ demoCase }) {
       setNoteDrafts({});
       setTitleOverrides({});
       setEditingTitleKey(null);
+      setRenameDraft("");
       setPreviewSaved(false);
       setPreviewCopied(false);
       setVisibleCount(10);
@@ -1717,6 +1720,24 @@ function ReportsTab({ demoCase }) {
     setNoteDrafts(prev => { const next = { ...prev }; delete next[key]; return next; });
   };
   const setNoteDraftFor = (key, text) => setNoteDrafts(prev => ({ ...prev, [key]: text }));
+
+  // Renaming a task's displayed title is draft-only until confirmed — the
+  // in-progress text lives in renameDraft, and only lands in
+  // titleOverrides (which is what actually reaches Save/Download/Copy
+  // link) once the check button (or Enter) commits it. Cancel (or Escape)
+  // just closes the input, leaving titleOverrides untouched.
+  const startRenameTitle = (key, currentTitle) => {
+    setEditingTitleKey(key);
+    setRenameDraft(currentTitle);
+  };
+  const confirmRenameTitle = (key) => {
+    setTitleOverrides(prev => {
+      if (renameDraft && renameDraft.trim()) return { ...prev, [key]: renameDraft.trim() };
+      const next = { ...prev }; delete next[key]; return next;
+    });
+    setEditingTitleKey(null);
+  };
+  const cancelRenameTitle = () => setEditingTitleKey(null);
 
   // Checking a photo just marks it selected (green check) — it still shows
   // in the grid until the selection toolbar's Delete is clicked, at which
@@ -1841,6 +1862,7 @@ function ReportsTab({ demoCase }) {
       setActiveNoteFormKeys({});
       setNoteDrafts({});
       setEditingTitleKey(null);
+      setRenameDraft("");
       setPreviewPeriodOpen(false);
       setSaving(false);
       setSelectedPhotos({});
@@ -2290,49 +2312,78 @@ function ReportsTab({ demoCase }) {
                           // "Completed".
                           const isCompleted = e.noPhotos;
                           return (
-                            <div key={entryKey} style={{ marginBottom: 20, paddingBottom: 20, borderBottom: "1px solid var(--tt-grey02)" }}>
+                            <div key={entryKey} style={{ marginBottom: 20, paddingBottom: 20, borderBottom: "2px solid var(--tt-grey02)" }}>
                               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1, minWidth: 0 }}>
-                                  {isEditingTitle ? (
-                                    <input
-                                      autoFocus
-                                      type="text"
-                                      value={displayTitle}
-                                      onChange={ev => setTitleOverrides(prev => ({ ...prev, [entryKey]: ev.target.value }))}
-                                      onBlur={() => {
-                                        setTitleOverrides(prev => {
-                                          if (prev[entryKey] && prev[entryKey].trim()) return prev;
-                                          const next = { ...prev }; delete next[entryKey]; return next;
-                                        });
-                                        setEditingTitleKey(null);
-                                      }}
-                                      onKeyDown={ev => { if (ev.key === "Enter") ev.currentTarget.blur(); }}
-                                      style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.5", fontFamily: "inherit", border: "1px solid var(--tt-text-1)", borderRadius: 6, padding: "1px 6px", outline: "none" }}
-                                    />
-                                  ) : (
-                                    <p style={{ flex: "0 1 auto", minWidth: 0, fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.5", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                      {displayTitle}
-                                    </p>
-                                  )}
-                                  {/* Renaming here only overrides the title for this report —
-                                      the original task/entry text is never modified. Kept right
-                                      next to the (possibly truncated) title, not pushed to the
-                                      far edge of the row. */}
-                                  {!previewSaved && !isEditingTitle && (
+                                {isEditingTitle ? (
+                                  // Same height/border/icon-prefix chrome as the "Add a note"
+                                  // input below — draft-only until the check button (or
+                                  // Enter) commits it into titleOverrides, or cancel (or
+                                  // Escape) discards it. Sized to the text itself (capped at
+                                  // the row's full width) rather than always stretching full
+                                  // width like a normal form field.
+                                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                                    <div style={{ position: "relative", maxWidth: "100%" }}>
+                                      <Pencil size={14} strokeWidth={SW} color="var(--tt-grey05)" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+                                      <input
+                                        ref={el => { if (el) { el.focus(); const len = el.value.length; el.setSelectionRange(len, len); } }}
+                                        type="text"
+                                        value={renameDraft}
+                                        onChange={ev => setRenameDraft(ev.target.value)}
+                                        onKeyDown={ev => {
+                                          if (ev.key === "Enter") { ev.preventDefault(); confirmRenameTitle(entryKey); }
+                                          if (ev.key === "Escape") { ev.preventDefault(); cancelRenameTitle(); }
+                                        }}
+                                        style={{
+                                          fieldSizing: "content", width: "100%", maxWidth: "100%", minWidth: 80,
+                                          height: 40, padding: "0 12px 0 36px", border: "1px solid var(--tt-text-1)", borderRadius: 8,
+                                          fontSize: 13, fontFamily: "inherit", color: "var(--tt-text-2)", outline: "none", boxSizing: "border-box",
+                                        }}
+                                      />
+                                    </div>
                                     <button
-                                      onClick={() => setEditingTitleKey(entryKey)}
+                                      onClick={() => confirmRenameTitle(entryKey)}
+                                      onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-mint)"}
+                                      onMouseLeave={ev => ev.currentTarget.style.background = "none"}
+                                      style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "background 0.15s" }}
+                                    >
+                                      <Check size={16} strokeWidth={SW} color="var(--tt-secondary)" />
+                                    </button>
+                                    <button
+                                      onClick={cancelRenameTitle}
                                       onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
                                       onMouseLeave={ev => ev.currentTarget.style.background = "none"}
-                                      style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "background 0.15s" }}
+                                      style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "background 0.15s" }}
                                     >
-                                      <Pencil size={13} strokeWidth={SW} color="var(--tt-grey05)" />
+                                      <X size={16} strokeWidth={SW} color="var(--tt-grey05)" />
                                     </button>
-                                  )}
-                                </div>
-                                {isCompleted && !isEditingTitle && (
-                                  <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: "var(--tt-secondary)", background: "var(--tt-mint)", borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap" }}>
-                                    Completed
-                                  </span>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1, minWidth: 0 }}>
+                                      <p style={{ flex: "0 1 auto", minWidth: 0, fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.5", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                        {displayTitle}
+                                      </p>
+                                      {/* Renaming here only overrides the title for this report —
+                                          the original task/entry text is never modified. Kept right
+                                          next to the (possibly truncated) title, not pushed to the
+                                          far edge of the row. */}
+                                      {!previewSaved && (
+                                        <button
+                                          onClick={() => startRenameTitle(entryKey, displayTitle)}
+                                          onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
+                                          onMouseLeave={ev => ev.currentTarget.style.background = "none"}
+                                          style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "background 0.15s" }}
+                                        >
+                                          <Pencil size={13} strokeWidth={SW} color="var(--tt-grey05)" />
+                                        </button>
+                                      )}
+                                    </div>
+                                    {isCompleted && (
+                                      <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: "var(--tt-secondary)", background: "var(--tt-mint)", borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap" }}>
+                                        Completed
+                                      </span>
+                                    )}
+                                  </>
                                 )}
                               </div>
                               {!isCompleted && (
@@ -2389,14 +2440,14 @@ function ReportsTab({ demoCase }) {
                     {Object.keys(selectedPhotos).length} item{Object.keys(selectedPhotos).length > 1 ? "s" : ""} selected
                   </span>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <button
                     onClick={() => setConfirmDeletePhotos(true)}
-                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.12)"}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.08)"}
                     onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                    style={{ background: "none", border: "none", color: "white", cursor: "pointer", padding: 8, borderRadius: 8, display: "flex", transition: "background 0.15s" }}
+                    style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: "1px solid rgba(255,255,255,0.4)", color: "white", cursor: "pointer", padding: "6px 12px", borderRadius: 8, fontSize: 13, fontWeight: 500, transition: "background 0.15s" }}
                   >
-                    <Trash2 size={16} strokeWidth={SW} />
+                    <Trash2 size={14} strokeWidth={SW} /> Delete
                   </button>
                   <button
                     onClick={handleDownloadSelectedPhotos}
