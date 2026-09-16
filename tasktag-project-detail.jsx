@@ -652,6 +652,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
   const [error, setError] = useState(false);
   const alwaysEditingRef = useRef(null);
   const [alwaysEditingFocused, setAlwaysEditingFocused] = useState(false);
+  const editStartValueRef = useRef(value);
   const editing = !disabled && !alwaysEditing && activeField === fieldId;
 
   const [popoverOpen, setPopoverOpen] = useState(false);
@@ -763,6 +764,13 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
     // instead of blurring into an unchanged empty field.
     const isEmpty = !value || !value.trim();
     const done = () => alwaysEditingRef.current?.blur();
+    // Reverts to whatever the field held when this edit session started
+    // (captured on the text-tag's onClick below) — same "cancel discards
+    // this session's changes" contract as the click-to-edit `editing`
+    // branch's X button, just without that branch's separate draft state
+    // (this field commits onSave on every keystroke, so "cancel" has to
+    // restore the prior committed value instead of dropping an unsaved one).
+    const cancelEdit = () => { onSave(editStartValueRef.current || ""); alwaysEditingRef.current?.blur(); };
     const confirmButton = (
       <button
         disabled={isEmpty}
@@ -774,6 +782,16 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
         <Check size={15} strokeWidth={SW} color="white" />
       </button>
     );
+    const cancelButton = (
+      <button
+        onClick={cancelEdit}
+        onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
+        onMouseLeave={ev => ev.currentTarget.style.background = "none"}
+        style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "background 0.15s" }}
+      >
+        <X size={15} strokeWidth={SW} color="var(--tt-grey06)" />
+      </button>
+    );
 
     // Once it holds a value and isn't actively focused, it reads as plain,
     // clickable text — same hover-then-click affordance as every other
@@ -783,7 +801,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
     if (!isEmpty && !alwaysEditingFocused) {
       const textTag = (
         <Tag
-          onClick={() => setAlwaysEditingFocused(true)}
+          onClick={() => { editStartValueRef.current = value; setAlwaysEditingFocused(true); }}
           onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey03)"}
           onMouseLeave={ev => ev.currentTarget.style.background = "none"}
           style={{ display: "block", cursor: "pointer", borderRadius: 6, margin: 0, whiteSpace: multiline ? "pre-wrap" : "normal", ...textStyle }}
@@ -814,9 +832,9 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
             onKeyDown={ev => { if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); done(); } }}
             placeholder={placeholder}
             rows={3}
-            style={{ fontFamily: "inherit", paddingRight: 44, overflowY: "hidden", ...inputStyle }}
+            style={{ fontFamily: "inherit", paddingRight: 76, overflowY: "hidden", ...inputStyle }}
           />
-          <div style={{ position: "absolute", right: 6, bottom: 6 }}>{confirmButton}</div>
+          <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>{cancelButton}{confirmButton}</div>
         </div>
       </div>
     ) : (
@@ -830,9 +848,9 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
           onBlur={() => setAlwaysEditingFocused(false)}
           onKeyDown={ev => { if (ev.key === "Enter") { ev.preventDefault(); done(); } }}
           placeholder={placeholder}
-          style={{ fontFamily: "inherit", padding: "0 44px 0 12px", ...inputStyle }}
+          style={{ fontFamily: "inherit", padding: "0 76px 0 12px", ...inputStyle }}
         />
-        <div style={{ position: "absolute", right: 6, bottom: 6 }}>{confirmButton}</div>
+        <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>{cancelButton}{confirmButton}</div>
       </div>
     );
   }
@@ -1162,13 +1180,14 @@ function PhotoThumb({ src, onClick }) {
 // off the trigger's own bounding rect (so it isn't clipped by the
 // grid/scroll container), with a single input for the caption text. Only
 // one popover is open at a time across the grid.
-function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, onToggleSelect, captions, onCaptionChange }) {
+function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, onToggleSelect, captions, onCaptionChange, onSetPhotoExcluded }) {
   const CAP = 4;
   const [expanded, setExpanded] = useState(false);
   const [openCaptionIdx, setOpenCaptionIdx] = useState(null); // original photo index, or null
   const [captionPos, setCaptionPos] = useState({ top: 0, left: 0 });
   const captionTriggerRef = useRef(null); // the specific trigger button last clicked, for scroll repositioning
   const captionPopoverRef = useRef(null);
+  const [swapOpen, setSwapOpen] = useState(false);
 
   useEffect(() => {
     if (openCaptionIdx === null) return;
@@ -1212,8 +1231,15 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
   // order as visiblePhotoKeys — lets the lightbox map a filmstrip
   // selection back to this entry's real excludedPhotos keys.
   const visibleOriginalIndices = items.map(it => it.i);
+  // More candidate photos than the per-task cap allows in at once — the
+  // swap trigger (and panel below the grid) only make sense once there's
+  // actually something to swap in. `onSetPhotoExcluded` is undefined once
+  // the report is saved, same gate as onToggleSelect/onCaptionChange.
+  const overLimit = !!onSetPhotoExcluded && (photos || []).length > PER_ENTRY_PHOTO_LIMIT;
+  const includedCount = items.length;
 
   return (
+    <div>
     <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 4, marginTop: 10 }}>
       {visibleItems.map(({ k, i }, viewIdx) => {
         const selected = !!(selectedPhotos && selectedPhotos[`${entryKey}_${i}`]);
@@ -1265,6 +1291,22 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
                 }}
               >
                 <MessageSquare size={11} color="var(--tt-grey06)" strokeWidth={2.25} />
+              </button>
+            )}
+            {!isCapCell && IMG_MAP[k] && overLimit && (
+              <button
+                onClick={e => { e.stopPropagation(); setSwapOpen(o => !o); }}
+                className="opacity-0 transition-opacity group-hover:opacity-100"
+                style={{
+                  position: "absolute", bottom: 6, left: 30,
+                  width: 20, height: 20, borderRadius: "50%",
+                  border: "none", background: "white",
+                  display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+                  cursor: "pointer", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)",
+                  zIndex: 2,
+                }}
+              >
+                <ArrowUpDown size={11} color="var(--tt-grey06)" strokeWidth={2.25} />
               </button>
             )}
             {canOpen && (
@@ -1322,6 +1364,44 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
           </div>
         );
       })}
+    </div>
+    {overLimit && swapOpen && (
+      <div style={{ marginTop: 10, border: "1px solid var(--tt-grey03)", borderRadius: 8, padding: 10, background: "var(--tt-grey01)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <p style={{ fontSize: 12, fontWeight: 600, color: "var(--tt-text-2)", margin: 0 }}>
+            Swap photos &middot; {includedCount}/{PER_ENTRY_PHOTO_LIMIT} included
+          </p>
+          <button
+            onClick={() => setSwapOpen(false)}
+            style={{ background: "none", border: "none", cursor: "pointer", padding: 2, display: "flex" }}
+          >
+            <X size={14} strokeWidth={SW} color="var(--tt-grey06)" />
+          </button>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 6 }}>
+          {(photos || []).map((k, i) => {
+            if (!IMG_MAP[k]) return null;
+            const included = !(excludedPhotos && excludedPhotos[`${entryKey}_${i}`]);
+            const disabled = !included && includedCount >= PER_ENTRY_PHOTO_LIMIT;
+            return (
+              <button
+                key={i}
+                disabled={disabled}
+                onClick={() => onSetPhotoExcluded(i, included)}
+                style={{ position: "relative", padding: 0, border: "none", background: "none", cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.4 : 1 }}
+              >
+                <div style={{ position: "relative", width: "100%", aspectRatio: "4/3", borderRadius: 4, overflow: "hidden", outline: included ? "2px solid var(--tt-secondary)" : "2px solid transparent" }}>
+                  <img src={IMG_MAP[k]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  <span style={{ position: "absolute", top: 3, right: 3, width: 16, height: 16, borderRadius: "50%", background: included ? "var(--tt-secondary)" : "rgba(10,22,41,0.35)", border: included ? "none" : "1.5px solid white", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {included && <Check size={10} color="white" strokeWidth={3} />}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    )}
     </div>
   );
 }
@@ -1867,6 +1947,28 @@ function applyPhotoCap(groups, maxPhotos = PHOTO_LIMIT) {
       photos: e.photos.filter((_, pi) => selected.has(all.findIndex(a => a.gi === gi && a.ei === ei && a.pi === pi))),
     })).filter(e => e.photos.length > 0 || e.noPhotos),
   }));
+}
+
+// TODO(BE): replace with the account's actual per-task-item photo cap from the API
+const PER_ENTRY_PHOTO_LIMIT = 12;
+
+// Marks everything past the first PER_ENTRY_PHOTO_LIMIT photos in each entry
+// as excluded by default, using the exact same excludedPhotos shape (and
+// `${entryKey}_${photoIndex}` keys) that applyPhotoExclusions/the results
+// table/copy-link already read — so an overflowing entry starts capped down
+// to its first 12 photos everywhere, with no separate data path to keep in
+// sync. PhotoGrid's swap panel then just flips these same keys back and
+// forth, never exceeding the cap.
+function defaultOverflowExclusions(groups, maxPerEntry = PER_ENTRY_PHOTO_LIMIT) {
+  const excluded = {};
+  groups.forEach(g => {
+    g.entries.forEach((e, i) => {
+      if (e.photos.length <= maxPerEntry) return;
+      const entryKey = `${g.key}_${i}`;
+      e.photos.forEach((_, pi) => { if (pi >= maxPerEntry) excluded[`${entryKey}_${pi}`] = true; });
+    });
+  });
+  return excluded;
 }
 
 function buildReportData(dateRange, periodStr, customRange, includeNoPhotoTasks = true) {
@@ -2484,7 +2586,7 @@ function ReportsTab({ demoCase }) {
         // saved right now — see pushReport, which assigns the same number.
         version: reports.length + 1,
         extraNotes: {},
-        excludedPhotos: {},
+        excludedPhotos: defaultOverflowExclusions(data.groups),
         photoCaptions: {},
         // System-generated starting point — freely editable from here, and
         // never regenerated for the life of this draft.
@@ -2714,6 +2816,9 @@ function ReportsTab({ demoCase }) {
             </>
           )}
         </div>
+        {!!preview.extraNotes[entryKey] && (
+          <div style={{ height: 1, background: "var(--tt-grey03)", marginTop: 16 }} />
+        )}
         {renderNoteSlot(entryKey)}
         {!isPhotoless && (
           <PhotoGrid
@@ -2725,6 +2830,7 @@ function ReportsTab({ demoCase }) {
             onToggleSelect={previewSaved ? undefined : (idx, photoKey) => togglePhotoSelected(entryKey, idx, photoKey)}
             captions={preview.photoCaptions}
             onCaptionChange={previewSaved ? undefined : (idx, text) => setPhotoCaption(entryKey, idx, text)}
+            onSetPhotoExcluded={previewSaved ? undefined : (idx, excluded) => setPreview(p => ({ ...p, excludedPhotos: { ...p.excludedPhotos, [`${entryKey}_${idx}`]: excluded } }))}
           />
         )}
       </div>
