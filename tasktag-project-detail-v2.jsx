@@ -569,6 +569,9 @@ function ReportCheckbox({ active, label, onClick }) {
 // activeField/onActivate/onDeactivate through every call site by hand),
 // with each field identified by its own fieldId string.
 const ActiveEditContext = createContext({ activeField: null, setActiveField: () => {} });
+// A stable (never-changing identity) inert value for the hidden measuring
+// scaffold to pin ActiveEditContext to — see hiddenMeasuringScaffold.
+const INERT_ACTIVE_EDIT = { activeField: null, setActiveField: () => {} };
 
 // ── Inline-editable text ──
 // No pencil icon — hovering shows a grey03 background to signal the field
@@ -2387,16 +2390,31 @@ function ReportsTab({ demoCase }) {
     if (!preview) return null;
     return (
       <div aria-hidden="true" style={{ visibility: "hidden", height: 0, overflow: "hidden" }}>
-        <div style={{ width: PAGE_W }}>
-          <div ref={headerMeasureRef}>{renderFullHeader()}</div>
-          <div ref={runningHeaderMeasureRef}>{renderRunningHeader()}</div>
-          <div ref={footerMeasureRef}>{renderPageFooter()}</div>
-          {flatBlocks.map(block => (
-            <div key={block.key} ref={el => { blockMeasureRefs.current[block.key] = el; }} style={{ width: PAGE_W - PAGE_PAD * 2 }}>
-              {renderBlock(block)}
-            </div>
-          ))}
-        </div>
+        {/* Pinned to a static, always-null activeField — this scaffold
+            exists purely to measure static rendered heights, but it
+            renders the SAME EditableField/TargetOpeningField instances
+            (with the same fieldId strings) as the visible page, which by
+            default read the real, shared ActiveEditContext. Without this
+            override, opening the visible Target Opening calendar also
+            "opens" this hidden copy's own invisible DateRangeCalendar,
+            which registers its own document-level outside-click listener.
+            That listener has no idea the real calendar's DOM exists, so it
+            treats every click on the real (visible) calendar as an outside
+            click and force-closes the whole field — the date looked like
+            it was never being saved, when actually the selection was being
+            cancelled out from under it a moment after being applied. */}
+        <ActiveEditContext.Provider value={INERT_ACTIVE_EDIT}>
+          <div style={{ width: PAGE_W }}>
+            <div ref={headerMeasureRef}>{renderFullHeader()}</div>
+            <div ref={runningHeaderMeasureRef}>{renderRunningHeader()}</div>
+            <div ref={footerMeasureRef}>{renderPageFooter()}</div>
+            {flatBlocks.map(block => (
+              <div key={block.key} ref={el => { blockMeasureRefs.current[block.key] = el; }} style={{ width: PAGE_W - PAGE_PAD * 2 }}>
+                {renderBlock(block)}
+              </div>
+            ))}
+          </div>
+        </ActiveEditContext.Provider>
       </div>
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3023,7 +3041,7 @@ function ReportsTab({ demoCase }) {
                   <div style={{
                     position: "sticky", bottom: 0, zIndex: 100,
                     display: "flex", alignItems: "center", justifyContent: "space-between",
-                    boxSizing: "border-box", padding: "12px 20px", borderRadius: 8,
+                    boxSizing: "border-box", padding: "12px 20px",
                     background: "var(--tt-grey06)",
                   }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
