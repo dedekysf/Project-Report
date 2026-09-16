@@ -680,12 +680,21 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
     );
   }
 
+  // Boxed fields (Summary) rest at grey02 (their permanent card fill, from
+  // boxStyle) and hover one step darker to grey03 — hovering has to change
+  // the WRAP (which owns the card's padding/radius), not the inner Tag,
+  // since the Tag alone wouldn't cover the padded edges of the card.
   return (
-    <div className="tt-editable-wrap" style={{ ...boxStyle }}>
+    <div
+      className="tt-editable-wrap"
+      onMouseEnter={boxed ? (ev => ev.currentTarget.style.background = "var(--tt-grey03)") : undefined}
+      onMouseLeave={boxed ? (ev => ev.currentTarget.style.background = "var(--tt-grey02)") : undefined}
+      style={{ ...boxStyle }}
+    >
       <Tag
         onClick={() => { setDraft(value || ""); setActiveField(fieldId); setError(false); }}
-        onMouseEnter={ev => { ev.currentTarget.style.background = boxed ? "var(--tt-grey02)" : "var(--tt-grey03)"; }}
-        onMouseLeave={ev => ev.currentTarget.style.background = "none"}
+        onMouseEnter={!boxed ? (ev => ev.currentTarget.style.background = "var(--tt-grey03)") : undefined}
+        onMouseLeave={!boxed ? (ev => ev.currentTarget.style.background = "none") : undefined}
         style={{ display: "inline-block", position: boxed ? "static" : "relative", cursor: "pointer", ...textStyle }}
       >
         {value || <span style={{ color: "var(--tt-grey05)", textDecoration: "underline", ...placeholderStyle }}>{placeholder}</span>}
