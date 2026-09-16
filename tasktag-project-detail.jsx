@@ -2262,7 +2262,7 @@ const buildReportHTML = (report) => {
       });
 
   const progressHTML = report.includeSummary
-    ? h("div", { style: "display:flex;align-items:center;gap:16px;margin-bottom:40px;" },
+    ? h("div", { style: "display:flex;align-items:center;gap:16px;margin-bottom:56px;" },
         h("div", { style: "flex:1;min-width:0;" },
           h("p", { style: "font-size:13px;font-weight:600;color:#0a1629;margin:0 0 8px;" }, `${completed} of ${total} tasks complete`),
           h("div", { style: "height:6px;background:#e8e8e6;border-radius:99px;overflow:hidden;" },
@@ -3028,7 +3028,7 @@ function ReportsTab({ demoCase }) {
       {/* Progress — entries logged this period vs. total on record, gated
           by the same "Task summary" checkbox the HTML export uses. */}
       {preview.includeSummary && previewData && (
-        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 40 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 56 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 8px" }}>
               {previewData.completed} of {previewData.total} tasks complete
