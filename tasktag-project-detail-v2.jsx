@@ -604,11 +604,11 @@ const INERT_ACTIVE_EDIT = { activeField: null, setActiveField: () => {} };
 // `alwaysEditing` skips the click-to-edit dance entirely — used for fields
 // (Summary, per-entry notes) that should just read as a plain textarea/
 // input from the start. Every keystroke calls onSave directly (no deferred
-// draft), but it still shows the same X/check affordance as the click-to-
-// edit fields — just triggered by focus instead of by entering edit mode.
-// X clears the field (and blurs); check simply blurs, signaling "done"
-// without changing the already-live value. `disabled` still wins over this
-// (a saved/locked report shows plain text).
+// draft, so there's nothing to cancel — no X here, only the click-to-edit
+// fields below get that). A single check button sits at the bottom-right
+// corner and is always visible, empty or not; clicking it just blurs the
+// field, signaling "done" without changing the already-live value.
+// `disabled` still wins over this (a saved/locked report shows plain text).
 //
 // Whatever sits below an active (editing) field is always 8px away: a
 // non-boxed field's own wrapper carries that as marginBottom, multiline's
@@ -618,7 +618,6 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
   const { activeField, setActiveField } = useContext(ActiveEditContext);
   const [draft, setDraft] = useState(value || "");
   const [error, setError] = useState(false);
-  const [focused, setFocused] = useState(false);
   const alwaysEditingRef = useRef(null);
   const editing = !disabled && !alwaysEditing && activeField === fieldId;
 
@@ -630,46 +629,28 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
   }
 
   if (alwaysEditing) {
-    // Keeps the field focused (so the icon row doesn't vanish mid-click)
-    // while still letting the button's own onClick fire right after.
-    const holdFocus = ev => ev.preventDefault();
-    const clear = () => { onSave(""); alwaysEditingRef.current?.blur(); };
     const done = () => alwaysEditingRef.current?.blur();
-    const iconButtons = (
-      <>
-        <button
-          onMouseDown={holdFocus}
-          onClick={clear}
-          onMouseEnter={ev => ev.currentTarget.style.background = boxed ? "rgba(255,255,255,0.6)" : "var(--tt-grey02)"}
-          onMouseLeave={ev => ev.currentTarget.style.background = "none"}
-          style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "background 0.15s" }}
-        >
-          <X size={15} strokeWidth={SW} color="var(--tt-grey06)" />
-        </button>
-        <button
-          onMouseDown={holdFocus}
-          onClick={done}
-          onMouseEnter={ev => ev.currentTarget.style.opacity = "0.85"}
-          onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
-          style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "var(--tt-secondary)", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "opacity 0.15s" }}
-        >
-          <Check size={15} strokeWidth={SW} color="white" />
-        </button>
-      </>
+    const confirmButton = (
+      <button
+        onClick={done}
+        onMouseEnter={ev => ev.currentTarget.style.opacity = "0.85"}
+        onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
+        style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "var(--tt-secondary)", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "opacity 0.15s" }}
+      >
+        <Check size={15} strokeWidth={SW} color="white" />
+      </button>
     );
     return multiline ? (
-      <div style={{ position: "relative", ...boxStyle }}>
+      <div style={boxStyle}>
         <Textarea
           ref={alwaysEditingRef}
           value={value}
           onChange={ev => onSave(ev.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
           placeholder={placeholder}
           rows={3}
           style={{ fontFamily: "inherit", ...inputStyle }}
         />
-        {focused && <div style={{ display: "flex", justifyContent: "flex-end", gap: 4, marginTop: 8 }}>{iconButtons}</div>}
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>{confirmButton}</div>
       </div>
     ) : (
       <div style={{ position: "relative" }}>
@@ -678,12 +659,10 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
           type="text"
           value={value}
           onChange={ev => onSave(ev.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
           placeholder={placeholder}
-          style={{ fontFamily: "inherit", padding: focused ? "0 76px 0 12px" : "0 12px", ...inputStyle }}
+          style={{ fontFamily: "inherit", padding: "0 44px 0 12px", ...inputStyle }}
         />
-        {focused && <div style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center", gap: 4 }}>{iconButtons}</div>}
+        <div style={{ position: "absolute", right: 6, bottom: 6 }}>{confirmButton}</div>
       </div>
     );
   }
@@ -735,7 +714,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
         )}
         <div style={multiline
           ? { display: "flex", justifyContent: "flex-end", gap: 4, marginTop: 8 }
-          : { position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center", gap: 4 }
+          : { position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }
         }>
           <button
             onClick={cancel}
