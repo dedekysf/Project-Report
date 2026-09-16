@@ -4,6 +4,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   ChevronLeft, Search, MoreVertical, Plus, Check, Link, Download,
   LayoutGrid, MapPin, Hash, FileText, FileImage,
@@ -620,7 +622,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
   const alwaysEditingRef = useRef(null);
   const editing = !disabled && !alwaysEditing && activeField === fieldId;
 
-  const boxStyle = boxed ? { position: "relative", background: "var(--tt-grey02)", borderRadius: 8, padding: 16 } : {};
+  const boxStyle = boxed ? { position: "relative", background: "var(--tt-grey02)", borderRadius: 8, padding: 8 } : {};
 
   if (disabled) {
     if (value) return <div style={boxStyle}><Tag style={{ display: "block", ...textStyle }}>{value}</Tag></div>;
@@ -657,7 +659,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
     );
     return multiline ? (
       <div style={{ position: "relative", ...boxStyle }}>
-        <textarea
+        <Textarea
           ref={alwaysEditingRef}
           value={value}
           onChange={ev => onSave(ev.target.value)}
@@ -665,13 +667,14 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
           onBlur={() => setFocused(false)}
           placeholder={placeholder}
           rows={3}
-          style={{ display: "block", width: "100%", fontFamily: "inherit", border: "none", outline: "none", resize: "none", background: "transparent", boxSizing: "border-box", ...inputStyle }}
+          className="min-h-0 resize-none border-none bg-transparent p-0 shadow-none focus-visible:border-none"
+          style={{ fontFamily: "inherit", ...inputStyle }}
         />
         {focused && <div style={{ display: "flex", justifyContent: "flex-end", gap: 4, marginTop: 8 }}>{iconButtons}</div>}
       </div>
     ) : (
       <div style={{ position: "relative" }}>
-        <input
+        <Input
           ref={alwaysEditingRef}
           type="text"
           value={value}
@@ -679,7 +682,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           placeholder={placeholder}
-          style={{ display: "block", width: "100%", height: 40, padding: focused ? "0 76px 0 12px" : "0 12px", border: "1px solid var(--tt-grey03)", borderRadius: 8, fontFamily: "inherit", outline: "none", boxSizing: "border-box", ...inputStyle }}
+          style={{ fontFamily: "inherit", padding: focused ? "0 76px 0 12px" : "0 12px", ...inputStyle }}
         />
         {focused && <div style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center", gap: 4 }}>{iconButtons}</div>}
       </div>
@@ -2554,7 +2557,7 @@ function ReportsTab({ demoCase }) {
       <EditableField
         fieldId="summary"
         value={preview.summary}
-        placeholder="Summarize how the project is going this period"
+        placeholder="Add a high-level overview of the progress made during this period..."
         alwaysEditing
         multiline
         boxed
