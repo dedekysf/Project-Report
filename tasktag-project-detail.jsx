@@ -2317,7 +2317,7 @@ const buildReportHTML = (report) => {
       (!e.noPhotos && visiblePhotoCount > 0
         ? dot + `<span style="font-size:11px;font-weight:500;color:#828282;">${visiblePhotoCount} photo${visiblePhotoCount === 1 ? "" : "s"}</span>`
         : "");
-    return h("div", { style: "margin-bottom:28px;" },
+    return h("div", { style: "margin-bottom:40px;" },
       h("p", { style: "font-size:18px;font-weight:600;color:#0a1629;line-height:1.35;margin:0;" }, e.note),
       h("div", { style: "margin-top:4px;" }, metaLine),
       e.noPhotos ? "" : renderPhotos(e.photos),
@@ -2891,7 +2891,7 @@ function ReportsTab({ demoCase }) {
       (_, i) => !(preview.excludedPhotos && preview.excludedPhotos[`${entryKey}_${i}`])
     ).length;
     return (
-      <div style={{ marginBottom: 28 }}>
+      <div style={{ marginBottom: 40 }}>
         {/* Renaming here only overrides the title for this report — the
             original task/entry text is never modified. No pencil icon —
             hover shows the grey02 affordance, click edits. */}
