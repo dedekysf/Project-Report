@@ -718,14 +718,14 @@ function LogoUploadBox({ src, onChange, disabled }) {
         flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
         cursor: disabled || loading ? "default" : "pointer",
         ...(src
-          ? { maxWidth: 140, height: "auto" }
+          ? { maxWidth: 100, height: "auto" }
           : { width: 48, height: 48, borderRadius: 8, overflow: "hidden", border: "1px dashed var(--tt-grey04)", background: "var(--tt-grey01)" }),
       }}
     >
       {loading ? (
         <span style={{ width: 18, height: 18, borderRadius: "50%", border: "2px solid var(--tt-grey03)", borderTopColor: "var(--tt-text-2)", display: "inline-block", animation: "tt-spin 0.75s linear infinite" }} />
       ) : src ? (
-        <img src={src} alt="Company logo" style={{ display: "block", maxWidth: 140, width: "100%", height: "auto" }} />
+        <img src={src} alt="Company logo" style={{ display: "block", maxWidth: 100, width: "100%", height: "auto" }} />
       ) : (
         <FileImage size={18} strokeWidth={SW} color="var(--tt-grey05)" />
       )}
