@@ -2833,7 +2833,6 @@ function ReportsTab({ demoCase }) {
               style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px",
                 borderBottom: "1px solid var(--tt-grey03)", flexShrink: 0, background: "white",
-                overflowY: "auto", scrollbarGutter: "stable",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: 800, width: "100%", margin: "0 auto" }}>
@@ -2893,10 +2892,10 @@ function ReportsTab({ demoCase }) {
                             onMouseEnter={e => { if (preview.dateRange !== id) e.currentTarget.style.background = "var(--tt-grey02)"; }}
                             onMouseLeave={e => { e.currentTarget.style.background = preview.dateRange === id ? "var(--tt-grey02)" : "white"; }}
                           >
-                            <span style={{ fontSize: 13, fontWeight: 500, color: "var(--tt-text-1)" }}>
+                            <span style={{ fontSize: 13, fontWeight: 500, color: "var(--tt-text-1)", whiteSpace: "nowrap" }}>
                               {renderPeriodLabel(id, preview.customRange)}
                             </span>
-                            {preview.dateRange === id && <Check size={14} color="var(--tt-secondary)" strokeWidth={2} />}
+                            {preview.dateRange === id && <Check size={14} color="var(--tt-secondary)" strokeWidth={2} style={{ flexShrink: 0, marginLeft: 12 }} />}
                           </div>
                           {i < PERIOD_OPTIONS.length - 1 && <div style={{ height: 1, background: "var(--tt-grey03)", margin: "0 12px" }} />}
                         </div>
