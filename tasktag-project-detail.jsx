@@ -611,12 +611,14 @@ const INERT_ACTIVE_EDIT = { activeField: null, setActiveField: () => {} };
 // field, signaling "done" without changing the already-live value.
 // `disabled` still wins over this (a saved/locked report shows plain text).
 //
-// `popover` (company name/address, client name) opens a small caret
-// popover off the trigger's own bounding rect instead of swapping inline —
-// same caret/positioning mechanics as the photo caption popover. Its draft
-// only commits on the single check button (or Enter); clicking outside (or
-// Escape) just closes the popover without saving, so there's no separate
-// cancel button to draw.
+// `popover` (company name/address, client name) opens a small 240px-wide
+// caret popover off the trigger's own bounding rect instead of swapping
+// inline — same caret/positioning mechanics as the photo caption popover.
+// The check button sits inside the input itself (right-aligned, like the
+// alwaysEditing fields) and is disabled while the draft is empty. It's the
+// only way to commit — Enter also works, but clicking outside (or Escape)
+// just closes the popover without saving, so there's no separate cancel
+// button to draw.
 //
 // Whatever sits below an active (editing) field is always 8px away: a
 // non-boxed field's own wrapper carries that as marginBottom, multiline's
@@ -661,8 +663,9 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
       setPopoverOpen(true);
     };
     const commit = () => { onSave(draft.trim()); setPopoverOpen(false); };
+    const popoverEmpty = !draft.trim();
     return (
-      <>
+      <div style={{ position: "relative" }}>
         <Tag
           ref={triggerRef}
           onClick={openPopover}
@@ -673,32 +676,40 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
           {value || <span style={{ color: "var(--tt-grey05)", textDecoration: "underline", ...placeholderStyle }}>{placeholder}</span>}
         </Tag>
         {popoverOpen && (
-          <div ref={popoverRef} style={{ position: "fixed", top: popoverPos.top, left: popoverPos.left, zIndex: 300, width: 200 }}>
+          <div ref={popoverRef} style={{ position: "fixed", top: popoverPos.top, left: popoverPos.left, zIndex: 300, width: 240 }}>
             <div style={{ position: "absolute", top: -5, left: 12, width: 10, height: 10, background: "white", border: "1px solid var(--tt-grey03)", borderRight: "none", borderBottom: "none", transform: "rotate(45deg)" }} />
-            <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 6, background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, padding: 8, boxShadow: "0 8px 24px rgba(10,22,41,0.16)" }}>
-              <Input
-                autoFocus
-                value={draft}
-                onChange={ev => setDraft(ev.target.value)}
-                onKeyDown={ev => {
-                  if (ev.key === "Enter") { ev.preventDefault(); commit(); }
-                  if (ev.key === "Escape") { ev.preventDefault(); setPopoverOpen(false); }
-                }}
-                placeholder={placeholder}
-                style={{ fontSize: 12, height: 32, flex: 1, minWidth: 0 }}
-              />
-              <button
-                onClick={commit}
-                onMouseEnter={ev => ev.currentTarget.style.opacity = "0.85"}
-                onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
-                style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: "pointer", padding: 0 }}
-              >
-                <Check size={15} strokeWidth={SW} color="white" />
-              </button>
+            <div style={{ position: "relative", background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, padding: 8, boxShadow: "0 8px 24px rgba(10,22,41,0.16)" }}>
+              <div style={{ position: "relative" }}>
+                <Input
+                  autoFocus
+                  value={draft}
+                  onChange={ev => setDraft(ev.target.value)}
+                  onKeyDown={ev => {
+                    if (ev.key === "Enter") { ev.preventDefault(); commit(); }
+                    if (ev.key === "Escape") { ev.preventDefault(); setPopoverOpen(false); }
+                  }}
+                  placeholder={placeholder}
+                  style={{ fontSize: 12, height: 32, padding: "0 36px 0 10px" }}
+                />
+                <button
+                  disabled={popoverEmpty}
+                  onClick={commit}
+                  onMouseEnter={ev => !popoverEmpty && (ev.currentTarget.style.opacity = "0.85")}
+                  onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
+                  style={{
+                    position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)",
+                    flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+                    width: 24, height: 24, background: popoverEmpty ? "var(--tt-grey04)" : "var(--tt-text-1)",
+                    border: "none", borderRadius: 6, cursor: popoverEmpty ? "not-allowed" : "pointer", padding: 0,
+                  }}
+                >
+                  <Check size={13} strokeWidth={SW} color="white" />
+                </button>
+              </div>
             </div>
           </div>
         )}
-      </>
+      </div>
     );
   }
 
@@ -1066,12 +1077,12 @@ function PhotoThumb({ src, onClick }) {
 // even after some are removed. An entry with zero visible photos renders
 // nothing.
 //
-// A second circle, centered over the thumbnail, is the caption trigger —
-// hover-only, always, even once a caption is already set. Clicking it
-// opens a small caret popover, fixed-positioned off the trigger's own
-// bounding rect (so it isn't clipped by the grid/scroll container), with a
-// single input for the caption text. Only one popover is open at a time
-// across the grid.
+// A second circle in the bottom-left corner (icon centered inside it, both
+// axes) is the caption trigger — hover-only, always, even once a caption
+// is already set. Clicking it opens a small caret popover, fixed-positioned
+// off the trigger's own bounding rect (so it isn't clipped by the
+// grid/scroll container), with a single input for the caption text. Only
+// one popover is open at a time across the grid.
 function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, onToggleSelect, captions, onCaptionChange }) {
   const CAP = 4;
   const [expanded, setExpanded] = useState(false);
@@ -1142,7 +1153,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
                 }}
                 className="opacity-0 transition-opacity group-hover:opacity-100"
                 style={{
-                  position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+                  position: "absolute", bottom: 6, left: 6,
                   width: 20, height: 20, borderRadius: "50%",
                   border: "none", background: "white",
                   display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
@@ -1169,19 +1180,39 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
               </button>
             )}
             {openCaptionIdx === i && (
-              <div ref={captionPopoverRef} style={{ position: "fixed", top: captionPos.top, left: captionPos.left, zIndex: 300, width: 220 }}>
+              <div ref={captionPopoverRef} style={{ position: "fixed", top: captionPos.top, left: captionPos.left, zIndex: 300, width: 240 }}>
                 <div style={{ position: "absolute", top: -5, left: 12, width: 10, height: 10, background: "white", border: "1px solid var(--tt-grey03)", borderRight: "none", borderBottom: "none", transform: "rotate(45deg)" }} />
                 <div style={{ position: "relative", background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, padding: 8, boxShadow: "0 8px 24px rgba(10,22,41,0.16)" }}>
-                  <Input
-                    autoFocus
-                    value={caption || ""}
-                    onChange={ev => onCaptionChange(i, ev.target.value)}
-                    onKeyDown={ev => {
-                      if (ev.key === "Enter" || ev.key === "Escape") { ev.preventDefault(); setOpenCaptionIdx(null); }
-                    }}
-                    placeholder="Add a caption"
-                    style={{ fontSize: 12, height: 32 }}
-                  />
+                  <div style={{ position: "relative" }}>
+                    <Input
+                      autoFocus
+                      value={caption || ""}
+                      onChange={ev => onCaptionChange(i, ev.target.value)}
+                      onKeyDown={ev => {
+                        if (ev.key === "Enter" || ev.key === "Escape") { ev.preventDefault(); setOpenCaptionIdx(null); }
+                      }}
+                      placeholder="Add a caption"
+                      style={{ fontSize: 12, height: 32, padding: "0 36px 0 10px" }}
+                    />
+                    {/* Caption already auto-saves on every keystroke — this
+                        button is just a "done" affordance (closes the
+                        popover), disabled until there's something typed. */}
+                    <button
+                      disabled={!caption}
+                      onClick={() => setOpenCaptionIdx(null)}
+                      onMouseEnter={ev => caption && (ev.currentTarget.style.opacity = "0.85")}
+                      onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
+                      style={{
+                        position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)",
+                        width: 24, height: 24, borderRadius: 6, border: "none",
+                        background: caption ? "var(--tt-text-1)" : "var(--tt-grey04)",
+                        cursor: caption ? "pointer" : "not-allowed",
+                        display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+                      }}
+                    >
+                      <Check size={13} strokeWidth={SW} color="white" />
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
