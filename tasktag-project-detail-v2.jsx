@@ -2183,25 +2183,7 @@ function ReportsTab({ demoCase }) {
         inputStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6 }}
       />
 
-      {/* Progress — entries logged this period vs. total on record, gated
-          by the same "Task summary" checkbox the HTML export uses. */}
-      {preview.includeSummary && previewData && (
-        <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 40 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 8px" }}>
-              {previewData.completed} of {previewData.total} tasks complete
-            </p>
-            <div style={{ height: 6, background: "var(--tt-grey03)", borderRadius: 99, overflow: "hidden" }}>
-              <div style={{ width: `${previewData.pct}%`, height: "100%", background: "var(--tt-secondary)", borderRadius: 99 }} />
-            </div>
-          </div>
-          <span style={{ fontSize: 28, fontWeight: 700, fontStyle: "italic", color: "var(--tt-text-1)", flexShrink: 0, lineHeight: 1 }}>
-            {previewData.pct}%
-          </span>
-        </div>
-      )}
-
-      <div style={{ height: 1, background: "var(--tt-grey03)", margin: "24px 0" }} />
+      <div style={{ height: 1, background: "var(--tt-grey03)", margin: "40px 0 24px" }} />
 
       <div style={{ display: "flex", flexWrap: "nowrap", gap: 32 }}>
         <div style={{ flex: "1 1 0", display: "flex", alignItems: "center", gap: 8 }}>
@@ -2225,6 +2207,26 @@ function ReportsTab({ demoCase }) {
           />
         </div>
       </div>
+
+      <div style={{ height: 1, background: "var(--tt-grey03)", marginTop: 24 }} />
+
+      {/* Progress — entries logged this period vs. total on record, gated
+          by the same "Task summary" checkbox the HTML export uses. */}
+      {preview.includeSummary && previewData && (
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 40 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 8px" }}>
+              {previewData.completed} of {previewData.total} tasks complete
+            </p>
+            <div style={{ height: 6, background: "var(--tt-grey03)", borderRadius: 99, overflow: "hidden" }}>
+              <div style={{ width: `${previewData.pct}%`, height: "100%", background: "var(--tt-secondary)", borderRadius: 99 }} />
+            </div>
+          </div>
+          <span style={{ fontSize: 28, fontWeight: 700, fontStyle: "italic", color: "var(--tt-text-1)", flexShrink: 0, lineHeight: 1 }}>
+            {previewData.pct}%
+          </span>
+        </div>
+      )}
     </div>
   );
 
