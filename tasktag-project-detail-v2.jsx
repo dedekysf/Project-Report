@@ -1736,19 +1736,16 @@ const buildReportHTML = (report) => {
     );
   };
 
-  // Section labels ("SEP 10" / "This week" / "September") only appear for
-  // week/month grouping, same as the live view's flatBlocks pagination —
-  // day grouping relies on each entry's own inline date instead, since a
-  // label repeating that same single date right above it would be
-  // redundant.
-  const entriesHTML = groups.length === 0
-    ? h("p", { style: "font-size:13px;color:#828282;text-align:center;padding:32px 0;" }, "No activity entries for this period.")
-    : groups.map(g =>
-        h("div", {},
-          grouping === "day" ? "" : h("p", { style: "font-size:11px;font-weight:600;color:#828282;letter-spacing:.06em;text-transform:uppercase;padding:8px 0;margin:0;" }, groupLabel(g).toUpperCase()),
-          ...g.entries.map(entryHTML)
-        )
-      ).join("");
+  // Flat list of page-able blocks — a label block per group (skipped for
+  // day grouping, same reasoning as before) followed by one block per
+  // entry — mirrors the live view's own flatBlocks list, which is what
+  // gets packed onto A4 pages below.
+  const blocks = groups.length === 0
+    ? [h("p", { style: "font-size:13px;color:#828282;text-align:center;padding:32px 0;" }, "No activity entries for this period.")]
+    : groups.flatMap(g => [
+        grouping === "day" ? "" : h("p", { style: "font-size:11px;font-weight:600;color:#828282;letter-spacing:.06em;text-transform:uppercase;padding:8px 0;margin:0;" }, groupLabel(g).toUpperCase()),
+        ...g.entries.map(entryHTML)
+      ].filter(Boolean));
 
   const progressHTML = report.includeSummary
     ? h("div", { style: "display:flex;align-items:center;gap:16px;margin-bottom:40px;" },
@@ -1808,7 +1805,13 @@ const buildReportHTML = (report) => {
     )
   );
 
-  const header =
+  // Full (page 1) vs. running (page 2+) header — mirrors renderFullHeader/
+  // renderRunningHeader/renderCompanyIdentityRow exactly, each self-padded
+  // (padding:PAGE_PAD PAGE_PAD 0) rather than relying on a wrapping CSS
+  // class, since with multiple pages there's no longer a single
+  // "card__header" — every page needs its own header/footer sitting
+  // directly in that page's own card.
+  const fullHeaderHTML = h("div", { style: `padding:${PAGE_PAD}px ${PAGE_PAD}px 0;` },
     identityRowHTML +
     h("div", { style: "height:1px;background:#e8e8e6;margin-bottom:20px;" }, "") +
     h("div", { style: "display:flex;flex-direction:column;gap:4px;margin-bottom:24px;" },
@@ -1817,10 +1820,15 @@ const buildReportHTML = (report) => {
     ) +
     summaryHTML +
     targetRowHTML +
-    progressHTML;
+    progressHTML
+  );
+  const runningHeaderHTML = h("div", { style: `padding:${PAGE_PAD}px ${PAGE_PAD}px 0;` },
+    identityRowHTML +
+    h("div", { style: "height:1px;background:#e8e8e6;margin-bottom:24px;" }, "")
+  );
 
   const contactRoleLine = POINT_OF_CONTACT_ROLE + (report.companyName ? ` · ${report.companyName}` : "");
-  const footer = h("div", { style: "padding:20px 40px;border-top:1px solid #e8e8e6;" },
+  const footerHTML = h("div", { style: "padding:20px 40px;border-top:1px solid #e8e8e6;" },
     h("div", { style: "display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;" },
       h("div", { style: "display:flex;align-items:center;gap:10px;" },
         h("div", { style: "width:36px;height:36px;border-radius:50%;background:#a85796;display:flex;align-items:center;justify-content:center;flex-shrink:0;" },
@@ -1838,19 +1846,78 @@ const buildReportHTML = (report) => {
     )
   );
 
+  // ── Pagination — split into real A4 pages, same as the live draft ──
+  // Real DOM measurement (offsetHeight), same technique as the live
+  // view's hidden measuring scaffold: buildReportHTML only ever runs
+  // client-side (the download/copy handlers, and the shared-link
+  // recipient's own browser rendering ReportPage), so `document` is
+  // always available here, and a real reflow is as accurate as it is
+  // live instead of guessing block heights analytically. Photo tiles use
+  // aspect-ratio (not a loaded image's natural size) for their height, so
+  // this measures correctly even before any <img> has finished loading.
+  //
+  // Header/runningHeader/footer/blocks are all measured as one continuous
+  // chain of sibling elements (not each isolated in its own container) —
+  // matching the live scaffold's structure exactly, since isolating each
+  // piece changes how its own leading/trailing CSS margins collapse
+  // (or don't) against neighbors, which shifted page breaks away from
+  // what the live draft produces for the same report.
+  const measureRoot = document.createElement("div");
+  measureRoot.style.cssText = "position:absolute;visibility:hidden;height:0;overflow:hidden;pointer-events:none;left:-99999px;top:0;";
+  document.body.appendChild(measureRoot);
+  const scaffold = document.createElement("div");
+  scaffold.style.cssText = `width:${PAGE_W}px;`;
+  measureRoot.appendChild(scaffold);
+
+  const appendMeasureEl = (htmlStr, width) => {
+    const el = document.createElement("div");
+    if (width) el.style.cssText = `width:${width}px;`;
+    el.innerHTML = htmlStr;
+    scaffold.appendChild(el);
+    return el;
+  };
+  const headerEl = appendMeasureEl(fullHeaderHTML);
+  const runningHeaderEl = appendMeasureEl(runningHeaderHTML);
+  const footerEl = appendMeasureEl(footerHTML);
+  const blockEls = blocks.map(b => appendMeasureEl(b, PAGE_W - PAGE_PAD * 2));
+
+  const headerH = headerEl.offsetHeight;
+  const runningHeaderH = runningHeaderEl.offsetHeight;
+  const footerH = footerEl.offsetHeight;
+  const blockHeights = blockEls.map(el => el.offsetHeight);
+  document.body.removeChild(measureRoot);
+
+  const pages = [];
+  let current = [];
+  let used = 0;
+  let isFirstPage = true;
+  blocks.forEach((block, i) => {
+    const blockH = blockHeights[i];
+    const available = PAGE_H - PAGE_PAD * 2 - (isFirstPage ? headerH : runningHeaderH) - footerH;
+    if (current.length > 0 && used + blockH > available) {
+      pages.push(current);
+      current = [];
+      used = 0;
+      isFirstPage = false;
+    }
+    current.push(block);
+    used += blockH;
+  });
+  if (current.length > 0 || pages.length === 0) pages.push(current);
+
   // width/min-height match PAGE_W/PAGE_H exactly (the live view's own A4
   // proportions — 800 × round(800×297/210)) rather than a loose max-width,
   // and the shadow matches the live page card's own
-  // "0 1px 3px rgba(10,22,41,0.08)" — a short report still reads as one
-  // full A4 sheet; a long one just grows taller than it, same as it would
-  // if printed to multiple pages.
-  const css = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;background:#f7f8fa;min-height:100vh;padding:32px 24px}.card{background:white;border:1px solid #e8e8e6;border-radius:12px;overflow:hidden;width:${PAGE_W}px;min-height:${PAGE_H}px;margin:0 auto;box-shadow:0 1px 3px rgba(10,22,41,0.08)}.card__header{padding:${PAGE_PAD}px ${PAGE_PAD}px 0}.card__body{padding:0 ${PAGE_PAD}px}`;
+  // "0 1px 3px rgba(10,22,41,0.08)".
+  const css = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;background:#f7f8fa;min-height:100vh;padding:32px 24px}.card{background:white;border:1px solid #e8e8e6;border-radius:12px;overflow:hidden;width:${PAGE_W}px;min-height:${PAGE_H}px;margin:0 auto}.card+.card{margin-top:24px}`;
 
-  const card = h("div", { class: "card" },
-    h("div", { class: "card__header" }, header),
-    h("div", { class: "card__body" }, entriesHTML),
-    footer
-  );
+  const cardsHTML = pages.map((pageBlocks, pi) =>
+    h("div", { class: "card", style: "box-shadow:0 1px 3px rgba(10,22,41,0.08);" },
+      pi === 0 ? fullHeaderHTML : runningHeaderHTML,
+      h("div", { style: `padding:0 ${PAGE_PAD}px;` }, pageBlocks.join("")),
+      footerHTML
+    )
+  ).join("");
 
   const title = "Project Report";
   return "<!DOCTYPE html>" +
@@ -1860,7 +1927,7 @@ const buildReportHTML = (report) => {
         h("title", {}, `${title} – ${report.period}`),
         h("style", {}, css)
       ),
-      h("body", {}, card)
+      h("body", {}, cardsHTML)
     );
 };
 
