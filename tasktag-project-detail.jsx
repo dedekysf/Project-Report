@@ -680,7 +680,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
         style={{ display: "inline-block", position: "relative", cursor: "pointer", borderRadius: 6, paddingRight: 16, transition: "background 0.15s", ...textStyle }}
       >
         {value || <span style={{ color: "var(--tt-grey05)", textDecoration: "underline", ...placeholderStyle }}>{placeholder}</span>}
-        <Pencil size={12} strokeWidth={SW} className="tt-editable-pencil" style={{ position: "absolute", top: 2, right: 0, color: "var(--tt-grey05)", pointerEvents: "none" }} />
+        <Pencil size={10} strokeWidth={SW} className="tt-editable-pencil" style={{ position: "absolute", top: 2, right: 0, color: "var(--tt-grey05)", pointerEvents: "none" }} />
       </Tag>
     </div>
   );
@@ -768,7 +768,7 @@ function TargetOpeningField({ fieldId, value, disabled, onApply }) {
         style={{ display: "inline-block", position: "relative", fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", textDecoration: value ? "none" : "underline", margin: 0, cursor: "pointer", borderRadius: 6, paddingRight: 16, transition: "background 0.15s" }}
       >
         {value || "Add target date"}
-        <Pencil size={12} strokeWidth={SW} className="tt-editable-pencil" style={{ position: "absolute", top: 2, right: 0, color: "var(--tt-grey05)", pointerEvents: "none" }} />
+        <Pencil size={10} strokeWidth={SW} className="tt-editable-pencil" style={{ position: "absolute", top: 2, right: 0, color: "var(--tt-grey05)", pointerEvents: "none" }} />
       </p>
       {open && (
         <DateRangeCalendar
