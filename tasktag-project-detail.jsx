@@ -187,7 +187,6 @@ const PROJECT_ADDRESS = "11 North Raintree Hollow Court, Sienna Plantation, Miss
 // TODO(BE): replace with the project's actual point of contact from the API
 const POINT_OF_CONTACT_NAME = "Maria Jose";
 const POINT_OF_CONTACT_ROLE = "Project Manager";
-const POINT_OF_CONTACT_COMPANY = "Reynolds Construction Co.";
 const initialsOf = (name) => name.split(" ").map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
 // TODO(BE): replace with the actual report ID from the API
 const REPORT_ID = `TX-1520-${APP_TODAY.getFullYear()}-${String(APP_TODAY.getMonth() + 1).padStart(2, "0")}`;
@@ -2280,7 +2279,7 @@ function ReportsTab({ demoCase }) {
             <p style={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", lineHeight: 1, margin: "0 0 4px" }}>{POINT_OF_CONTACT_NAME}</p>
             {/* TODO(BE): replace with the contact's actual role/company from the API */}
             <p style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)", lineHeight: 1, margin: 0 }}>
-              {POINT_OF_CONTACT_ROLE} · {preview.companyName || POINT_OF_CONTACT_COMPANY}
+              {POINT_OF_CONTACT_ROLE}{preview.companyName ? ` · ${preview.companyName}` : ""}
             </p>
           </div>
         </div>
