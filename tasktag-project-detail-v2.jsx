@@ -297,13 +297,11 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
     if (singleDate) {
       setRangeStart(key);
       setRangeEnd(null);
-      // A short beat before applying/closing so the clicked day's filled
-      // circle actually gets painted at least once — applying in the same
-      // tick as setRangeStart lets the parent close the calendar (it
-      // unmounts on the same state flush) before React ever commits a
-      // frame showing the selection, so the click looked like it did
-      // nothing.
-      if (onApply) setTimeout(() => onApply(key, null), 160);
+      // Commits the actual value immediately and unconditionally — the
+      // caller is responsible for any delay before it closes/unmounts this
+      // calendar (see TargetOpeningField), so the picked date is never
+      // dependent on a timer to actually be saved.
+      if (onApply) onApply(key, null);
       return;
     }
     if (!rangeStart || rangeEnd) {
@@ -800,10 +798,14 @@ function TargetOpeningField({ fieldId, value, disabled, onApply }) {
             if (start) {
               const [y, m, d] = start.split("-");
               const formatted = new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+              // Both commit immediately, synchronously, on the click itself
+              // — closing is what's deferred (below), never the save.
               setDisplayValue(formatted);
               onApply(formatted);
+              setTimeout(() => setActiveField(null), 160);
+            } else {
+              setActiveField(null);
             }
-            setActiveField(null);
           }}
         />
       )}
