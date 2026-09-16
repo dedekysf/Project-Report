@@ -779,6 +779,11 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
     // (this field commits onSave on every keystroke, so "cancel" has to
     // restore the prior committed value instead of dropping an unsaved one).
     const cancelEdit = () => { onSave(editStartValueRef.current || ""); alwaysEditingRef.current?.blur(); };
+    // The X only makes sense once there's a prior committed value to revert
+    // to — i.e. this is a re-edit of existing content (editStartValueRef
+    // was seeded from a non-empty value on the text-tag's onClick below),
+    // not the field's very first, still-blank fill-in.
+    const showCancel = !!(editStartValueRef.current && editStartValueRef.current.trim());
     const confirmButton = (
       <button
         disabled={confirmDisabled}
@@ -840,9 +845,9 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
             onKeyDown={ev => { if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); done(); } }}
             placeholder={placeholder}
             rows={2}
-            style={{ fontFamily: "inherit", paddingRight: 76, overflowY: "hidden", ...inputStyle }}
+            style={{ fontFamily: "inherit", paddingRight: showCancel ? 76 : 44, overflowY: "hidden", ...inputStyle }}
           />
-          <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>{cancelButton}{confirmButton}</div>
+          <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>{showCancel && cancelButton}{confirmButton}</div>
         </div>
       </div>
     ) : (
@@ -856,9 +861,9 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
           onBlur={() => setAlwaysEditingFocused(false)}
           onKeyDown={ev => { if (ev.key === "Enter") { ev.preventDefault(); done(); } }}
           placeholder={placeholder}
-          style={{ fontFamily: "inherit", padding: "0 76px 0 12px", ...inputStyle }}
+          style={{ fontFamily: "inherit", padding: showCancel ? "0 76px 0 12px" : "0 44px 0 12px", ...inputStyle }}
         />
-        <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>{cancelButton}{confirmButton}</div>
+        <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>{showCancel && cancelButton}{confirmButton}</div>
       </div>
     );
   }
