@@ -672,16 +672,16 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
   }
 
   return (
-    <div className="tt-editable-wrap" style={{ position: "relative", ...boxStyle }}>
+    <div className="tt-editable-wrap" style={{ ...boxStyle }}>
       <Tag
         onClick={() => { setDraft(value || ""); setActiveField(fieldId); setError(false); }}
         onMouseEnter={ev => { if (!boxed) ev.currentTarget.style.background = "var(--tt-grey02)"; }}
         onMouseLeave={ev => ev.currentTarget.style.background = "none"}
-        style={{ display: "block", cursor: "pointer", borderRadius: 6, transition: "background 0.15s", ...textStyle }}
+        style={{ display: "inline-block", position: "relative", cursor: "pointer", borderRadius: 6, paddingRight: 16, transition: "background 0.15s", ...textStyle }}
       >
         {value || <span style={{ color: "var(--tt-grey05)", textDecoration: "underline", ...placeholderStyle }}>{placeholder}</span>}
+        <Pencil size={12} strokeWidth={SW} className="tt-editable-pencil" style={{ position: "absolute", top: 2, right: 0, color: "var(--tt-grey05)", pointerEvents: "none" }} />
       </Tag>
-      <Pencil size={12} strokeWidth={SW} className="tt-editable-pencil" style={{ position: "absolute", top: 4, right: 4, color: "var(--tt-grey05)", pointerEvents: "none" }} />
     </div>
   );
 }
@@ -760,16 +760,16 @@ function TargetOpeningField({ fieldId, value, disabled, onApply }) {
   }
 
   return (
-    <div className="tt-editable-wrap" style={{ position: "relative" }} ref={anchorRef}>
+    <div className="tt-editable-wrap" ref={anchorRef}>
       <p
         onClick={() => setActiveField(open ? null : fieldId)}
         onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
         onMouseLeave={ev => ev.currentTarget.style.background = "none"}
-        style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", textDecoration: value ? "none" : "underline", margin: 0, cursor: "pointer", borderRadius: 6, transition: "background 0.15s" }}
+        style={{ display: "inline-block", position: "relative", fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", textDecoration: value ? "none" : "underline", margin: 0, cursor: "pointer", borderRadius: 6, paddingRight: 16, transition: "background 0.15s" }}
       >
         {value || "Add target date"}
+        <Pencil size={12} strokeWidth={SW} className="tt-editable-pencil" style={{ position: "absolute", top: 2, right: 0, color: "var(--tt-grey05)", pointerEvents: "none" }} />
       </p>
-      <Pencil size={12} strokeWidth={SW} className="tt-editable-pencil" style={{ position: "absolute", top: 4, right: 4, color: "var(--tt-grey05)", pointerEvents: "none" }} />
       {open && (
         <DateRangeCalendar
           anchorRef={anchorRef}
