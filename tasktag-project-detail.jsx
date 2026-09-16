@@ -346,6 +346,12 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
         border: "1.5px solid var(--tt-grey03)",
         borderRadius: 16,
         background: "white",
+        // A thin border alone was easy to lose against the white report
+        // page behind it — even correctly on top (z-index 9999), it read
+        // as "sunk into" the page below with nothing to visually separate
+        // the two. A real elevation shadow, matching other floating
+        // popovers in this app, fixes that regardless of what's behind it.
+        boxShadow: "0 8px 24px rgba(10,22,41,0.16)",
         userSelect: "none",
       }}
     >
