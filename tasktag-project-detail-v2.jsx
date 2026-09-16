@@ -2042,7 +2042,7 @@ function ReportsTab({ demoCase }) {
       (_, i) => !(preview.excludedPhotos && preview.excludedPhotos[`${entryKey}_${i}`])
     ).length;
     return (
-      <div style={{ marginBottom: 24 }}>
+      <div style={{ marginBottom: 28 }}>
         {/* Renaming here only overrides the title for this report — the
             original task/entry text is never modified. No pencil icon —
             hover shows the grey02 affordance, click edits. */}
@@ -2196,7 +2196,7 @@ function ReportsTab({ demoCase }) {
         inputStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6 }}
       />
 
-      <div style={{ height: 1, background: "var(--tt-grey03)", margin: "16px 0 24px" }} />
+      <div style={{ height: 1, background: "var(--tt-grey03)", margin: "16px 0 8px" }} />
 
       <div style={{ display: "flex", flexWrap: "nowrap", gap: 24 }}>
         <div style={{ flex: "1 1 0", display: "flex", alignItems: "center", gap: 8 }}>
@@ -2221,7 +2221,7 @@ function ReportsTab({ demoCase }) {
         </div>
       </div>
 
-      <div style={{ height: 1, background: "var(--tt-grey03)", marginTop: 24 }} />
+      <div style={{ height: 1, background: "var(--tt-grey03)", marginTop: 8 }} />
 
       {/* Progress — entries logged this period vs. total on record, gated
           by the same "Task summary" checkbox the HTML export uses. */}
