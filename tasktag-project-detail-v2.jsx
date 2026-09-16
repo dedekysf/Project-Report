@@ -2282,21 +2282,29 @@ function ReportsTab({ demoCase }) {
   // memoized on the same signature as the layout effect above, so an
   // unrelated re-render of this tab reuses the same React elements instead
   // of rebuilding (and having React reconcile) this whole subtree again.
-  const hiddenMeasuringScaffold = useMemo(() => (
-    <div aria-hidden="true" style={{ visibility: "hidden", height: 0, overflow: "hidden" }}>
-      <div style={{ width: PAGE_W }}>
-        <div ref={headerMeasureRef}>{renderFullHeader()}</div>
-        <div ref={runningHeaderMeasureRef}>{renderRunningHeader()}</div>
-        <div ref={footerMeasureRef}>{renderPageFooter()}</div>
-        {flatBlocks.map(block => (
-          <div key={block.key} ref={el => { blockMeasureRefs.current[block.key] = el; }} style={{ width: PAGE_W - PAGE_PAD * 2 }}>
-            {renderBlock(block)}
-          </div>
-        ))}
+  const hiddenMeasuringScaffold = useMemo(() => {
+    // renderFullHeader/etc. read straight from `preview` with no
+    // null-check (they're only ever meant to be called while the preview
+    // modal is open) — this hook still runs on every render regardless,
+    // including before "Generate" is ever clicked, so it must bail out
+    // itself instead of assuming the caller already gated it.
+    if (!preview) return null;
+    return (
+      <div aria-hidden="true" style={{ visibility: "hidden", height: 0, overflow: "hidden" }}>
+        <div style={{ width: PAGE_W }}>
+          <div ref={headerMeasureRef}>{renderFullHeader()}</div>
+          <div ref={runningHeaderMeasureRef}>{renderRunningHeader()}</div>
+          <div ref={footerMeasureRef}>{renderPageFooter()}</div>
+          {flatBlocks.map(block => (
+            <div key={block.key} ref={el => { blockMeasureRefs.current[block.key] = el; }} style={{ width: PAGE_W - PAGE_PAD * 2 }}>
+              {renderBlock(block)}
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ), [layoutDepsKey]);
+  }, [layoutDepsKey]);
 
   const visiblePages = useMemo(() => {
     if (!pageLayout) return null;
