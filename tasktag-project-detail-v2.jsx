@@ -1882,10 +1882,10 @@ const PERIOD_RANGE = {
 
 // ── Dummy data ──
 const DUMMY_ENTRIES = [
-  // Deliberately over PER_ENTRY_PHOTO_LIMIT (12) — the most recent entry is
-  // always the first task item shown, so the swap-photos UI has something
-  // to demo without needing a specific date range.
-  { date: "2026-09-10", note: "Flooring installation started on the ground floor.", photos: ["img5", "img1", "img6", "img2", "img3", "img7", "img4", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2"] },
+  // Deliberately at PHOTO_LIMIT (50) — the most recent entry is always the
+  // first task item shown, so the over-the-cap "manage photos" UI has
+  // something to demo without needing a specific date range.
+  { date: "2026-09-10", note: "Flooring installation started on the ground floor.", photos: ["img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5"] },
   { date: "2026-09-09", note: "Exterior siding repairs completed on the south wall.", photos: ["img9", "img2", "img3", "img7", "img4", "img5", "img6"] },
   { date: "2026-09-08", note: "Final electrical connections completed in the main panel.", photos: ["img9", "img8"] },
   { date: "2026-09-07", note: "Plumbing fixtures installed in all bathrooms.", photos: [] },
