@@ -2921,7 +2921,9 @@ function ReportsTab({ demoCase }) {
               {!previewSaved && e.photos.length > PER_ENTRY_PHOTO_LIMIT ? (
                 <button
                   onClick={() => setPhotoManager({ entryKey, photos: e.photos, taskName: displayTitle })}
-                  style={{ display: "flex", alignItems: "center", gap: 3, background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, fontWeight: 500, color: "var(--tt-secondary)" }}
+                  onMouseEnter={ev => ev.currentTarget.style.textDecoration = "underline"}
+                  onMouseLeave={ev => ev.currentTarget.style.textDecoration = "none"}
+                  style={{ display: "flex", alignItems: "center", gap: 3, background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, fontWeight: 500, color: "var(--tt-grey05)" }}
                 >
                   {visiblePhotoCount} of {e.photos.length} photos
                   <ExternalLink size={11} strokeWidth={SW} />
