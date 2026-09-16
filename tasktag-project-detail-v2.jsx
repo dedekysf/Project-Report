@@ -10,7 +10,7 @@ import {
   Activity, Users, BarChart2, SlidersHorizontal,
   ArrowUpDown, Calendar, AlignJustify, Clock,
   UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, Crown, AlertTriangle,
-  RotateCw, ZoomIn, ZoomOut, Folder, ArrowLeft, ArrowRight, Info, StickyNote,
+  RotateCw, ZoomIn, ZoomOut, Folder, ArrowLeft, ArrowRight, Info,
 } from "lucide-react";
 
 import logoImg from "./src/Img/tasktag-logo.13f1babda8fdbb1b7251572a0fe11f9e.png";
@@ -599,21 +599,47 @@ const INERT_ACTIVE_EDIT = { activeField: null, setActiveField: () => {} };
 // Enter) just shows `errorMessage` below the field and leaves editing
 // open instead of calling onSave.
 //
+// `alwaysEditing` skips the click-to-edit dance entirely — used for fields
+// (Summary, per-entry notes) that should just read as a plain textarea/
+// input from the start. No draft state, no commit/cancel icons: every
+// keystroke calls onSave directly, like any other controlled form field.
+// `disabled` still wins over this (a saved/locked report shows plain text).
+//
 // Whatever sits below an active (editing) field is always 8px away: a
 // non-boxed field's own wrapper carries that as marginBottom, multiline's
 // check/cancel row sits 8px under the textarea, and the error message (if
 // any) sits 8px under that.
-function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, onCancel, multiline, disabled, boxed, required, errorMessage, textStyle, inputStyle, as: Tag = "p" }) {
+function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, onCancel, multiline, disabled, boxed, required, errorMessage, textStyle, inputStyle, as: Tag = "p", alwaysEditing }) {
   const { activeField, setActiveField } = useContext(ActiveEditContext);
   const [draft, setDraft] = useState(value || "");
   const [error, setError] = useState(false);
-  const editing = !disabled && activeField === fieldId;
+  const editing = !disabled && !alwaysEditing && activeField === fieldId;
 
   const boxStyle = boxed ? { position: "relative", background: "var(--tt-grey02)", borderRadius: 8, padding: 16 } : {};
 
   if (disabled) {
     if (value) return <div style={boxStyle}><Tag style={{ display: "block", ...textStyle }}>{value}</Tag></div>;
     return placeholder ? <div style={boxStyle}><Tag style={{ display: "block", ...textStyle, color: "var(--tt-grey05)" }}>{placeholder}</Tag></div> : null;
+  }
+
+  if (alwaysEditing) {
+    return multiline ? (
+      <textarea
+        value={value}
+        onChange={ev => onSave(ev.target.value)}
+        placeholder={placeholder}
+        rows={3}
+        style={{ display: "block", width: "100%", fontFamily: "inherit", border: "none", outline: "none", resize: "none", boxSizing: "border-box", ...boxStyle, ...inputStyle }}
+      />
+    ) : (
+      <input
+        type="text"
+        value={value}
+        onChange={ev => onSave(ev.target.value)}
+        placeholder={placeholder}
+        style={{ display: "block", width: "100%", height: 40, padding: "0 12px", border: "1px solid var(--tt-grey03)", borderRadius: 8, fontFamily: "inherit", outline: "none", boxSizing: "border-box", ...inputStyle }}
+      />
+    );
   }
 
   if (editing) {
@@ -2032,7 +2058,6 @@ function ReportsTab({ demoCase }) {
   // { includeSummary, includeNoPhotoTasks, dateRange, period, customRange, extraNotes } | null
   // extraNotes: { [entryKey]: noteText } — one note per entry/photo-list at most
   const [preview,          setPreview]          = useState(null);
-  const [activeNoteFormKeys, setActiveNoteFormKeys] = useState({}); // { [entryKey]: true } — entries currently in note-edit mode (no saved note yet)
   const [titleOverrides,   setTitleOverrides]    = useState({}); // { [entryKey]: overriddenTitle } — per-entry task name edits, this report only
   const [previewLoading,   setPreviewLoading]    = useState(false);
   const [visibleCount,     setVisibleCount]      = useState(10); // infinite scroll — entries revealed so far
@@ -2164,7 +2189,6 @@ function ReportsTab({ demoCase }) {
         targetOpening: "",
         clientName: "",
       });
-      setActiveNoteFormKeys({});
       setActiveEditField(null);
       setTitleOverrides({});
       setVisibleCount(10);
@@ -2178,7 +2202,6 @@ function ReportsTab({ demoCase }) {
   // to its normal "Choose what this report includes" + results table view.
   const closePreview = () => {
     setPreview(null);
-    setActiveNoteFormKeys({});
     setActiveEditField(null);
     setTitleOverrides({});
     setVisibleCount(10);
@@ -2283,12 +2306,9 @@ function ReportsTab({ demoCase }) {
   }
 
   // Rendered under every entry's photo list (and once for the empty-period
-  // state). Notes commit immediately into preview.extraNotes as soon as the
-  // check icon is clicked — there's no deferred draft held until Save
-  // report anymore. Before any note exists, an "Add a note" trigger opens
-  // the EditableField straight into edit mode; once a note is saved,
-  // re-editing it is just hover (grey02) + click, same as every other
-  // EditableField on this page.
+  // state) as a plain, always-editable input — no separate "Add a note"
+  // trigger step. Notes commit into preview.extraNotes on every keystroke,
+  // same as typing into any other input.
   //
   // Declared before renderEntryBlock/renderBlock (which call it) — those
   // get invoked synchronously from inside the hiddenMeasuringScaffold
@@ -2297,40 +2317,20 @@ function ReportsTab({ demoCase }) {
   // "Cannot access 'renderNoteSlot' before initialization" the moment a
   // report is actually generated.
   const renderNoteSlot = (key) => {
-    const savedNote = preview.extraNotes[key];
-
-    if (!savedNote && !activeNoteFormKeys[key]) {
-      return (
-        <button
-          onClick={() => {
-            setActiveNoteFormKeys(prev => ({ ...prev, [key]: true }));
-            setActiveEditField(`note_${key}`);
-          }}
-          onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
-          onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", padding: 0, marginTop: 10, cursor: "pointer", fontSize: 12, fontWeight: 500, color: "var(--tt-text-1)" }}
-        >
-          <StickyNote size={13} strokeWidth={SW} color="var(--tt-text-1)" /> Add a note
-        </button>
-      );
-    }
-
     return (
       <div style={{ marginTop: 10 }}>
         <EditableField
           fieldId={`note_${key}`}
-          value={savedNote || ""}
+          value={preview.extraNotes[key] || ""}
           placeholder="Describe the note for this task"
+          alwaysEditing
           onSave={v => {
             setPreview(p => {
               const next = { ...p.extraNotes };
               if (v) next[key] = v; else delete next[key];
               return { ...p, extraNotes: next };
             });
-            setActiveNoteFormKeys(prev => { const next = { ...prev }; delete next[key]; return next; });
           }}
-          onCancel={() => setActiveNoteFormKeys(prev => { const next = { ...prev }; delete next[key]; return next; })}
-          textStyle={{ display: "block", fontSize: 12, fontStyle: "italic", color: "var(--tt-text-2)", lineHeight: "1.5", margin: 0, padding: 8, borderRadius: 8 }}
           inputStyle={{ fontSize: 12, height: 40 }}
         />
       </div>
@@ -2499,13 +2499,15 @@ function ReportsTab({ demoCase }) {
       </div>
 
       {/* Summary — set apart in its own grey02 box like a project
-          description. The box owns its own grey02 chrome (via `boxed`) so
-          editing swaps the same card for a textarea instead of nesting a
-          separate bordered box inside it. */}
+          description. Always a plain textarea (`alwaysEditing`), not a
+          click-to-edit field: the box owns its own grey02 chrome (via
+          `boxed`) so the textarea fills that same card directly instead of
+          nesting a separate bordered box inside it. */}
       <EditableField
         fieldId="summary"
         value={preview.summary}
         placeholder="Summarize how the project is going this period"
+        alwaysEditing
         multiline
         boxed
         onSave={v => setPreview(p => ({ ...p, summary: v }))}
@@ -2619,7 +2621,6 @@ function ReportsTab({ demoCase }) {
   const layoutDepsKey = preview
     ? JSON.stringify({ ...preview, logo: preview.logo ? preview.logo.length : 0 })
       + "|" + JSON.stringify(titleOverrides)
-      + "|" + JSON.stringify(activeNoteFormKeys)
       + "|" + JSON.stringify(selectedPhotos)
       + "|" + flatBlocks.map(b => b.key).join(",")
     : "";
