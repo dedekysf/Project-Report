@@ -2136,7 +2136,7 @@ function ReportsTab({ demoCase }) {
   );
 
   const renderFullHeader = () => (
-    <div style={{ padding: `${PAGE_PAD}px ${PAGE_PAD}px 56px` }}>
+    <div style={{ padding: `${PAGE_PAD}px ${PAGE_PAD}px 28px` }}>
       {renderCompanyIdentityRow()}
       <div style={{ height: 1, background: "var(--tt-grey03)", marginBottom: 20 }} />
 
