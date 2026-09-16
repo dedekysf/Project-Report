@@ -173,6 +173,7 @@ style.textContent = `
      grey02 hover background. */
   .tt-editable-pencil { opacity: 0; transition: opacity 0.15s; }
   .tt-editable-wrap:hover .tt-editable-pencil { opacity: 1; }
+  .tt-editable-field:hover { padding: 2px 4px !important; }
 `;
 document.head.appendChild(style);
 
@@ -220,7 +221,7 @@ const STATUS_META = {
 };
 
 // ── Date Range Calendar ──
-function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, singleDate = false }) {
+function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, singleDate = false, alwaysBelow = false }) {
   const today = APP_TODAY;
   const [viewYear,   setViewYear]   = useState(today.getFullYear());
   const [viewMonth,  setViewMonth]  = useState(today.getMonth());
@@ -266,7 +267,7 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
     // Always opens below the anchor, never above it — only nudged up if it
     // would otherwise overflow the bottom of the viewport.
     let top = anchor.bottom + MARGIN;
-    top = Math.min(top, Math.max(MARGIN, vh - CAL_H - MARGIN));
+    if (!alwaysBelow) top = Math.min(top, Math.max(MARGIN, vh - CAL_H - MARGIN));
 
     setPos({ top, left });
   }, [anchorRef]);
@@ -293,7 +294,18 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
 
   const handleDay = (key) => {
     if (!allowFuture && key > todayKey) return; // dates after today can't be selected
-    if (singleDate) { setRangeStart(key); setRangeEnd(null); return; }
+    if (singleDate) {
+      setRangeStart(key);
+      setRangeEnd(null);
+      // A short beat before applying/closing so the clicked day's filled
+      // circle actually gets painted at least once — applying in the same
+      // tick as setRangeStart lets the parent close the calendar (it
+      // unmounts on the same state flush) before React ever commits a
+      // frame showing the selection, so the click looked like it did
+      // nothing.
+      if (onApply) setTimeout(() => onApply(key, null), 160);
+      return;
+    }
     if (!rangeStart || rangeEnd) {
       setRangeStart(key); setRangeEnd(null);
     } else {
@@ -330,9 +342,9 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
       ref={calRef}
       onWheel={handleWheel}
       style={{
-        position: "fixed",
-        top: pos.top,
-        left: pos.left,
+        position: alwaysBelow ? "absolute" : "fixed",
+        top: alwaysBelow ? "calc(100% + 8px)" : pos.top,
+        left: alwaysBelow ? 0 : pos.left,
         zIndex: 9999,
         pointerEvents: "auto", // guard against an ancestor (e.g. the side panel wrapper) turning this off
         width: 308,
@@ -390,6 +402,11 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
           const lo = rangeStart;
           const hi = singleDate ? null : effectiveEnd && effectiveEnd > rangeStart ? effectiveEnd : rangeStart && !rangeEnd && hovering && hovering > rangeStart ? hovering : null;
           const inBand = lo && hi && key >= lo && key <= hi;
+          // singleDate has no band to preview, but every date still needs
+          // its own plain hover cue — without this, hovering did nothing at
+          // all since inBand (the only thing driving hover background) can
+          // never be true in this mode.
+          const isSingleHover = singleDate && !disabled && !selected && hovering === key;
 
           // band left/right caps for rounded ends
           const isLeft  = start || col === 0 || key === lo;
@@ -410,9 +427,9 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
                 height: CELL, width: CELL,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 cursor: disabled ? "not-allowed" : "pointer",
-                // seamless band background
-                background: inBand ? "var(--tt-grey03)" : "transparent",
-                borderRadius: bandRadius,
+                // seamless band background (or the plain single-date hover cue)
+                background: (inBand || isSingleHover) ? "var(--tt-grey03)" : "transparent",
+                borderRadius: isSingleHover ? "50%" : bandRadius,
               }}
             >
               {/* The actual date circle */}
@@ -422,7 +439,7 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
                 borderRadius: "50%",
                 background: selected ? "var(--tt-text-1)" : "transparent",
                 border: isToday && !selected ? "1.5px solid var(--tt-text-1)" : "none",
-                color: selected ? "#fff" : inBand ? "var(--tt-text-1)" : disabled ? "var(--tt-grey04)" : otherMonth ? "var(--tt-grey03)" : isToday ? "var(--tt-text-1)" : "var(--tt-text-2)",
+                color: selected ? "#fff" : (inBand || isSingleHover) ? "var(--tt-text-1)" : disabled ? "var(--tt-grey04)" : otherMonth ? "var(--tt-grey03)" : isToday ? "var(--tt-text-1)" : "var(--tt-text-2)",
                 fontSize: 13,
                 fontWeight: selected || isToday ? 600 : 400,
                 zIndex: 1,
@@ -437,7 +454,7 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
       </div>
 
       {/* Footer */}
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--tt-grey03)" }}>
+      {!singleDate && <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--tt-grey03)" }}>
         <button
           onClick={onClose}
           onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
@@ -456,7 +473,7 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
             border: "none", background: "var(--tt-text-1)",
             fontSize: 13, fontWeight: 500, color: "#fff", cursor: "pointer", transition: "opacity 0.15s",
           }}>Apply</button>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -487,15 +504,17 @@ function TasksTab() {
           <ChevronUp size={16} color="var(--tt-grey05)" strokeWidth={SW} />
         </div>
 
-        <div className="flex items-center gap-3 py-[10px] border-b border-[var(--tt-grey03)]">
-          <div className="w-[18px] h-[18px] rounded-full border-[1.5px] border-[var(--tt-grey04)] shrink-0 cursor-pointer hover:border-[var(--tt-secondary)] transition-colors" />
-          <span className="flex-1 text-[14px] text-[var(--tt-text-1)]">Fix the sink</span>
-          <div className="flex items-center gap-2">
-            <div className="tt-task-chip"><AlignJustify size={12} color="var(--tt-grey05)" strokeWidth={1} /></div>
-            <div className="tt-task-chip"><Calendar size={12} color="var(--tt-grey05)" strokeWidth={1} /><span>Oct 18</span></div>
-            <div className="tt-task-chip"><Clock size={12} color="var(--tt-grey05)" strokeWidth={1} /><span>8.5h</span></div>
-            <div className="tt-task-chip"><UserPlus size={12} color="var(--tt-grey05)" strokeWidth={1} /><span>Assignee</span></div>
-            <div className="tt-task-chip"><Link2 size={12} color="var(--tt-grey05)" strokeWidth={1} /></div>
+        <div className="flex flex-col">
+          <div className="flex items-center gap-3 py-[10px] border-b border-[var(--tt-grey03)] mb-[40px] last:mb-0">
+            <div className="w-[18px] h-[18px] rounded-full border-[1.5px] border-[var(--tt-grey04)] shrink-0 cursor-pointer hover:border-[var(--tt-secondary)] transition-colors" />
+            <span className="flex-1 text-[14px] text-[var(--tt-text-1)]">Fix the sink</span>
+            <div className="flex items-center gap-2">
+              <div className="tt-task-chip"><AlignJustify size={12} color="var(--tt-grey05)" strokeWidth={1} /></div>
+              <div className="tt-task-chip"><Calendar size={12} color="var(--tt-grey05)" strokeWidth={1} /><span>Oct 18</span></div>
+              <div className="tt-task-chip"><Clock size={12} color="var(--tt-grey05)" strokeWidth={1} /><span>8.5h</span></div>
+              <div className="tt-task-chip"><UserPlus size={12} color="var(--tt-grey05)" strokeWidth={1} /><span>Assignee</span></div>
+              <div className="tt-task-chip"><Link2 size={12} color="var(--tt-grey05)" strokeWidth={1} /></div>
+            </div>
           </div>
         </div>
 
@@ -557,7 +576,7 @@ function ReportCheckbox({ active, label, onClick }) {
 const ActiveEditContext = createContext({ activeField: null, setActiveField: () => {} });
 
 // ── Inline-editable text ──
-// No pencil icon — hovering shows a grey02 background to signal the field
+// No pencil icon — hovering shows a grey03 background to signal the field
 // is editable, and clicking swaps it for an input (or textarea) with
 // check/cancel icons matching the task-name rename pattern (inside the
 // input for single-line fields, below it in-flow for multiline ones, since
@@ -587,7 +606,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
   const [error, setError] = useState(false);
   const editing = !disabled && activeField === fieldId;
 
-  const boxStyle = boxed ? { background: "var(--tt-grey02)", borderRadius: 8, padding: 16 } : {};
+  const boxStyle = boxed ? { position: "relative", background: "var(--tt-grey02)", borderRadius: 8, padding: 16 } : {};
 
   if (disabled) {
     if (value) return <div style={boxStyle}><Tag style={{ display: "block", ...textStyle }}>{value}</Tag></div>;
@@ -667,12 +686,16 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
     <div className="tt-editable-wrap" style={{ ...boxStyle }}>
       <Tag
         onClick={() => { setDraft(value || ""); setActiveField(fieldId); setError(false); }}
-        onMouseEnter={ev => { if (!boxed) ev.currentTarget.style.background = "var(--tt-grey02)"; }}
+        onMouseEnter={ev => { if (!boxed) ev.currentTarget.style.background = "var(--tt-grey03)"; }}
         onMouseLeave={ev => ev.currentTarget.style.background = "none"}
-        style={{ display: "inline-block", position: "relative", cursor: "pointer", borderRadius: 6, paddingRight: 16, transition: "background 0.15s", ...textStyle }}
+        className={boxed ? undefined : "tt-editable-field"}
+        style={{ display: "inline-block", position: boxed ? "static" : "relative", cursor: "pointer", borderRadius: 6, paddingRight: 0, transition: "background 0.08s, padding 0.08s", ...textStyle }}
       >
         {value || <span style={{ color: "var(--tt-grey05)", textDecoration: "underline", ...placeholderStyle }}>{placeholder}</span>}
-        <Pencil size={10} strokeWidth={SW} className="tt-editable-pencil" style={{ position: "absolute", top: 2, right: 0, color: "var(--tt-grey06)", pointerEvents: "none" }} />
+        <Pencil size={10} strokeWidth={SW} className="tt-editable-pencil" style={boxed
+          ? { position: "absolute", right: 2, bottom: 2, color: "var(--tt-grey06)", pointerEvents: "none" }
+          : { position: "static", display: "inline-block", whiteSpace: "nowrap", marginLeft: 4, verticalAlign: "middle", color: "var(--tt-grey06)", pointerEvents: "none" }
+        } />
       </Tag>
     </div>
   );
@@ -687,7 +710,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
 //
 // Before a logo exists, this is a fixed 48x48 dashed placeholder. Once one
 // is uploaded, the box drops the placeholder chrome and just sizes to the
-// image itself (max-width 140px, height auto) so a wide logo isn't
+// image itself (max-width 80px, height auto) so a wide logo isn't
 // squeezed into a small square. While the file is being read, a small
 // spinner replaces the placeholder/image.
 function LogoUploadBox({ src, onChange, disabled }) {
@@ -707,19 +730,20 @@ function LogoUploadBox({ src, onChange, disabled }) {
 
   return (
     <div
+      className="tt-editable-wrap"
       onClick={() => !disabled && !loading && inputRef.current?.click()}
       style={{
-        flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+        position: "relative", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
         cursor: disabled || loading ? "default" : "pointer",
         ...(src
-          ? { maxWidth: 100, height: "auto" }
+          ? { maxWidth: 80, height: "auto" }
           : { width: 48, height: 48, borderRadius: 8, overflow: "hidden", border: "1px dashed var(--tt-grey04)", background: "var(--tt-grey01)" }),
       }}
     >
       {loading ? (
         <span style={{ width: 18, height: 18, borderRadius: "50%", border: "2px solid var(--tt-grey03)", borderTopColor: "var(--tt-text-2)", display: "inline-block", animation: "tt-spin 0.75s linear infinite" }} />
       ) : src ? (
-        <img src={src} alt="Company logo" style={{ display: "block", maxWidth: 100, width: "100%", height: "auto" }} />
+        <img src={src} alt="Company logo" style={{ display: "block", maxWidth: 80, width: "100%", height: "auto" }} />
       ) : (
         <FileImage size={18} strokeWidth={SW} color="var(--tt-grey05)" />
       )}
@@ -746,32 +770,39 @@ function TargetOpeningField({ fieldId, value, disabled, onApply }) {
   const { activeField, setActiveField } = useContext(ActiveEditContext);
   const anchorRef = useRef(null);
   const open = !disabled && activeField === fieldId;
+  const [displayValue, setDisplayValue] = useState(value || "");
+
+  useEffect(() => { setDisplayValue(value || ""); }, [value]);
 
   if (disabled) {
-    return <p style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "var(--tt-text-1)", margin: 0 }}>{value || "—"}</p>;
+    return <p style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "var(--tt-text-1)", margin: 0 }}>{displayValue || "—"}</p>;
   }
 
   return (
-    <div className="tt-editable-wrap" ref={anchorRef}>
+    <div className="tt-editable-wrap" ref={anchorRef} style={{ position: "relative" }}>
       <p
         onClick={() => setActiveField(open ? null : fieldId)}
-        onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
+        onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey03)"}
         onMouseLeave={ev => ev.currentTarget.style.background = "none"}
-        style={{ display: "inline-block", position: "relative", fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "var(--tt-text-1)", textDecoration: value ? "none" : "underline", margin: 0, cursor: "pointer", borderRadius: 6, paddingRight: 16, transition: "background 0.15s" }}
+        className="tt-editable-field"
+        style={{ display: "inline-block", position: "relative", fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "var(--tt-text-1)", textDecoration: displayValue ? "none" : "underline", margin: 0, cursor: "pointer", borderRadius: 6, paddingRight: 0, transition: "background 0.08s, padding 0.08s" }}
       >
-        {value || "Add target date"}
-        <Pencil size={10} strokeWidth={SW} className="tt-editable-pencil" style={{ position: "absolute", top: 2, right: 0, color: "var(--tt-grey06)", pointerEvents: "none" }} />
+        {displayValue || "Add target date"}
+        <Pencil size={10} strokeWidth={SW} className="tt-editable-pencil" style={{ position: "static", display: "inline-block", whiteSpace: "nowrap", marginLeft: 4, verticalAlign: "middle", color: "var(--tt-grey06)", pointerEvents: "none" }} />
       </p>
       {open && (
         <DateRangeCalendar
           anchorRef={anchorRef}
           allowFuture
           singleDate
+          alwaysBelow
           onClose={() => setActiveField(null)}
           onApply={(start) => {
             if (start) {
               const [y, m, d] = start.split("-");
-              onApply(new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }));
+              const formatted = new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+              setDisplayValue(formatted);
+              onApply(formatted);
             }
             setActiveField(null);
           }}
@@ -886,7 +917,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
             className="group"
             style={{ position: "relative" }}
             onMouseEnter={e => { if (canOpen) e.currentTarget.lastElementChild.style.opacity = "1"; }}
-            onMouseLeave={e => { if (canOpen) e.currentTarget.lastElementChild.style.opacity = "0"; }}
+            onMouseLeave={e => { if (canOpen) e.currentTarget.lastElementChild.style.opacity = selected ? "1" : "0"; }}
           >
             <PhotoThumb src={IMG_MAP[k]} onClick={canOpen ? () => onOpen(visiblePhotoKeys, viewIdx, visibleOriginalIndices) : undefined} />
             {!isCapCell && IMG_MAP[k] && (
@@ -1684,8 +1715,8 @@ const buildReportHTML = (report) => {
   // TODO(BE): replace with the project's actual name and address from the API
   const meta =
     h("p", { style: "font-size:11px;color:#828282;margin-bottom:24px;text-transform:uppercase;" }, `Period: ${report.period}`) +
-    h("h2", { style: "font-size:28px;font-weight:700;color:#0a1629;margin-bottom:4px;line-height:1.15;" }, PROJECT_NAME) +
-    h("p", { style: "font-size:12px;color:#828282;margin-bottom:24px;" }, PROJECT_ADDRESS);
+    h("h2", { style: "font-size:28px;font-weight:700;color:#0a1629;margin:0;line-height:1.15;" }, PROJECT_NAME) +
+    h("p", { style: "font-size:12px;color:#828282;margin:4px 0 24px;" }, PROJECT_ADDRESS);
 
   const body = h("div", { style: "padding:20px;" }, meta + progressHTML + entriesHTML);
   const card = h("div", { class: "card" }, header + divider + body);
@@ -2054,7 +2085,7 @@ function ReportsTab({ demoCase }) {
       (_, i) => !(preview.excludedPhotos && preview.excludedPhotos[`${entryKey}_${i}`])
     ).length;
     return (
-      <div style={{ marginBottom: 28 }}>
+      <div style={{ marginBottom: 40 }}>
         {/* Renaming here only overrides the title for this report — the
             original task/entry text is never modified. No pencil icon —
             hover shows the grey02 affordance, click edits. */}
@@ -2158,14 +2189,19 @@ function ReportsTab({ demoCase }) {
           />
         </div>
       </div>
-      <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)" }}>
-        Report by TaskTag
-      </span>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 6, whiteSpace: "nowrap", marginTop: 10 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", lineHeight: 1 }}>
+          PERIOD
+        </span>
+        <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-text-2)", margin: 0, lineHeight: 1 }}>
+          {preview.period.toUpperCase()}
+        </p>
+      </div>
     </div>
   );
 
   const renderFullHeader = () => (
-    <div style={{ padding: `${PAGE_PAD}px ${PAGE_PAD}px 28px` }}>
+    <div style={{ padding: `${PAGE_PAD}px ${PAGE_PAD}px 0` }}>
       {renderCompanyIdentityRow()}
       <div style={{ height: 1, background: "var(--tt-grey03)", marginBottom: 20 }} />
 
@@ -2177,27 +2213,26 @@ function ReportsTab({ demoCase }) {
           editable. Neither is required — an empty field just shows its
           placeholder. Summary and its progress bar sit directly below,
           with Target Opening/Prepared For after. */}
-      <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-text-2)", margin: "0 0 4px" }}>
-        Period: {preview.period}
-      </p>
-      <EditableField
-        fieldId="projectName"
-        value={preview.projectName}
-        placeholder={PROJECT_NAME}
-        disabled={previewSaved}
-        onSave={v => setPreview(p => ({ ...p, projectName: v }))}
-        textStyle={{ fontSize: 28, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 8px" }}
-        inputStyle={{ fontSize: 28, fontWeight: 700 }}
-      />
-      <EditableField
-        fieldId="address"
-        value={preview.address}
-        placeholder={PROJECT_ADDRESS}
-        disabled={previewSaved}
-        onSave={v => setPreview(p => ({ ...p, address: v }))}
-        textStyle={{ fontSize: 13, fontWeight: 400, color: "var(--tt-grey05)", margin: "0 0 16px" }}
-        inputStyle={{ fontSize: 13, fontWeight: 400 }}
-      />
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 24 }}>
+        <EditableField
+          fieldId="projectName"
+          value={preview.projectName}
+          placeholder={PROJECT_NAME}
+          disabled={previewSaved}
+          onSave={v => setPreview(p => ({ ...p, projectName: v }))}
+          textStyle={{ fontSize: 28, fontWeight: 700, color: "var(--tt-text-1)", lineHeight: 1, margin: 0 }}
+          inputStyle={{ fontSize: 28, fontWeight: 700, lineHeight: 1, color: "var(--tt-text-1)" }}
+        />
+        <EditableField
+          fieldId="address"
+          value={preview.address}
+          placeholder={PROJECT_ADDRESS}
+          disabled={previewSaved}
+          onSave={v => setPreview(p => ({ ...p, address: v }))}
+          textStyle={{ fontSize: 13, fontWeight: 400, color: "var(--tt-grey05)", lineHeight: 1, margin: 0 }}
+          inputStyle={{ fontSize: 13, fontWeight: 400, lineHeight: 1, color: "var(--tt-grey05)" }}
+        />
+      </div>
 
       {/* Summary — set apart in its own grey02 box like a project
           description. The box owns its own grey02 chrome (via `boxed`) so
@@ -2217,8 +2252,8 @@ function ReportsTab({ demoCase }) {
 
       <div style={{ height: 1, background: "var(--tt-grey03)", margin: "16px 0 8px" }} />
 
-      <div style={{ display: "flex", flexWrap: "nowrap", gap: 24 }}>
-        <div style={{ flex: "1 1 0", display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ display: "flex", flexWrap: "nowrap", gap: 24, alignItems: "center", marginBottom: 24 }}>
+        <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: 8 }}>
           <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: 0, flexShrink: 0 }}>Target Opening</p>
           <TargetOpeningField
             fieldId="targetOpening"
@@ -2227,7 +2262,7 @@ function ReportsTab({ demoCase }) {
             onApply={formatted => setPreview(p => ({ ...p, targetOpening: formatted }))}
           />
         </div>
-        <div style={{ flex: "1 1 0", display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: 8 }}>
           <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: 0, flexShrink: 0 }}>Prepared For</p>
           <EditableField
             fieldId="clientName"
@@ -2242,12 +2277,12 @@ function ReportsTab({ demoCase }) {
         </div>
       </div>
 
-      <div style={{ height: 1, background: "var(--tt-grey03)", marginTop: 8 }} />
+      <div style={{ height: 1, background: "var(--tt-grey03)", margin: "0 0 24px" }} />
 
       {/* Progress — entries logged this period vs. total on record, gated
           by the same "Task summary" checkbox the HTML export uses. */}
       {preview.includeSummary && previewData && (
-        <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 40 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 40 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 8px" }}>
               {previewData.completed} of {previewData.total} tasks complete
@@ -2972,7 +3007,7 @@ function ReportsTab({ demoCase }) {
                 deleted" disclaimer is always visible right here; it moves
                 the selection into excludedPhotos (filtered everywhere). */}
             {Object.keys(selectedPhotos).length > 0 && (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "12px 20px", background: "var(--tt-grey06)", flexShrink: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: PAGE_W, maxWidth: "100%", margin: "0 auto", boxSizing: "border-box", padding: "12px 20px", background: "var(--tt-grey06)", flexShrink: 0 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: 800, width: "100%" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <button
