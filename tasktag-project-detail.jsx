@@ -1715,14 +1715,12 @@ const buildReportHTML = (report) => {
     const statusColor = STATUS_HEX[kind];
     const visiblePhotoCount = (e.photos || []).length;
     const dot = "<span style=\"display:inline-block;width:3px;height:3px;border-radius:50%;background:#bdbdbd;vertical-align:middle;margin:0 6px;\"></span>";
-    // Grouped-by-day sections already show the date in their group label
-    // right above (e.g. "SEP 10") — repeating "Due: Sep 10" on every entry
-    // underneath it is redundant, so this line-only skips it when grouping
-    // is "day" (week/month grouping still needs it, since the group label
-    // then only says "This week"/"September", not a specific date).
-    const dueHTML = grouping === "day"
-      ? ""
-      : `<span style="font-size:11px;font-weight:500;color:#828282;">${fmtDate(parseDate(e.date))}</span>` + dot;
+    // Matches the live view exactly: the per-entry date always shows
+    // inline (the live meta line has no grouping-based condition on it),
+    // and the section label above only appears for week/month grouping —
+    // see entriesHTML below, which skips it for "day" the same way the
+    // live view's flatBlocks pagination does.
+    const dueHTML = `<span style="font-size:11px;font-weight:500;color:#828282;">${fmtDate(parseDate(e.date))}</span>` + dot;
     const metaLine =
       `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${statusColor};vertical-align:middle;margin-right:6px;"></span>` +
       `<span style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:${statusColor};">${statusMeta.label}${kind === "past_due" && daysAgo > 0 ? ` ${daysAgo} days` : ""}</span>` +
@@ -1739,11 +1737,16 @@ const buildReportHTML = (report) => {
     );
   };
 
+  // Section labels ("SEP 10" / "This week" / "September") only appear for
+  // week/month grouping, same as the live view's flatBlocks pagination —
+  // day grouping relies on each entry's own inline date instead, since a
+  // label repeating that same single date right above it would be
+  // redundant.
   const entriesHTML = groups.length === 0
     ? h("p", { style: "font-size:13px;color:#828282;text-align:center;padding:32px 0;" }, "No activity entries for this period.")
     : groups.map(g =>
         h("div", {},
-          h("p", { style: "font-size:11px;font-weight:600;color:#828282;letter-spacing:.06em;text-transform:uppercase;padding:8px 0;margin:0;" }, groupLabel(g).toUpperCase()),
+          grouping === "day" ? "" : h("p", { style: "font-size:11px;font-weight:600;color:#828282;letter-spacing:.06em;text-transform:uppercase;padding:8px 0;margin:0;" }, groupLabel(g).toUpperCase()),
           ...g.entries.map(entryHTML)
         )
       ).join("");
