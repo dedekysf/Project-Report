@@ -746,7 +746,7 @@ function TargetOpeningField({ fieldId, value, disabled, onApply }) {
   const open = !disabled && activeField === fieldId;
 
   if (disabled) {
-    return <p style={{ fontSize: 12, fontWeight: 600, color: "var(--tt-text-1)", margin: 0 }}>{value || "—"}</p>;
+    return <p style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "var(--tt-text-1)", margin: 0 }}>{value || "—"}</p>;
   }
 
   return (
@@ -755,7 +755,7 @@ function TargetOpeningField({ fieldId, value, disabled, onApply }) {
         onClick={() => setActiveField(open ? null : fieldId)}
         onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
         onMouseLeave={ev => ev.currentTarget.style.background = "none"}
-        style={{ display: "inline-block", position: "relative", fontSize: 12, fontWeight: 600, color: "var(--tt-text-1)", textDecoration: value ? "none" : "underline", margin: 0, cursor: "pointer", borderRadius: 6, paddingRight: 16, transition: "background 0.15s" }}
+        style={{ display: "inline-block", position: "relative", fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "var(--tt-text-1)", textDecoration: value ? "none" : "underline", margin: 0, cursor: "pointer", borderRadius: 6, paddingRight: 16, transition: "background 0.15s" }}
       >
         {value || "Add target date"}
         <Pencil size={10} strokeWidth={SW} className="tt-editable-pencil" style={{ position: "absolute", top: 2, right: 0, color: "var(--tt-grey06)", pointerEvents: "none" }} />
@@ -1322,7 +1322,7 @@ const DUMMY_ENTRIES = [
 // TODO(BE): replace with the crew member who actually logged each entry,
 // from the API — derived from the entry's date here only because DUMMY_
 // ENTRIES has no owner field of its own.
-const ENTRY_OWNERS = ["Paul A.", "Morgan T.", "Jordan B.", "Casey L.", "Riley S."];
+const ENTRY_OWNERS = ["Paul Anderson", "Morgan Taylor", "Carlos Smith", "Casey Lin", "Riley Scott"];
 const ownerForEntry = (dateStr) => ENTRY_OWNERS[parseDate(dateStr).getDate() % ENTRY_OWNERS.length];
 
 // TODO(BE): replace with the project's actual task/checklist list from the
@@ -2038,6 +2038,9 @@ function ReportsTab({ demoCase }) {
     const isPhotoless = e.noPhotos;
     const { kind, daysAgo } = statusForEntry(e.date);
     const statusMeta = STATUS_META[kind];
+    const visiblePhotoCount = (e.photos || []).filter(
+      (_, i) => !(preview.excludedPhotos && preview.excludedPhotos[`${entryKey}_${i}`])
+    ).length;
     return (
       <div style={{ marginBottom: 24 }}>
         {/* Renaming here only overrides the title for this report — the
@@ -2064,12 +2067,20 @@ function ReportsTab({ demoCase }) {
           </span>
           <span style={{ width: 3, height: 3, borderRadius: "50%", background: "var(--tt-grey04)", flexShrink: 0 }} />
           <span style={{ fontSize: 11, fontWeight: 500, color: "var(--tt-grey05)" }}>
-            {fmtDate(parseDate(e.date))}
+            Due: {fmtDate(parseDate(e.date))}
           </span>
           <span style={{ width: 3, height: 3, borderRadius: "50%", background: "var(--tt-grey04)", flexShrink: 0 }} />
           <span style={{ fontSize: 11, fontWeight: 500, color: "var(--tt-grey05)" }}>
             {ownerForEntry(e.date)}
           </span>
+          {!isPhotoless && visiblePhotoCount > 0 && (
+            <>
+              <span style={{ width: 3, height: 3, borderRadius: "50%", background: "var(--tt-grey04)", flexShrink: 0 }} />
+              <span style={{ fontSize: 11, fontWeight: 500, color: "var(--tt-grey05)" }}>
+                {visiblePhotoCount} photo{visiblePhotoCount === 1 ? "" : "s"}
+              </span>
+            </>
+          )}
         </div>
         {!isPhotoless && (
           <PhotoGrid
@@ -2158,7 +2169,7 @@ function ReportsTab({ demoCase }) {
         value={preview.projectName}
         placeholder={PROJECT_NAME}
         onSave={v => setPreview(p => ({ ...p, projectName: v }))}
-        textStyle={{ fontSize: 28, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 4px" }}
+        textStyle={{ fontSize: 28, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 8px" }}
         inputStyle={{ fontSize: 28, fontWeight: 700 }}
       />
       <EditableField
@@ -2166,7 +2177,7 @@ function ReportsTab({ demoCase }) {
         value={preview.address}
         placeholder={PROJECT_ADDRESS}
         onSave={v => setPreview(p => ({ ...p, address: v }))}
-        textStyle={{ fontSize: 13, fontWeight: 400, color: "var(--tt-grey05)", margin: "0 0 20px" }}
+        textStyle={{ fontSize: 13, fontWeight: 400, color: "var(--tt-grey05)", margin: "0 0 16px" }}
         inputStyle={{ fontSize: 13, fontWeight: 400 }}
       />
 
@@ -2204,8 +2215,8 @@ function ReportsTab({ demoCase }) {
             placeholder="Add client name"
             placeholderStyle={{ color: "var(--tt-text-1)" }}
             onSave={v => setPreview(p => ({ ...p, clientName: v }))}
-            textStyle={{ fontSize: 12, fontWeight: 600, color: preview.clientName ? "var(--tt-text-1)" : "var(--tt-grey05)", margin: 0 }}
-            inputStyle={{ fontSize: 12, fontWeight: 600, width: 170 }}
+            textStyle={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: preview.clientName ? "var(--tt-text-1)" : "var(--tt-grey05)", margin: 0 }}
+            inputStyle={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", width: 170 }}
           />
         </div>
       </div>
