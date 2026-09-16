@@ -1824,12 +1824,12 @@ const buildReportHTML = (report) => {
           h("span", { style: "font-size:13px;font-weight:700;color:white;" }, initialsOf(POINT_OF_CONTACT_NAME))
         ),
         h("div", {},
-          h("p", { style: "font-size:11px;font-weight:600;color:#0a1629;line-height:1;margin:0 0 4px;" }, POINT_OF_CONTACT_NAME),
+          h("p", { style: "font-size:11px;font-weight:600;color:#0a1629;line-height:1;margin:0 0 6px;" }, POINT_OF_CONTACT_NAME),
           h("p", { style: "font-size:11px;font-weight:400;color:#828282;line-height:1;margin:0;" }, contactRoleLine)
         )
       ),
       h("div", { style: "text-align:right;" },
-        h("p", { style: "font-size:11px;color:#828282;line-height:1;margin:0 0 4px;" }, "Generated via TaskTag"),
+        h("p", { style: "font-size:11px;color:#828282;line-height:1;margin:0 0 6px;" }, "Generated via TaskTag"),
         h("p", { style: "font-size:11px;color:#828282;line-height:1;margin:0;" }, `Report ID: ${REPORT_ID}`)
       )
     )
@@ -2456,7 +2456,7 @@ function ReportsTab({ demoCase }) {
             <span style={{ fontSize: 13, fontWeight: 700, color: "white" }}>{initialsOf(POINT_OF_CONTACT_NAME)}</span>
           </div>
           <div>
-            <p style={{ fontSize: 11, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: 1, margin: "0 0 4px" }}>{POINT_OF_CONTACT_NAME}</p>
+            <p style={{ fontSize: 11, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: 1, margin: "0 0 6px" }}>{POINT_OF_CONTACT_NAME}</p>
             {/* TODO(BE): replace with the contact's actual role/company from the API */}
             <p style={{ fontSize: 11, fontWeight: 400, color: "var(--tt-grey05)", lineHeight: 1, margin: 0 }}>
               {POINT_OF_CONTACT_ROLE}{preview.companyName ? ` · ${preview.companyName}` : ""}
@@ -2464,7 +2464,7 @@ function ReportsTab({ demoCase }) {
           </div>
         </div>
         <div style={{ textAlign: "right" }}>
-          <p style={{ fontSize: 11, color: "var(--tt-grey05)", lineHeight: 1, margin: "0 0 4px" }}>Generated via TaskTag</p>
+          <p style={{ fontSize: 11, color: "var(--tt-grey05)", lineHeight: 1, margin: "0 0 6px" }}>Generated via TaskTag</p>
           {/* TODO(BE): replace with the actual report ID from the API */}
           <p style={{ fontSize: 11, color: "var(--tt-grey05)", lineHeight: 1, margin: 0 }}>Report ID: {REPORT_ID}</p>
         </div>
