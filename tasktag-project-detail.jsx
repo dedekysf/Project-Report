@@ -295,11 +295,9 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
   const handleDay = (key) => {
     if (!allowFuture && key > todayKey) return; // dates after today can't be selected
     if (singleDate) {
-      // Just selects/highlights the day — committing it is a separate,
-      // explicit Apply click (see the footer button below), so there's
-      // no ambiguity about whether merely clicking a date saved it.
       setRangeStart(key);
       setRangeEnd(null);
+      if (onApply) onApply(key, null);
       return;
     }
     if (!rangeStart || rangeEnd) {
@@ -450,7 +448,7 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
       </div>
 
       {/* Footer */}
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--tt-grey03)" }}>
+      {!singleDate && <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--tt-grey03)" }}>
         <button
           onClick={onClose}
           onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
@@ -461,17 +459,15 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
             fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s",
           }}>Cancel</button>
         <button
-          onClick={() => { if (rangeStart && onApply) onApply(rangeStart, rangeEnd); }}
-          disabled={!rangeStart}
-          onMouseEnter={e => { if (rangeStart) e.currentTarget.style.opacity = "0.85"; }}
+          onClick={() => onApply ? onApply(rangeStart, rangeEnd) : onClose()}
+          onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
           onMouseLeave={e => e.currentTarget.style.opacity = "1"}
           style={{
             padding: "6px 16px", borderRadius: 8,
             border: "none", background: "var(--tt-text-1)",
-            fontSize: 13, fontWeight: 500, color: "#fff",
-            cursor: rangeStart ? "pointer" : "not-allowed", opacity: rangeStart ? 1 : 0.5, transition: "opacity 0.15s",
+            fontSize: 13, fontWeight: 500, color: "#fff", cursor: "pointer", transition: "opacity 0.15s",
           }}>Apply</button>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -2442,8 +2438,16 @@ function ReportsTab({ demoCase }) {
             background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 12,
             boxShadow: "0 1px 3px rgba(10,22,41,0.08)",
             display: "flex", flexDirection: "column",
-            contentVisibility: "auto",
-            containIntrinsicSize: `${PAGE_W}px ${PAGE_H}px`,
+            // Page 1 stays fully rendered (no content-visibility) — it
+            // holds the only interactive header fields (Target Opening
+            // etc.), and content-visibility:auto has been known to leave
+            // stale paints on a descendant after a state-only update in
+            // some Chrome versions, which made date selection look like it
+            // silently did nothing even though the DOM had updated.
+            ...(isFirst ? {} : {
+              contentVisibility: "auto",
+              containIntrinsicSize: `${PAGE_W}px ${PAGE_H}px`,
+            }),
           }}
         >
           {isFirst ? renderFullHeader() : renderRunningHeader()}
@@ -2997,47 +3001,55 @@ function ReportsTab({ demoCase }) {
                     )}
                   </>
                 )}
+
+                {/* Selection toolbar — sticky to the bottom of the scroll
+                    viewport (not fixed to the screen) so it naturally
+                    inherits this same maxWidth:800 box's width and
+                    horizontal position — including the scrollbar-gutter
+                    reservation above — instead of having to duplicate that
+                    centering math against the raw viewport. Delete acts
+                    immediately (no confirmation modal) since the "original
+                    photo won't be deleted" disclaimer is always visible
+                    right here; it moves the selection into excludedPhotos
+                    (filtered everywhere). */}
+                {Object.keys(selectedPhotos).length > 0 && (
+                  <div style={{
+                    position: "sticky", bottom: 0, zIndex: 100,
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    boxSizing: "border-box", padding: "12px 20px", borderRadius: 8,
+                    background: "var(--tt-grey06)",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <button
+                        onClick={clearPhotoSelection}
+                        style={{ background: "none", border: "1.5px solid rgba(255,255,255,0.6)", borderRadius: "50%", width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "white", padding: 0, flexShrink: 0 }}
+                      >
+                        <X size={13} strokeWidth={SW} />
+                      </button>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        <span style={{ fontSize: 13, fontWeight: 500, color: "white" }}>
+                          {Object.keys(selectedPhotos).length} item{Object.keys(selectedPhotos).length > 1 ? "s" : ""} selected
+                        </span>
+                        <span style={{ fontSize: 12, color: "white" }}>
+                          The original photo won't be deleted.
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <button
+                        onClick={handleDeleteSelectedPhotos}
+                        onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.08)"}
+                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                        style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: "1px solid rgba(255,255,255,0.4)", color: "white", cursor: "pointer", padding: "6px 12px", borderRadius: 8, fontSize: 13, fontWeight: 500, transition: "background 0.15s" }}
+                      >
+                        <Trash2 size={14} strokeWidth={SW} /> Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
               </div>
             </div>
-
-            {/* Selection toolbar — appears above the footer once one or
-                more photos are checked. Delete acts immediately (no
-                confirmation modal) since the "original photo won't be
-                deleted" disclaimer is always visible right here; it moves
-                the selection into excludedPhotos (filtered everywhere). */}
-            {Object.keys(selectedPhotos).length > 0 && (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: PAGE_W, maxWidth: "100%", margin: "0 auto", boxSizing: "border-box", padding: "12px 20px", background: "var(--tt-grey06)", flexShrink: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: 800, width: "100%" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <button
-                    onClick={clearPhotoSelection}
-                    style={{ background: "none", border: "1.5px solid rgba(255,255,255,0.6)", borderRadius: "50%", width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "white", padding: 0, flexShrink: 0 }}
-                  >
-                    <X size={13} strokeWidth={SW} />
-                  </button>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    <span style={{ fontSize: 13, fontWeight: 500, color: "white" }}>
-                      {Object.keys(selectedPhotos).length} item{Object.keys(selectedPhotos).length > 1 ? "s" : ""} selected
-                    </span>
-                    <span style={{ fontSize: 12, color: "white" }}>
-                      The original photo won't be deleted.
-                    </span>
-                  </div>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <button
-                    onClick={handleDeleteSelectedPhotos}
-                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.08)"}
-                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                    style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: "1px solid rgba(255,255,255,0.4)", color: "white", cursor: "pointer", padding: "6px 12px", borderRadius: 8, fontSize: 13, fontWeight: 500, transition: "background 0.15s" }}
-                  >
-                    <Trash2 size={14} strokeWidth={SW} /> Delete
-                  </button>
-                </div>
-              </div>
-              </div>
-            )}
 
             {/* Footer CTAs — defaults to just "Save report"; once saved,
                 switches to Download/Copy link (closing is left to the user) */}
