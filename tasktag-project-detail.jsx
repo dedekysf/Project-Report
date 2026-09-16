@@ -2925,10 +2925,12 @@ function ReportsTab({ demoCase }) {
     if (report.projectName) params.set("projectName", report.projectName);
     if (report.address) params.set("address", report.address);
     // Same reasoning as the download branch — the latest saved identity,
-    // not this report's own snapshot. The logo is a small (max 160px)
-    // downscaled data URL by the time it reaches here — see
-    // resizeImageToDataURL — so it's safe to carry in the URL too.
-    if (companyIdentity.logo) params.set("logo", companyIdentity.logo);
+    // not this report's own snapshot. The logo is deliberately left out
+    // here even though it IS a small downscaled data URL (see
+    // resizeImageToDataURL) — it's still the single largest thing in this
+    // URL by far, and turns an otherwise short, simple link into an
+    // unreadable multi-thousand-character block. The download (which has
+    // no such constraint) still includes it in full.
     if (companyIdentity.companyName) params.set("companyName", companyIdentity.companyName);
     if (companyIdentity.companyAddress) params.set("companyAddress", companyIdentity.companyAddress);
     // "summary" is already taken (the includeSummary toggle above) — the
