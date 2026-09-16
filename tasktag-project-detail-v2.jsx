@@ -929,13 +929,14 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
                   border: selected ? "none" : "1.5px solid white", background: selected ? "var(--tt-secondary)" : "rgba(10,22,41,0.35)",
                   display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
                   cursor: onToggleSelect ? "pointer" : "default", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)",
+                  zIndex: 2,
                 }}
               >
                 {selected && <Check size={12} color="white" strokeWidth={3} />}
               </button>
             )}
             {canOpen && (
-              <div style={{ position: "absolute", inset: 0, borderRadius: 4, background: "rgba(10,22,41,0.25)", opacity: 0, transition: "opacity 0.15s", pointerEvents: "none" }} />
+              <div style={{ position: "absolute", inset: 0, borderRadius: 4, background: "rgba(10,22,41,0.25)", opacity: 0, transition: "opacity 0.15s", pointerEvents: "none", zIndex: 1 }} />
             )}
             {isCapCell && (
               <button
