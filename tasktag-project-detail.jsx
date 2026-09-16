@@ -630,28 +630,34 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
   }
 
   if (alwaysEditing) {
+    // No text yet — nothing to confirm, so the button stays disabled
+    // instead of blurring into an unchanged empty field.
+    const isEmpty = !value || !value.trim();
     const done = () => alwaysEditingRef.current?.blur();
     const confirmButton = (
       <button
+        disabled={isEmpty}
         onClick={done}
-        onMouseEnter={ev => ev.currentTarget.style.opacity = "0.85"}
+        onMouseEnter={ev => !isEmpty && (ev.currentTarget.style.opacity = "0.85")}
         onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
-        style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "opacity 0.15s" }}
+        style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: isEmpty ? "not-allowed" : "pointer", padding: 0, opacity: isEmpty ? 0.4 : 1, transition: "opacity 0.15s" }}
       >
         <Check size={15} strokeWidth={SW} color="white" />
       </button>
     );
     return multiline ? (
       <div style={boxStyle}>
-        <Textarea
-          ref={alwaysEditingRef}
-          value={value}
-          onChange={ev => onSave(ev.target.value)}
-          placeholder={placeholder}
-          rows={3}
-          style={{ fontFamily: "inherit", ...inputStyle }}
-        />
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>{confirmButton}</div>
+        <div style={{ position: "relative" }}>
+          <Textarea
+            ref={alwaysEditingRef}
+            value={value}
+            onChange={ev => onSave(ev.target.value)}
+            placeholder={placeholder}
+            rows={3}
+            style={{ fontFamily: "inherit", paddingRight: 44, paddingBottom: 40, ...inputStyle }}
+          />
+          <div style={{ position: "absolute", right: 6, bottom: 6 }}>{confirmButton}</div>
+        </div>
       </div>
     ) : (
       <div style={{ position: "relative" }}>
@@ -678,6 +684,9 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
     };
     const cancel = () => { setActiveField(null); setError(false); if (onCancel) onCancel(); };
     const onChange = ev => { setDraft(ev.target.value); if (error) setError(false); };
+    // No text typed yet — nothing to commit, so the check button stays
+    // disabled (same rule as the always-editing fields below).
+    const isEmpty = !draft.trim();
     return (
       <div key="editing" style={{ position: "relative", maxWidth: "100%", minWidth: 0, ...(!boxed ? { marginBottom: 8 } : {}), ...boxStyle }}>
         {multiline ? (
@@ -726,10 +735,11 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
             <X size={15} strokeWidth={SW} color="var(--tt-grey06)" />
           </button>
           <button
+            disabled={isEmpty}
             onClick={commit}
-            onMouseEnter={ev => ev.currentTarget.style.opacity = "0.85"}
+            onMouseEnter={ev => !isEmpty && (ev.currentTarget.style.opacity = "0.85")}
             onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
-            style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "opacity 0.15s" }}
+            style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: isEmpty ? "not-allowed" : "pointer", padding: 0, opacity: isEmpty ? 0.4 : 1, transition: "opacity 0.15s" }}
           >
             <Check size={15} strokeWidth={SW} color="white" />
           </button>
@@ -2354,7 +2364,7 @@ function ReportsTab({ demoCase }) {
     }
 
     return (
-      <div style={{ marginTop: 10 }}>
+      <div style={{ marginTop: 24 }}>
         <EditableField
           fieldId={`note_${key}`}
           value={preview.extraNotes[key] || ""}
@@ -2549,8 +2559,8 @@ function ReportsTab({ demoCase }) {
           (`disabled`) — the box still wraps that locked text the same way. */}
       <div style={{ background: "var(--tt-grey02)", borderRadius: 8, padding: 8 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 4px", marginBottom: 8 }}>
-          <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: 0 }}>Summary</p>
-          <span style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)" }}>Optional</span>
+          <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-2)", margin: 0 }}>Summary</p>
+          <span style={{ fontSize: 10, fontWeight: 400, color: "var(--tt-grey05)" }}>Optional</span>
         </div>
         <EditableField
         fieldId="summary"
