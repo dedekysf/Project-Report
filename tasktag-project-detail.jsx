@@ -1696,7 +1696,7 @@ const buildReportHTML = (report) => {
         : "";
     }).filter(Boolean);
     if (cells.length === 0) return "";
-    return h("div", { style: "display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:8px;" }, ...cells);
+    return h("div", { style: "display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:12px;" }, ...cells);
   };
 
   const groupLabel = (g) => formatGroupLabel(g, grouping);
@@ -1713,7 +1713,7 @@ const buildReportHTML = (report) => {
   // avoids that collapse entirely and gives each gap its exact value.
   const noteHTML = (note) =>
     h("div", { style: "margin-top:8px;" },
-      h("p", { style: "font-size:12px;font-style:italic;color:#303742;line-height:1.5;margin:0;padding:8px;border-radius:8px;" }, note.note)
+      h("p", { style: "font-size:12px;color:#303742;line-height:1.5;margin:0;" }, note.note)
     );
 
   const entryHTML = (e, attachedNoteHTML) => {
@@ -1737,9 +1737,9 @@ const buildReportHTML = (report) => {
       (!e.noPhotos && visiblePhotoCount > 0
         ? dot + `<span style="font-size:11px;font-weight:500;color:#828282;">${visiblePhotoCount} photo${visiblePhotoCount === 1 ? "" : "s"}</span>`
         : "");
-    return h("div", { style: "margin-bottom:24px;" },
+    return h("div", { style: "margin-bottom:40px;" },
       h("p", { style: "font-size:18px;font-weight:600;color:#0a1629;line-height:1.35;margin:0;" }, e.note),
-      h("div", { style: "margin-top:8px;" }, metaLine),
+      h("div", { style: "margin-top:4px;" }, metaLine),
       e.noPhotos ? "" : renderPhotos(e.photos),
       attachedNoteHTML || ""
     );
@@ -1834,7 +1834,7 @@ const buildReportHTML = (report) => {
   const fullHeaderHTML = h("div", { style: `padding:${PAGE_PAD}px ${PAGE_PAD}px 0;` },
     identityRowHTML +
     h("div", { style: "height:1px;background:#e8e8e6;margin-bottom:20px;" }, "") +
-    h("div", { style: "display:flex;flex-direction:column;gap:4px;margin-bottom:24px;" },
+    h("div", { style: "display:flex;flex-direction:column;gap:8px;margin-bottom:24px;" },
       h("h2", { style: "font-size:28px;font-weight:700;color:#0a1629;line-height:1;margin:0;" }, projectName),
       h("p", { style: "font-size:13px;font-weight:400;color:#828282;line-height:1;margin:0;" }, address)
     ) +
