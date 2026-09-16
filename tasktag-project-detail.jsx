@@ -636,7 +636,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
         onClick={done}
         onMouseEnter={ev => ev.currentTarget.style.opacity = "0.85"}
         onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
-        style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "var(--tt-secondary)", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "opacity 0.15s" }}
+        style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "opacity 0.15s" }}
       >
         <Check size={15} strokeWidth={SW} color="white" />
       </button>
@@ -729,7 +729,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
             onClick={commit}
             onMouseEnter={ev => ev.currentTarget.style.opacity = "0.85"}
             onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
-            style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "var(--tt-secondary)", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "opacity 0.15s" }}
+            style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "opacity 0.15s" }}
           >
             <Check size={15} strokeWidth={SW} color="white" />
           </button>
@@ -2541,27 +2541,29 @@ function ReportsTab({ demoCase }) {
       </div>
 
       {/* Summary — set apart in its own grey02 box like a project
-          description. Always a plain textarea (`alwaysEditing`), not a
-          click-to-edit field: the box owns its own grey02 chrome (via
-          `boxed`) so the textarea fills that same card directly instead of
-          nesting a separate bordered box inside it. Locked to plain text
-          once the report is saved (`disabled`). */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-        <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: 0 }}>Summary</p>
-        <span style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)" }}>Optional</span>
-      </div>
-      <EditableField
+          description, with its "Summary"/"Optional" label row inside that
+          same box (not above it). The box is owned here, not by
+          EditableField's `boxed` (which would nest the label outside the
+          card), so the textarea fills the card directly underneath the
+          label. Locked to plain text once the report is saved
+          (`disabled`) — the box still wraps that locked text the same way. */}
+      <div style={{ background: "var(--tt-grey02)", borderRadius: 8, padding: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 4px", marginBottom: 8 }}>
+          <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: 0 }}>Summary</p>
+          <span style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)" }}>Optional</span>
+        </div>
+        <EditableField
         fieldId="summary"
         value={preview.summary}
         placeholder="Add a high-level overview of the progress made during this period..."
         disabled={previewSaved}
         alwaysEditing
         multiline
-        boxed
         onSave={v => setPreview(p => ({ ...p, summary: v }))}
         textStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, margin: 0 }}
         inputStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6 }}
-      />
+        />
+      </div>
 
       <div style={{ height: 1, background: "var(--tt-grey03)", margin: "16px 0 8px" }} />
 
