@@ -2183,7 +2183,7 @@ function ReportsTab({ demoCase }) {
         inputStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6 }}
       />
 
-      <div style={{ height: 1, background: "var(--tt-grey03)", margin: "40px 0 24px" }} />
+      <div style={{ height: 1, background: "var(--tt-grey03)", margin: "16px 0 24px" }} />
 
       <div style={{ display: "flex", flexWrap: "nowrap", gap: 32 }}>
         <div style={{ flex: "1 1 0", display: "flex", alignItems: "center", gap: 8 }}>
