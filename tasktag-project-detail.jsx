@@ -1373,30 +1373,24 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
                     />
                     {/* Caption already auto-saves on every keystroke — this
                         button is just a "done" affordance (closes the
-                        popover). Same "nothing to confirm" rule as every
-                        other edit mode: disabled while empty, and disabled
-                        again once it's unchanged from when this popover
-                        opened (captionStartRef). */}
-                    {(() => {
-                      const captionConfirmDisabled = !caption || caption === captionStartRef.current;
-                      return (
-                        <button
-                          disabled={captionConfirmDisabled}
-                          onClick={() => setOpenCaptionIdx(null)}
-                          onMouseEnter={ev => !captionConfirmDisabled && (ev.currentTarget.style.opacity = "0.85")}
-                          onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
-                          style={{
-                            position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)",
-                            width: 24, height: 24, borderRadius: 6, border: "none",
-                            background: captionConfirmDisabled ? "var(--tt-grey04)" : "var(--tt-text-1)",
-                            cursor: captionConfirmDisabled ? "not-allowed" : "pointer",
-                            display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
-                          }}
-                        >
-                          <Check size={13} strokeWidth={SW} color="white" />
-                        </button>
-                      );
-                    })()}
+                        popover) and always stays enabled, even with nothing
+                        typed — an empty caption is a valid outcome (the
+                        trigger was opened, then the user decided against
+                        one), unlike every other edit mode's "nothing to
+                        confirm" rule. */}
+                    <button
+                      onClick={() => setOpenCaptionIdx(null)}
+                      onMouseEnter={ev => ev.currentTarget.style.opacity = "0.85"}
+                      onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
+                      style={{
+                        position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)",
+                        width: 24, height: 24, borderRadius: 6, border: "none",
+                        background: "var(--tt-text-1)", cursor: "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+                      }}
+                    >
+                      <Check size={13} strokeWidth={SW} color="white" />
+                    </button>
                   </div>
                 </div>
               </div>
