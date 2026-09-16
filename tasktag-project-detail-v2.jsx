@@ -167,6 +167,12 @@ style.textContent = `
     color: var(--tt-text-2); transition: background 0.15s;
   }
   .tt-icon-btn:hover { background: var(--tt-grey02); }
+
+  /* Editable-field hover cue — a pencil icon fades in next to any field
+     that can be clicked into edit mode, on top of (not instead of) its
+     grey02 hover background. */
+  .tt-editable-pencil { opacity: 0; transition: opacity 0.15s; }
+  .tt-editable-wrap:hover .tt-editable-pencil { opacity: 1; }
 `;
 document.head.appendChild(style);
 
@@ -182,8 +188,6 @@ const PROJECT_ADDRESS = "11 North Raintree Hollow Court, Sienna Plantation, Miss
 const POINT_OF_CONTACT_NAME = "Jordan Blake";
 const POINT_OF_CONTACT_ROLE = "Project Manager";
 const POINT_OF_CONTACT_COMPANY = "Reynolds Construction Co.";
-// TODO(BE): replace with the firm's actual office address from the API
-const COMPANY_ADDRESS = "4500 Industrial Blvd, Houston, TX 77004";
 const initialsOf = (name) => name.split(" ").map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
 // TODO(BE): replace with the actual report ID from the API
 const REPORT_ID = `TX-1520-${APP_TODAY.getFullYear()}-${String(APP_TODAY.getMonth() + 1).padStart(2, "0")}`;
@@ -584,7 +588,7 @@ const ActiveEditContext = createContext({ activeField: null, setActiveField: () 
 // non-boxed field's own wrapper carries that as marginBottom, multiline's
 // check/cancel row sits 8px under the textarea, and the error message (if
 // any) sits 8px under that.
-function EditableField({ fieldId, value, placeholder, onSave, onCancel, multiline, disabled, boxed, required, errorMessage, textStyle, inputStyle, as: Tag = "p" }) {
+function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, onCancel, multiline, disabled, boxed, required, errorMessage, textStyle, inputStyle, as: Tag = "p" }) {
   const { activeField, setActiveField } = useContext(ActiveEditContext);
   const [draft, setDraft] = useState(value || "");
   const [error, setError] = useState(false);
@@ -667,15 +671,16 @@ function EditableField({ fieldId, value, placeholder, onSave, onCancel, multilin
   }
 
   return (
-    <div style={boxStyle}>
+    <div className="tt-editable-wrap" style={{ position: "relative", ...boxStyle }}>
       <Tag
         onClick={() => { setDraft(value || ""); setActiveField(fieldId); setError(false); }}
         onMouseEnter={ev => { if (!boxed) ev.currentTarget.style.background = "var(--tt-grey02)"; }}
         onMouseLeave={ev => ev.currentTarget.style.background = "none"}
         style={{ display: "block", cursor: "pointer", borderRadius: 6, transition: "background 0.15s", ...textStyle }}
       >
-        {value || <span style={{ color: "var(--tt-grey05)" }}>{placeholder}</span>}
+        {value || <span style={{ color: "var(--tt-grey05)", textDecoration: "underline", ...placeholderStyle }}>{placeholder}</span>}
       </Tag>
+      <Pencil size={12} strokeWidth={SW} className="tt-editable-pencil" style={{ position: "absolute", top: 4, right: 4, color: "var(--tt-grey05)", pointerEvents: "none" }} />
     </div>
   );
 }
@@ -686,34 +691,51 @@ function EditableField({ fieldId, value, placeholder, onSave, onCancel, multilin
 // keeps its own input ref, since the same header (and this box with it)
 // renders once per page — a single shared ref would only ever point at
 // whichever page's copy mounted last.
+//
+// Before a logo exists, this is a fixed 48x48 dashed placeholder. Once one
+// is uploaded, the box drops the placeholder chrome and just sizes to the
+// image itself (max-width 140px, height auto) so a wide logo isn't
+// squeezed into a small square. While the file is being read, a small
+// spinner replaces the placeholder/image.
 function LogoUploadBox({ src, onChange, disabled }) {
   const inputRef = useRef(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleFile = ev => {
+    const file = ev.target.files?.[0];
+    ev.target.value = "";
+    if (!file) return;
+    setLoading(true);
+    const reader = new FileReader();
+    reader.onload = () => { onChange(reader.result); setLoading(false); };
+    reader.onerror = () => setLoading(false);
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div
-      onClick={() => !disabled && inputRef.current?.click()}
+      onClick={() => !disabled && !loading && inputRef.current?.click()}
       style={{
-        width: 48, height: 48, borderRadius: 8, flexShrink: 0, overflow: "hidden",
-        border: `1px dashed var(--tt-grey04)`, background: "var(--tt-grey01)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        cursor: disabled ? "default" : "pointer",
+        flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+        cursor: disabled || loading ? "default" : "pointer",
+        ...(src
+          ? { maxWidth: 140, height: "auto" }
+          : { width: 48, height: 48, borderRadius: 8, overflow: "hidden", border: "1px dashed var(--tt-grey04)", background: "var(--tt-grey01)" }),
       }}
     >
-      {src
-        ? <img src={src} alt="Company logo" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-        : <FileImage size={18} strokeWidth={SW} color="var(--tt-grey05)" />}
+      {loading ? (
+        <span style={{ width: 18, height: 18, borderRadius: "50%", border: "2px solid var(--tt-grey03)", borderTopColor: "var(--tt-text-2)", display: "inline-block", animation: "tt-spin 0.75s linear infinite" }} />
+      ) : src ? (
+        <img src={src} alt="Company logo" style={{ display: "block", maxWidth: 140, width: "100%", height: "auto" }} />
+      ) : (
+        <FileImage size={18} strokeWidth={SW} color="var(--tt-grey05)" />
+      )}
       {!disabled && (
         <input
           ref={inputRef}
           type="file"
           accept="image/*"
-          onChange={ev => {
-            const file = ev.target.files?.[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = () => onChange(reader.result);
-            reader.readAsDataURL(file);
-            ev.target.value = "";
-          }}
+          onChange={handleFile}
           style={{ display: "none" }}
         />
       )}
@@ -737,15 +759,16 @@ function TargetOpeningField({ fieldId, value, disabled, onApply }) {
   }
 
   return (
-    <div style={{ position: "relative" }} ref={anchorRef}>
+    <div className="tt-editable-wrap" style={{ position: "relative" }} ref={anchorRef}>
       <p
         onClick={() => setActiveField(open ? null : fieldId)}
         onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
         onMouseLeave={ev => ev.currentTarget.style.background = "none"}
-        style={{ fontSize: 14, fontWeight: 600, color: value ? "var(--tt-text-1)" : "var(--tt-grey05)", margin: 0, cursor: "pointer", borderRadius: 6, transition: "background 0.15s" }}
+        style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", textDecoration: value ? "none" : "underline", margin: 0, cursor: "pointer", borderRadius: 6, transition: "background 0.15s" }}
       >
         {value || "Add target date"}
       </p>
+      <Pencil size={12} strokeWidth={SW} className="tt-editable-pencil" style={{ position: "absolute", top: 4, right: 4, color: "var(--tt-grey05)", pointerEvents: "none" }} />
       {open && (
         <DateRangeCalendar
           anchorRef={anchorRef}
@@ -1829,8 +1852,11 @@ function ReportsTab({ demoCase }) {
         projectName: PROJECT_NAME,
         address: PROJECT_ADDRESS,
         logo: null,
-        companyName: POINT_OF_CONTACT_COMPANY,
-        companyAddress: COMPANY_ADDRESS,
+        // Left blank rather than pre-filled — shown as "Add company
+        // name"/"Add company address" placeholders until the user fills
+        // them in, same as target opening/prepared for.
+        companyName: "",
+        companyAddress: "",
         summary: buildDefaultSummary(data.groups),
         targetOpening: "",
         clientName: "",
@@ -2033,7 +2059,8 @@ function ReportsTab({ demoCase }) {
           <EditableField
             fieldId="companyName"
             value={preview.companyName}
-            placeholder={POINT_OF_CONTACT_COMPANY}
+            placeholder="Add company name"
+            placeholderStyle={{ color: "var(--tt-text-1)" }}
             onSave={v => setPreview(p => ({ ...p, companyName: v }))}
             textStyle={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: 0 }}
             inputStyle={{ fontSize: 14, fontWeight: 700 }}
@@ -2041,7 +2068,7 @@ function ReportsTab({ demoCase }) {
           <EditableField
             fieldId="companyAddress"
             value={preview.companyAddress}
-            placeholder={COMPANY_ADDRESS}
+            placeholder="Add company address"
             onSave={v => setPreview(p => ({ ...p, companyAddress: v }))}
             textStyle={{ fontSize: 11, fontWeight: 400, color: "var(--tt-grey05)", margin: 0 }}
             inputStyle={{ fontSize: 11, fontWeight: 400 }}
@@ -2105,7 +2132,7 @@ function ReportsTab({ demoCase }) {
       {/* Progress — entries logged this period vs. total on record, gated
           by the same "Task summary" checkbox the HTML export uses. */}
       {preview.includeSummary && previewData && (
-        <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 40 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 8px" }}>
               {previewData.completed} of {previewData.total} tasks complete
@@ -2120,7 +2147,7 @@ function ReportsTab({ demoCase }) {
         </div>
       )}
 
-      <div style={{ height: 1, background: "var(--tt-grey03)", margin: "20px 0" }} />
+      <div style={{ height: 1, background: "var(--tt-grey03)", margin: "24px 0" }} />
 
       <div style={{ display: "flex", flexWrap: "nowrap", gap: 32 }}>
         <div style={{ flex: "1 1 0", display: "flex", alignItems: "center", gap: 8 }}>
@@ -2137,6 +2164,7 @@ function ReportsTab({ demoCase }) {
             fieldId="clientName"
             value={preview.clientName}
             placeholder="Add client name"
+            placeholderStyle={{ color: "var(--tt-text-1)" }}
             onSave={v => setPreview(p => ({ ...p, clientName: v }))}
             textStyle={{ fontSize: 14, fontWeight: 600, color: preview.clientName ? "var(--tt-text-1)" : "var(--tt-grey05)", margin: 0 }}
             inputStyle={{ fontSize: 14, fontWeight: 600, width: 170 }}
