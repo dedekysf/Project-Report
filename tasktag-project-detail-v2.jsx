@@ -1436,14 +1436,21 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
         .map((k, i) => ({ k, i }))
         .filter(({ i, k }) => IMG_MAP[k] && !!(excludedPhotos && excludedPhotos[`${entryKey}_${i}`]));
       return (
-        <div style={{ marginTop: 10, border: "1px solid var(--tt-grey03)", borderRadius: 8, padding: 10, background: "var(--tt-grey01)" }}>
+        <div style={{ marginTop: 10, border: "1px solid var(--tt-grey03)", borderRadius: 8, padding: 16, background: "var(--tt-grey01)" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-            <p style={{ fontSize: 12, fontWeight: 600, color: "var(--tt-text-2)", margin: 0 }}>
-              Choose a photo to swap in
-            </p>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <p style={{ fontSize: 12, fontWeight: 600, color: "var(--tt-text-2)", margin: 0 }}>
+                Available to swap
+              </p>
+              <span style={{ display: "flex", alignItems: "center", justifyContent: "center", minWidth: 20, height: 20, padding: "0 4px", borderRadius: "50%", background: "var(--tt-grey03)", fontSize: 11, fontWeight: 700, color: "var(--tt-text-1)" }}>
+                {available.length}
+              </span>
+            </div>
             <button
               onClick={() => setSwapTriggerIdx(null)}
-              style={{ background: "none", border: "none", cursor: "pointer", padding: 2, display: "flex" }}
+              onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey03)"}
+              onMouseLeave={ev => ev.currentTarget.style.background = "none"}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "background 0.15s" }}
             >
               <X size={14} strokeWidth={SW} color="var(--tt-grey06)" />
             </button>
