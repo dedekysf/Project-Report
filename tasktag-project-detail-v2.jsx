@@ -1237,7 +1237,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
   const captionTriggerRef = useRef(null); // the specific trigger button last clicked, for scroll repositioning
   const captionPopoverRef = useRef(null);
   const captionStartRef = useRef(""); // caption text when the open popover was triggered, for the "no change" disabled check
-  const [swapOpen, setSwapOpen] = useState(false);
+  const [swapTriggerIdx, setSwapTriggerIdx] = useState(null); // original index of the included photo a swap was started from, or null
 
   useEffect(() => {
     if (openCaptionIdx === null) return;
@@ -1286,11 +1286,10 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
   // actually something to swap in. `onSetPhotoExcluded` is undefined once
   // the report is saved, same gate as onToggleSelect/onCaptionChange.
   const overLimit = !!onSetPhotoExcluded && (photos || []).length > PER_ENTRY_PHOTO_LIMIT;
-  const includedCount = items.length;
 
   return (
     <div>
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 4, marginTop: 10 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 10 }}>
       {visibleItems.map(({ k, i }, viewIdx) => {
         const selected = !!(selectedPhotos && selectedPhotos[`${entryKey}_${i}`]);
         const isCapCell = !expanded && remaining > 0 && viewIdx === visibleItems.length - 1;
@@ -1346,7 +1345,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
             )}
             {!isCapCell && IMG_MAP[k] && overLimit && (
               <button
-                onClick={e => { e.stopPropagation(); setSwapOpen(o => !o); }}
+                onClick={e => { e.stopPropagation(); setSwapTriggerIdx(prev => prev === i ? null : i); }}
                 className="opacity-0 transition-opacity group-hover:opacity-100"
                 style={{
                   position: "absolute", bottom: 6, left: 30,
@@ -1429,43 +1428,48 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
         );
       })}
     </div>
-    {overLimit && swapOpen && (
-      <div style={{ marginTop: 10, border: "1px solid var(--tt-grey03)", borderRadius: 8, padding: 10, background: "var(--tt-grey01)" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          <p style={{ fontSize: 12, fontWeight: 600, color: "var(--tt-text-2)", margin: 0 }}>
-            Swap photos &middot; {includedCount}/{PER_ENTRY_PHOTO_LIMIT} included
-          </p>
-          <button
-            onClick={() => setSwapOpen(false)}
-            style={{ background: "none", border: "none", cursor: "pointer", padding: 2, display: "flex" }}
-          >
-            <X size={14} strokeWidth={SW} color="var(--tt-grey06)" />
-          </button>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 6 }}>
-          {(photos || []).map((k, i) => {
-            if (!IMG_MAP[k]) return null;
-            const included = !(excludedPhotos && excludedPhotos[`${entryKey}_${i}`]);
-            const disabled = !included && includedCount >= PER_ENTRY_PHOTO_LIMIT;
-            return (
+    {overLimit && swapTriggerIdx !== null && (() => {
+      // Only the photos NOT currently included are worth showing here —
+      // the ones already in are exactly what this list exists to swap
+      // one of them out for, so listing them too would just be noise.
+      const available = (photos || [])
+        .map((k, i) => ({ k, i }))
+        .filter(({ i, k }) => IMG_MAP[k] && !!(excludedPhotos && excludedPhotos[`${entryKey}_${i}`]));
+      return (
+        <div style={{ marginTop: 10, border: "1px solid var(--tt-grey03)", borderRadius: 8, padding: 10, background: "var(--tt-grey01)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+            <p style={{ fontSize: 12, fontWeight: 600, color: "var(--tt-text-2)", margin: 0 }}>
+              Choose a photo to swap in
+            </p>
+            <button
+              onClick={() => setSwapTriggerIdx(null)}
+              style={{ background: "none", border: "none", cursor: "pointer", padding: 2, display: "flex" }}
+            >
+              <X size={14} strokeWidth={SW} color="var(--tt-grey06)" />
+            </button>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 6 }}>
+            {available.map(({ k, i }) => (
               <button
                 key={i}
-                disabled={disabled}
-                onClick={() => onSetPhotoExcluded(i, included)}
-                style={{ position: "relative", padding: 0, border: "none", background: "none", cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.4 : 1 }}
+                onClick={() => {
+                  // 1-for-1 swap: the clicked (available) photo comes in,
+                  // the one whose swap button opened this panel goes out.
+                  onSetPhotoExcluded(swapTriggerIdx, true);
+                  onSetPhotoExcluded(i, false);
+                  setSwapTriggerIdx(null);
+                }}
+                style={{ position: "relative", padding: 0, border: "none", background: "none", cursor: "pointer" }}
               >
-                <div style={{ position: "relative", width: "100%", aspectRatio: "4/3", borderRadius: 4, overflow: "hidden", outline: included ? "2px solid var(--tt-secondary)" : "2px solid transparent" }}>
+                <div style={{ width: "100%", aspectRatio: "4/3", borderRadius: 4, overflow: "hidden" }}>
                   <img src={IMG_MAP[k]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                  <span style={{ position: "absolute", top: 3, right: 3, width: 16, height: 16, borderRadius: "50%", background: included ? "var(--tt-secondary)" : "rgba(10,22,41,0.35)", border: included ? "none" : "1.5px solid white", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    {included && <Check size={10} color="white" strokeWidth={3} />}
-                  </span>
                 </div>
               </button>
-            );
-          })}
+            ))}
+          </div>
         </div>
-      </div>
-    )}
+      );
+    })()}
     </div>
   );
 }
@@ -1836,7 +1840,7 @@ const DUMMY_ENTRIES = [
   // Deliberately over PER_ENTRY_PHOTO_LIMIT (12) — the most recent entry is
   // always the first task item shown, so the swap-photos UI has something
   // to demo without needing a specific date range.
-  { date: "2026-09-10", note: "Flooring installation started on the ground floor.", photos: ["img5", "img1", "img6", "img2", "img3", "img7", "img4", "img8", "img9", "img1", "img2", "img3", "img4", "img5"] },
+  { date: "2026-09-10", note: "Flooring installation started on the ground floor.", photos: ["img5", "img1", "img6", "img2", "img3", "img7", "img4", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2"] },
   { date: "2026-09-09", note: "Exterior siding repairs completed on the south wall.", photos: ["img9", "img2", "img3", "img7", "img4", "img5", "img6"] },
   { date: "2026-09-08", note: "Final electrical connections completed in the main panel.", photos: ["img9", "img8"] },
   { date: "2026-09-07", note: "Plumbing fixtures installed in all bathrooms.", photos: [] },
@@ -2229,7 +2233,7 @@ const buildReportHTML = (report) => {
         : "";
     }).filter(Boolean);
     if (cells.length === 0) return "";
-    return h("div", { style: "display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:12px;" }, ...cells);
+    return h("div", { style: "display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px;" }, ...cells);
   };
 
   const groupLabel = (g) => formatGroupLabel(g, grouping);
@@ -2270,7 +2274,7 @@ const buildReportHTML = (report) => {
       (!e.noPhotos && visiblePhotoCount > 0
         ? dot + `<span style="font-size:11px;font-weight:500;color:#828282;">${visiblePhotoCount} photo${visiblePhotoCount === 1 ? "" : "s"}</span>`
         : "");
-    return h("div", { style: "margin-bottom:40px;" },
+    return h("div", { style: "margin-bottom:28px;" },
       h("p", { style: "font-size:18px;font-weight:600;color:#0a1629;line-height:1.35;margin:0;" }, e.note),
       h("div", { style: "margin-top:4px;" }, metaLine),
       e.noPhotos ? "" : renderPhotos(e.photos),
@@ -2845,7 +2849,7 @@ function ReportsTab({ demoCase }) {
       (_, i) => !(preview.excludedPhotos && preview.excludedPhotos[`${entryKey}_${i}`])
     ).length;
     return (
-      <div style={{ marginBottom: 40 }}>
+      <div style={{ marginBottom: 28 }}>
         {/* Renaming here only overrides the title for this report — the
             original task/entry text is never modified. No pencil icon —
             hover shows the grey02 affordance, click edits. */}
@@ -3833,7 +3837,7 @@ function ReportsTab({ demoCase }) {
                               <div className="tt-skeleton" style={{ width: "60%", height: 18, marginBottom: 8 }} />
                               <div className="tt-skeleton" style={{ width: 160, height: 11, marginBottom: 10 }} />
                               {e.photos.length > 0 && (
-                                <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 4 }}>
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
                                   {[0, 1, 2, 3].map(pi => (
                                     <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "4/3", borderRadius: 4 }} />
                                   ))}
@@ -3886,7 +3890,7 @@ function ReportsTab({ demoCase }) {
                       <div style={{ width: PAGE_W, margin: "24px 0 0" }}>
                         <div className="tt-skeleton" style={{ width: "85%", height: 16, marginBottom: 10 }} />
                         {nextEntry && nextEntry.photos.length > 0 && (
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 4 }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
                             {[0, 1, 2].map(pi => (
                               <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "4/3", borderRadius: 4 }} />
                             ))}
