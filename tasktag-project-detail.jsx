@@ -616,15 +616,19 @@ function isHiddenByChrome(rect) {
 // Enter) just shows `errorMessage` below the field and leaves editing
 // open instead of calling onSave.
 //
-// `alwaysEditing` skips the click-to-edit dance entirely — used for fields
-// (Summary, per-entry notes) that should just read as a plain textarea/
-// input from the start. Every keystroke calls onSave directly (no deferred
-// draft, so there's nothing to cancel — no X here, only the click-to-edit
-// fields below get that). A single check button sits at the bottom-right
-// corner and is always visible, empty or not; clicking it (or pressing
-// Enter — Shift+Enter still inserts a newline in the textarea) just blurs
-// the field, signaling "done" without changing the already-live value.
-// `disabled` still wins over this (a saved/locked report shows plain text).
+// `alwaysEditing` skips the click-to-edit dance only while a field is
+// empty (Summary, per-entry notes read as a live textarea/input from the
+// start instead of hiding behind a placeholder click) — every keystroke
+// calls onSave directly, no deferred draft. Once it holds a value and
+// isn't focused, it flips to plain, clickable text (hover highlights it,
+// click re-opens the textarea/input and focuses it), same affordance as
+// every click-to-edit field below. A check button sits at the bottom-right
+// corner of the live textarea/input, disabled while empty; clicking it (or
+// pressing Enter — Shift+Enter still inserts a newline) just blurs the
+// field, which is what triggers the flip to plain text. No X here — there's
+// no deferred draft to discard, only the click-to-edit fields below get
+// that. `disabled` still wins over all of this (a saved/locked report
+// shows plain text unconditionally).
 //
 // `popover` (company name/address, client name) opens a small 240px-wide
 // caret popover off the trigger's own bounding rect instead of swapping
@@ -644,6 +648,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
   const [draft, setDraft] = useState(value || "");
   const [error, setError] = useState(false);
   const alwaysEditingRef = useRef(null);
+  const [alwaysEditingFocused, setAlwaysEditingFocused] = useState(false);
   const editing = !disabled && !alwaysEditing && activeField === fieldId;
 
   const [popoverOpen, setPopoverOpen] = useState(false);
@@ -766,13 +771,39 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
         <Check size={15} strokeWidth={SW} color="white" />
       </button>
     );
+
+    // Once it holds a value and isn't actively focused, it reads as plain,
+    // clickable text — same hover-then-click affordance as every other
+    // EditableField (see the plain "display" branch below). An empty field
+    // skips this and always shows the live textarea/input instead of
+    // hiding behind a placeholder click.
+    if (!isEmpty && !alwaysEditingFocused) {
+      const textTag = (
+        <Tag
+          onClick={() => setAlwaysEditingFocused(true)}
+          onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey03)"}
+          onMouseLeave={ev => ev.currentTarget.style.background = "none"}
+          style={{ display: "block", cursor: "pointer", borderRadius: 6, margin: 0, whiteSpace: multiline ? "pre-wrap" : "normal", ...textStyle }}
+        >
+          {value}
+        </Tag>
+      );
+      return multiline ? <div style={boxStyle}>{textTag}</div> : textTag;
+    }
+
+    // `!isEmpty` guards the focus() call — it only needs to fire on the
+    // transition from the text tag above into this textarea/input (a fresh
+    // mount, so nothing is focused yet), not on an empty field a user
+    // hasn't clicked into on its own.
     return multiline ? (
       <div style={boxStyle}>
         <div style={{ position: "relative" }}>
           <Textarea
-            ref={alwaysEditingRef}
+            ref={el => { alwaysEditingRef.current = el; if (el && !isEmpty) el.focus(); }}
             value={value}
             onChange={ev => onSave(ev.target.value)}
+            onFocus={() => setAlwaysEditingFocused(true)}
+            onBlur={() => setAlwaysEditingFocused(false)}
             onKeyDown={ev => { if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); done(); } }}
             placeholder={placeholder}
             rows={3}
@@ -784,10 +815,12 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
     ) : (
       <div style={{ position: "relative" }}>
         <Input
-          ref={alwaysEditingRef}
+          ref={el => { alwaysEditingRef.current = el; if (el && !isEmpty) el.focus(); }}
           type="text"
           value={value}
           onChange={ev => onSave(ev.target.value)}
+          onFocus={() => setAlwaysEditingFocused(true)}
+          onBlur={() => setAlwaysEditingFocused(false)}
           onKeyDown={ev => { if (ev.key === "Enter") { ev.preventDefault(); done(); } }}
           placeholder={placeholder}
           style={{ fontFamily: "inherit", padding: "0 44px 0 12px", ...inputStyle }}
