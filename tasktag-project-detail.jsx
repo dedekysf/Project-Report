@@ -1722,10 +1722,10 @@ const buildReportHTML = (report) => {
     // then only says "This week"/"September", not a specific date).
     const dueHTML = grouping === "day"
       ? ""
-      : `<span style="font-size:11px;font-weight:500;color:#828282;">Due: ${fmtDate(parseDate(e.date))}</span>` + dot;
+      : `<span style="font-size:11px;font-weight:500;color:#828282;">${fmtDate(parseDate(e.date))}</span>` + dot;
     const metaLine =
       `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${statusColor};vertical-align:middle;margin-right:6px;"></span>` +
-      `<span style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:${statusColor};">${statusMeta.label}${kind === "past_due" ? ` · ${daysAgo} days` : ""}</span>` +
+      `<span style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:${statusColor};">${statusMeta.label}${kind === "past_due" && daysAgo > 0 ? ` ${daysAgo} days` : ""}</span>` +
       dot +
       dueHTML +
       `<span style="font-size:11px;font-weight:500;color:#828282;">${ownerForEntry(e.date)}</span>` +
@@ -1825,8 +1825,8 @@ const buildReportHTML = (report) => {
           h("span", { style: "font-size:13px;font-weight:700;color:white;" }, initialsOf(POINT_OF_CONTACT_NAME))
         ),
         h("div", {},
-          h("p", { style: "font-size:14px;font-weight:700;color:#0a1629;line-height:1;margin:0 0 4px;" }, POINT_OF_CONTACT_NAME),
-          h("p", { style: "font-size:12px;font-weight:400;color:#828282;line-height:1;margin:0;" }, contactRoleLine)
+          h("p", { style: "font-size:11px;font-weight:600;color:#0a1629;line-height:1;margin:0 0 4px;" }, POINT_OF_CONTACT_NAME),
+          h("p", { style: "font-size:11px;font-weight:400;color:#828282;line-height:1;margin:0;" }, contactRoleLine)
         )
       ),
       h("div", { style: "text-align:right;" },
@@ -1871,6 +1871,12 @@ function ReportsTab({ demoCase }) {
   const [customRange, setCustomRange] = useState(null); // { start, end } date strings
   const prevDateRangeRef = useRef("last_7"); // dateRange to fall back to if custom is opened but no date is picked
   const [reports,     setReports]     = useState([]);
+  // The company identity (logo/name/address) last saved with any report —
+  // reused as the default for every new draft, and also substituted into
+  // every previously-saved report's download/copy output, so a later
+  // update to it retroactively applies everywhere instead of only going
+  // forward from the report it was captured on.
+  const [companyIdentity, setCompanyIdentity] = useState({ logo: null, companyName: "", companyAddress: "" });
   const [lastSavedId, setLastSavedId] = useState(null); // highlights the most recently saved row in the results table
   const [openPeriod,  setOpenPeriod]  = useState(false);
   const [toast,       setToast]       = useState(null); // { type: "success" | "error", message }
@@ -1971,6 +1977,12 @@ function ReportsTab({ demoCase }) {
       clientName,
     };
     setReports(prev => [newReport, ...prev]);
+    // Saving is what promotes this draft's identity to "the" company
+    // identity — future drafts start from it, and every already-saved
+    // report's download/copy switches to it too (see handleDownload/
+    // handleCopy, which read companyIdentity instead of their own
+    // frozen report.logo/companyName/companyAddress).
+    setCompanyIdentity({ logo, companyName, companyAddress });
     setLastSavedId(id);
     setTimeout(() => {
       setReports(prev => prev.map(r => r.id === id ? { ...r, status: "done" } : r));
@@ -2024,12 +2036,11 @@ function ReportsTab({ demoCase }) {
         // never regenerated for the life of this draft.
         projectName: PROJECT_NAME,
         address: PROJECT_ADDRESS,
-        logo: null,
-        // Left blank rather than pre-filled — shown as "Add company
-        // name"/"Add company address" placeholders until the user fills
-        // them in, same as target opening/prepared for.
-        companyName: "",
-        companyAddress: "",
+        // Pre-filled from the last saved report's company identity (if
+        // any) rather than always starting blank — see companyIdentity.
+        logo: companyIdentity.logo,
+        companyName: companyIdentity.companyName,
+        companyAddress: companyIdentity.companyAddress,
         summary: buildDefaultSummary(data.groups),
         targetOpening: "",
         clientName: "",
@@ -2254,11 +2265,11 @@ function ReportsTab({ demoCase }) {
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: statusMeta.color, flexShrink: 0 }} />
           <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: statusMeta.color }}>
-            {statusMeta.label}{kind === "past_due" ? ` · ${daysAgo} days` : ""}
+            {statusMeta.label}{kind === "past_due" && daysAgo > 0 ? ` ${daysAgo} days` : ""}
           </span>
           <span style={{ width: 3, height: 3, borderRadius: "50%", background: "var(--tt-grey04)", flexShrink: 0 }} />
           <span style={{ fontSize: 11, fontWeight: 500, color: "var(--tt-grey05)" }}>
-            Due: {fmtDate(parseDate(e.date))}
+            {fmtDate(parseDate(e.date))}
           </span>
           <span style={{ width: 3, height: 3, borderRadius: "50%", background: "var(--tt-grey04)", flexShrink: 0 }} />
           <span style={{ fontSize: 11, fontWeight: 500, color: "var(--tt-grey05)" }}>
@@ -2467,9 +2478,9 @@ function ReportsTab({ demoCase }) {
             <span style={{ fontSize: 13, fontWeight: 700, color: "white" }}>{initialsOf(POINT_OF_CONTACT_NAME)}</span>
           </div>
           <div>
-            <p style={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", lineHeight: 1, margin: "0 0 4px" }}>{POINT_OF_CONTACT_NAME}</p>
+            <p style={{ fontSize: 11, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: 1, margin: "0 0 4px" }}>{POINT_OF_CONTACT_NAME}</p>
             {/* TODO(BE): replace with the contact's actual role/company from the API */}
-            <p style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)", lineHeight: 1, margin: 0 }}>
+            <p style={{ fontSize: 11, fontWeight: 400, color: "var(--tt-grey05)", lineHeight: 1, margin: 0 }}>
               {POINT_OF_CONTACT_ROLE}{preview.companyName ? ` · ${preview.companyName}` : ""}
             </p>
           </div>
@@ -2717,7 +2728,9 @@ function ReportsTab({ demoCase }) {
   }, []);
 
   const handleDownload = (report) => {
-    const html = buildReportHTML(report);
+    // Company identity always reflects the latest save, not this report's
+    // own (possibly older) snapshot — see companyIdentity.
+    const html = buildReportHTML({ ...report, logo: companyIdentity.logo, companyName: companyIdentity.companyName, companyAddress: companyIdentity.companyAddress });
     const fileName = "report_" + report.period.replace(/[\s]/g, "_").replace(/–/g, "-") + ".html";
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -2767,8 +2780,10 @@ function ReportsTab({ demoCase }) {
     // not part of the shared link.
     if (report.projectName) params.set("projectName", report.projectName);
     if (report.address) params.set("address", report.address);
-    if (report.companyName) params.set("companyName", report.companyName);
-    if (report.companyAddress) params.set("companyAddress", report.companyAddress);
+    // Same reasoning as the download branch — the latest saved identity,
+    // not this report's own snapshot.
+    if (companyIdentity.companyName) params.set("companyName", companyIdentity.companyName);
+    if (companyIdentity.companyAddress) params.set("companyAddress", companyIdentity.companyAddress);
     // "summary" is already taken (the includeSummary toggle above) — the
     // summary text content gets its own key.
     if (report.summary) params.set("summaryText", report.summary);
