@@ -754,7 +754,7 @@ function TargetOpeningField({ fieldId, value, disabled, onApply }) {
   const open = !disabled && activeField === fieldId;
 
   if (disabled) {
-    return <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", margin: 0 }}>{value || "—"}</p>;
+    return <p style={{ fontSize: 12, fontWeight: 600, color: "var(--tt-text-1)", margin: 0 }}>{value || "—"}</p>;
   }
 
   return (
@@ -763,7 +763,7 @@ function TargetOpeningField({ fieldId, value, disabled, onApply }) {
         onClick={() => setActiveField(open ? null : fieldId)}
         onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
         onMouseLeave={ev => ev.currentTarget.style.background = "none"}
-        style={{ display: "inline-block", position: "relative", fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", textDecoration: value ? "none" : "underline", margin: 0, cursor: "pointer", borderRadius: 6, paddingRight: 16, transition: "background 0.15s" }}
+        style={{ display: "inline-block", position: "relative", fontSize: 12, fontWeight: 600, color: "var(--tt-text-1)", textDecoration: value ? "none" : "underline", margin: 0, cursor: "pointer", borderRadius: 6, paddingRight: 16, transition: "background 0.15s" }}
       >
         {value || "Add target date"}
         <Pencil size={10} strokeWidth={SW} className="tt-editable-pencil" style={{ position: "absolute", top: 2, right: 0, color: "var(--tt-grey06)", pointerEvents: "none" }} />
@@ -2187,7 +2187,7 @@ function ReportsTab({ demoCase }) {
 
       <div style={{ display: "flex", flexWrap: "nowrap", gap: 24 }}>
         <div style={{ flex: "1 1 0", display: "flex", alignItems: "center", gap: 8 }}>
-          <p style={{ fontSize: 14, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: 0, flexShrink: 0 }}>Target Opening</p>
+          <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: 0, flexShrink: 0 }}>Target Opening</p>
           <TargetOpeningField
             fieldId="targetOpening"
             value={preview.targetOpening}
@@ -2195,15 +2195,15 @@ function ReportsTab({ demoCase }) {
           />
         </div>
         <div style={{ flex: "1 1 0", display: "flex", alignItems: "center", gap: 8 }}>
-          <p style={{ fontSize: 14, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: 0, flexShrink: 0 }}>Prepared For</p>
+          <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: 0, flexShrink: 0 }}>Prepared For</p>
           <EditableField
             fieldId="clientName"
             value={preview.clientName}
             placeholder="Add client name"
             placeholderStyle={{ color: "var(--tt-text-1)" }}
             onSave={v => setPreview(p => ({ ...p, clientName: v }))}
-            textStyle={{ fontSize: 14, fontWeight: 600, color: preview.clientName ? "var(--tt-text-1)" : "var(--tt-grey05)", margin: 0 }}
-            inputStyle={{ fontSize: 14, fontWeight: 600, width: 170 }}
+            textStyle={{ fontSize: 12, fontWeight: 600, color: preview.clientName ? "var(--tt-text-1)" : "var(--tt-grey05)", margin: 0 }}
+            inputStyle={{ fontSize: 12, fontWeight: 600, width: 170 }}
           />
         </div>
       </div>
