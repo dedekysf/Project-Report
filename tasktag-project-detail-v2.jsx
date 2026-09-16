@@ -2047,7 +2047,7 @@ function ReportsTab({ demoCase }) {
     const { kind, daysAgo } = statusForEntry(e.date);
     const statusMeta = STATUS_META[kind];
     return (
-      <div style={{ marginBottom: 20 }}>
+      <div style={{ marginBottom: 24 }}>
         {/* Renaming here only overrides the title for this report — the
             original task/entry text is never modified. No pencil icon —
             hover shows the grey02 affordance, click edits. */}
