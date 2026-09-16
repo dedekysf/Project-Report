@@ -641,6 +641,21 @@ function isHiddenByChrome(rect) {
 // just closes the popover without saving, so there's no separate cancel
 // button to draw.
 //
+// Focuses an input/textarea and places the caret at the end of its current
+// text, instead of wherever the browser's default focus() leaves it (often
+// position 0) — every edit mode across EditableField/PhotoGrid uses this so
+// re-editing existing content always picks up at the end. A stable,
+// module-level function (not an inline arrow) so passing it directly as
+// `ref` only fires once per mount rather than on every re-render while
+// typing; call sites that also need to run other ref logic guard the call
+// with `el !== document.activeElement` for the same reason.
+function focusAtEnd(el) {
+  if (!el) return;
+  el.focus();
+  const len = el.value.length;
+  el.setSelectionRange(len, len);
+}
+
 // Whatever sits below an active (editing) field is always 8px away: a
 // non-boxed field's own wrapper carries that as marginBottom, multiline's
 // check/cancel row sits 8px under the textarea, and the error message (if
@@ -730,7 +745,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
             <div style={{ position: "relative", background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, padding: 8, boxShadow: "0 8px 24px rgba(10,22,41,0.16)" }}>
               <div style={{ position: "relative" }}>
                 <Input
-                  autoFocus
+                  ref={focusAtEnd}
                   value={draft}
                   onChange={ev => setDraft(ev.target.value)}
                   onKeyDown={ev => {
@@ -828,16 +843,19 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
     // `!isEmpty` guards the focus() call — it only needs to fire on the
     // transition from the text tag above into this textarea/input (a fresh
     // mount, so nothing is focused yet), not on an empty field a user
-    // hasn't clicked into on its own. `aboveWhenEditing` (Summary's
-    // "Summary"/"Optional" label row) only makes sense while the field is
-    // actually live — it disappears along with the textarea once the value
-    // flips to plain text above.
+    // hasn't clicked into on its own. `el !== document.activeElement` then
+    // keeps that from re-firing (and re-snapping the caret to the end) on
+    // every keystroke's re-render, once the field is already focused — see
+    // focusAtEnd. `aboveWhenEditing` (Summary's "Summary"/"Optional" label
+    // row) only makes sense while the field is actually live — it
+    // disappears along with the textarea once the value flips to plain
+    // text above.
     return multiline ? (
       <div style={boxStyle}>
         {aboveWhenEditing}
         <div style={{ position: "relative" }}>
           <Textarea
-            ref={el => { alwaysEditingRef.current = el; if (el && !isEmpty) el.focus(); }}
+            ref={el => { alwaysEditingRef.current = el; if (el && !isEmpty && el !== document.activeElement) focusAtEnd(el); }}
             value={value}
             onChange={ev => onSave(ev.target.value)}
             onFocus={() => setAlwaysEditingFocused(true)}
@@ -853,7 +871,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
     ) : (
       <div style={{ position: "relative" }}>
         <Input
-          ref={el => { alwaysEditingRef.current = el; if (el && !isEmpty) el.focus(); }}
+          ref={el => { alwaysEditingRef.current = el; if (el && !isEmpty && el !== document.activeElement) focusAtEnd(el); }}
           type="text"
           value={value}
           onChange={ev => onSave(ev.target.value)}
@@ -889,7 +907,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
       <div key="editing" style={{ position: "relative", maxWidth: "100%", minWidth: 0, ...(!boxed ? { marginBottom: 8 } : {}), ...boxStyle }}>
         {multiline ? (
           <textarea
-            ref={el => { if (el) { el.focus(); const len = el.value.length; el.setSelectionRange(len, len); } }}
+            ref={focusAtEnd}
             value={draft}
             onChange={onChange}
             onKeyDown={ev => {
@@ -906,7 +924,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
           />
         ) : (
           <input
-            ref={el => { if (el) { el.focus(); const len = el.value.length; el.setSelectionRange(len, len); } }}
+            ref={focusAtEnd}
             type="text"
             value={draft}
             onChange={onChange}
@@ -1349,7 +1367,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
                 <div style={{ position: "relative", background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, padding: 8, boxShadow: "0 8px 24px rgba(10,22,41,0.16)" }}>
                   <div style={{ position: "relative" }}>
                     <Input
-                      autoFocus
+                      ref={focusAtEnd}
                       value={caption || ""}
                       onChange={ev => onCaptionChange(i, ev.target.value)}
                       onKeyDown={ev => {
