@@ -1420,6 +1420,8 @@ function PhotoManagerModal({ photos, excludedPhotos, entryKey, taskName, onSetPh
   const includedCount = items.filter(({ i }) => !(excludedPhotos && excludedPhotos[`${entryKey}_${i}`])).length;
   const [limitWarning, setLimitWarning] = useState(false);
   const warningTimerRef = useRef(null);
+  const [cappedTooltipIdx, setCappedTooltipIdx] = useState(null); // index of the capped (disabled) photo currently hovered, or null
+  const [cappedTooltipPos, setCappedTooltipPos] = useState({ top: 0, left: 0 });
 
   useEffect(() => {
     const handler = e => { if (e.key === "Escape") onClose(); };
@@ -1477,6 +1479,12 @@ function PhotoManagerModal({ photos, excludedPhotos, entryKey, taskName, onSetPh
                   if (capped) { flashLimitWarning(); return; }
                   onSetPhotoExcluded(i, included);
                 }}
+                onMouseEnter={capped ? e => {
+                  const r = e.currentTarget.getBoundingClientRect();
+                  setCappedTooltipPos({ top: r.top - 8, left: r.left + r.width / 2 });
+                  setCappedTooltipIdx(i);
+                } : undefined}
+                onMouseLeave={capped ? () => setCappedTooltipIdx(null) : undefined}
                 style={{ position: "relative", padding: 0, border: "none", background: "none", cursor: capped ? "not-allowed" : "pointer", opacity: capped ? 0.45 : 1 }}
               >
                 <div style={{ position: "relative", width: "100%", aspectRatio: "16/9", borderRadius: 6, overflow: "hidden", outline: included ? "2px solid var(--tt-secondary)" : "2px solid transparent" }}>
@@ -1490,6 +1498,19 @@ function PhotoManagerModal({ photos, excludedPhotos, entryKey, taskName, onSetPh
           })}
         </div>
       </div>
+      {cappedTooltipIdx !== null && (
+        <div style={{
+          position: "fixed", zIndex: 5200,
+          top: cappedTooltipPos.top, left: cappedTooltipPos.left,
+          transform: "translate(-50%, -100%)",
+          background: "var(--tt-text-1)", color: "white",
+          fontSize: 11, fontWeight: 500, whiteSpace: "nowrap",
+          padding: "4px 8px", borderRadius: 4,
+          pointerEvents: "none",
+        }}>
+          Unselect an image first
+        </div>
+      )}
     </div>
   );
 }
