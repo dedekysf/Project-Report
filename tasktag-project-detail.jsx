@@ -611,22 +611,95 @@ const INERT_ACTIVE_EDIT = { activeField: null, setActiveField: () => {} };
 // field, signaling "done" without changing the already-live value.
 // `disabled` still wins over this (a saved/locked report shows plain text).
 //
+// `popover` (company name/address, client name) opens a small caret
+// popover off the trigger's own bounding rect instead of swapping inline —
+// same caret/positioning mechanics as the photo caption popover. Its draft
+// only commits on the single check button (or Enter); clicking outside (or
+// Escape) just closes the popover without saving, so there's no separate
+// cancel button to draw.
+//
 // Whatever sits below an active (editing) field is always 8px away: a
 // non-boxed field's own wrapper carries that as marginBottom, multiline's
 // check/cancel row sits 8px under the textarea, and the error message (if
 // any) sits 8px under that.
-function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, onCancel, multiline, disabled, boxed, required, errorMessage, textStyle, inputStyle, as: Tag = "p", alwaysEditing }) {
+function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, onCancel, multiline, disabled, boxed, required, errorMessage, textStyle, inputStyle, as: Tag = "p", alwaysEditing, popover }) {
   const { activeField, setActiveField } = useContext(ActiveEditContext);
   const [draft, setDraft] = useState(value || "");
   const [error, setError] = useState(false);
   const alwaysEditingRef = useRef(null);
   const editing = !disabled && !alwaysEditing && activeField === fieldId;
 
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
+  const triggerRef = useRef(null);
+  const popoverRef = useRef(null);
+  useEffect(() => {
+    if (!popoverOpen) return;
+    const handler = e => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target) && triggerRef.current && !triggerRef.current.contains(e.target)) {
+        setPopoverOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [popoverOpen]);
+
   const boxStyle = boxed ? { position: "relative", background: "var(--tt-grey02)", borderRadius: 8, padding: 8 } : {};
 
   if (disabled) {
     if (value) return <div style={boxStyle}><Tag style={{ display: "block", ...textStyle }}>{value}</Tag></div>;
     return placeholder ? <div style={boxStyle}><Tag style={{ display: "block", ...textStyle, color: "var(--tt-grey05)" }}>{placeholder}</Tag></div> : null;
+  }
+
+  if (popover) {
+    const openPopover = () => {
+      setDraft(value || "");
+      if (triggerRef.current) {
+        const r = triggerRef.current.getBoundingClientRect();
+        setPopoverPos({ top: r.bottom + 8, left: r.left });
+      }
+      setPopoverOpen(true);
+    };
+    const commit = () => { onSave(draft.trim()); setPopoverOpen(false); };
+    return (
+      <>
+        <Tag
+          ref={triggerRef}
+          onClick={openPopover}
+          onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey03)"}
+          onMouseLeave={ev => ev.currentTarget.style.background = "none"}
+          style={{ display: "inline-block", position: "relative", cursor: "pointer", ...textStyle }}
+        >
+          {value || <span style={{ color: "var(--tt-grey05)", textDecoration: "underline", ...placeholderStyle }}>{placeholder}</span>}
+        </Tag>
+        {popoverOpen && (
+          <div ref={popoverRef} style={{ position: "fixed", top: popoverPos.top, left: popoverPos.left, zIndex: 300, width: 200 }}>
+            <div style={{ position: "absolute", top: -5, left: 12, width: 10, height: 10, background: "white", border: "1px solid var(--tt-grey03)", borderRight: "none", borderBottom: "none", transform: "rotate(45deg)" }} />
+            <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 6, background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, padding: 8, boxShadow: "0 8px 24px rgba(10,22,41,0.16)" }}>
+              <Input
+                autoFocus
+                value={draft}
+                onChange={ev => setDraft(ev.target.value)}
+                onKeyDown={ev => {
+                  if (ev.key === "Enter") { ev.preventDefault(); commit(); }
+                  if (ev.key === "Escape") { ev.preventDefault(); setPopoverOpen(false); }
+                }}
+                placeholder={placeholder}
+                style={{ fontSize: 12, height: 32, flex: 1, minWidth: 0 }}
+              />
+              <button
+                onClick={commit}
+                onMouseEnter={ev => ev.currentTarget.style.opacity = "0.85"}
+                onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
+                style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: "pointer", padding: 0 }}
+              >
+                <Check size={15} strokeWidth={SW} color="white" />
+              </button>
+            </div>
+          </div>
+        )}
+      </>
+    );
   }
 
   if (alwaysEditing) {
@@ -993,12 +1066,12 @@ function PhotoThumb({ src, onClick }) {
 // even after some are removed. An entry with zero visible photos renders
 // nothing.
 //
-// A second, matching circle in the bottom-left corner is the caption
-// trigger — hover-only unless a caption is already set (same visibility
-// rule as the checkbox's "selected" state). Clicking it opens a small
-// caret popover, fixed-positioned off the trigger's own bounding rect (so
-// it isn't clipped by the grid/scroll container), with a single input for
-// the caption text. Only one popover is open at a time across the grid.
+// A second circle, centered over the thumbnail, is the caption trigger —
+// hover-only, always, even once a caption is already set. Clicking it
+// opens a small caret popover, fixed-positioned off the trigger's own
+// bounding rect (so it isn't clipped by the grid/scroll container), with a
+// single input for the caption text. Only one popover is open at a time
+// across the grid.
 function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, onToggleSelect, captions, onCaptionChange }) {
   const CAP = 4;
   const [expanded, setExpanded] = useState(false);
@@ -1067,9 +1140,10 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
                   setCaptionPos({ top: r.bottom + 8, left: r.left - 6 });
                   setOpenCaptionIdx(prev => prev === i ? null : i);
                 }}
-                className={`transition-opacity ${caption ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+                className="opacity-0 transition-opacity group-hover:opacity-100"
                 style={{
-                  position: "absolute", bottom: 6, left: 6, width: 20, height: 20, borderRadius: "50%",
+                  position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+                  width: 20, height: 20, borderRadius: "50%",
                   border: "none", background: "white",
                   display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
                   cursor: "pointer", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)",
@@ -1979,7 +2053,7 @@ const buildReportHTML = (report) => {
       h("span", { style: "font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;line-height:1;" }, "VIA TASKTAG")
     )
   );
-  const updateLineHTML = h("p", { style: "font-size:12px;font-weight:600;color:#828282;margin:0;" }, `Update No. ${report.version} \xB7 ${report.period}`);
+  const updateLineHTML = h("p", { style: "font-size:12px;font-weight:600;text-transform:uppercase;color:#828282;margin:0 0 12px;" }, `Update No. ${report.version} \xB7 ${report.period}`);
 
   // Full (page 1) vs. running (page 2+) header — mirrors renderFullHeader/
   // renderRunningHeader/renderCompanyIdentityRow exactly, each self-padded
@@ -1990,10 +2064,12 @@ const buildReportHTML = (report) => {
   const fullHeaderHTML = h("div", { style: `padding:${PAGE_PAD}px ${PAGE_PAD}px 0;` },
     identityRowHTML +
     h("div", { style: "height:1px;background:#e8e8e6;margin-bottom:20px;" }, "") +
-    h("div", { style: "display:flex;flex-direction:column;gap:4px;margin-bottom:24px;" },
+    h("div", { style: "margin-bottom:24px;" },
       updateLineHTML,
-      h("h2", { style: "font-size:28px;font-weight:700;color:#0a1629;line-height:1;margin:0;" }, projectName),
-      h("p", { style: "font-size:13px;font-weight:400;color:#828282;line-height:1;margin:0;" }, address)
+      h("div", { style: "display:flex;flex-direction:column;gap:4px;" },
+        h("h2", { style: "font-size:28px;font-weight:700;color:#0a1629;line-height:1;margin:0;" }, projectName),
+        h("p", { style: "font-size:13px;font-weight:400;color:#828282;line-height:1;margin:0;" }, address)
+      )
     ) +
     summaryHTML +
     targetRowHTML +
@@ -2426,7 +2502,7 @@ function ReportsTab({ demoCase }) {
     }
 
     return (
-      <div style={{ marginTop: 12, marginBottom: 12 }}>
+      <div style={{ marginTop: 16, marginBottom: 12 }}>
         <EditableField
           fieldId={`note_${key}`}
           value={preview.extraNotes[key] || ""}
@@ -2554,18 +2630,18 @@ function ReportsTab({ demoCase }) {
             placeholder="Add company name"
             placeholderStyle={{ color: "var(--tt-text-1)" }}
             disabled={!editable || previewSaved}
+            popover
             onSave={v => setPreview(p => ({ ...p, companyName: v }))}
             textStyle={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 2px" }}
-            inputStyle={{ fontSize: 14, fontWeight: 700 }}
           />
           <EditableField
             fieldId="companyAddress"
             value={preview.companyAddress}
             placeholder="Add company address"
             disabled={!editable || previewSaved}
+            popover
             onSave={v => setPreview(p => ({ ...p, companyAddress: v }))}
             textStyle={{ fontSize: 11, fontWeight: 400, color: "var(--tt-grey05)", margin: 0 }}
-            inputStyle={{ fontSize: 11, fontWeight: 400 }}
           />
         </div>
       </div>
@@ -2597,28 +2673,30 @@ function ReportsTab({ demoCase }) {
           Neither is required — an empty field just shows its placeholder.
           Summary and its progress bar sit directly below, with Target
           Opening/Prepared For after. */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 24 }}>
-        <p style={{ fontSize: 12, fontWeight: 600, color: "var(--tt-grey05)", margin: 0 }}>
+      <div style={{ marginBottom: 24 }}>
+        <p style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "var(--tt-grey05)", margin: "0 0 12px" }}>
           Update No. {preview.version} · {preview.period}
         </p>
-        <EditableField
-          fieldId="projectName"
-          value={preview.projectName}
-          placeholder={PROJECT_NAME}
-          disabled={previewSaved}
-          onSave={v => setPreview(p => ({ ...p, projectName: v }))}
-          textStyle={{ fontSize: 28, fontWeight: 700, color: "var(--tt-text-1)", lineHeight: 1, margin: 0 }}
-          inputStyle={{ fontSize: 28, fontWeight: 700, lineHeight: 1, color: "var(--tt-text-1)" }}
-        />
-        <EditableField
-          fieldId="address"
-          value={preview.address}
-          placeholder={PROJECT_ADDRESS}
-          disabled={previewSaved}
-          onSave={v => setPreview(p => ({ ...p, address: v }))}
-          textStyle={{ fontSize: 13, fontWeight: 400, color: "var(--tt-grey05)", lineHeight: 1, margin: 0 }}
-          inputStyle={{ fontSize: 13, fontWeight: 400, lineHeight: 1, color: "var(--tt-grey05)" }}
-        />
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <EditableField
+            fieldId="projectName"
+            value={preview.projectName}
+            placeholder={PROJECT_NAME}
+            disabled={previewSaved}
+            onSave={v => setPreview(p => ({ ...p, projectName: v }))}
+            textStyle={{ fontSize: 28, fontWeight: 700, color: "var(--tt-text-1)", lineHeight: 1, margin: 0 }}
+            inputStyle={{ fontSize: 28, fontWeight: 700, lineHeight: 1, color: "var(--tt-text-1)" }}
+          />
+          <EditableField
+            fieldId="address"
+            value={preview.address}
+            placeholder={PROJECT_ADDRESS}
+            disabled={previewSaved}
+            onSave={v => setPreview(p => ({ ...p, address: v }))}
+            textStyle={{ fontSize: 13, fontWeight: 400, color: "var(--tt-grey05)", lineHeight: 1, margin: 0 }}
+            inputStyle={{ fontSize: 13, fontWeight: 400, lineHeight: 1, color: "var(--tt-grey05)" }}
+          />
+        </div>
       </div>
 
       {/* Summary — set apart in its own grey02 box like a project
@@ -2628,7 +2706,7 @@ function ReportsTab({ demoCase }) {
           card), so the textarea fills the card directly underneath the
           label. Locked to plain text once the report is saved
           (`disabled`) — the box still wraps that locked text the same way. */}
-      <div style={{ background: "var(--tt-grey02)", borderRadius: 8, padding: 16 }}>
+      <div style={{ background: "var(--tt-grey02)", borderRadius: 12, padding: 16 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 4px", marginBottom: 8 }}>
           <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-2)", margin: 0 }}>Summary</p>
           <span style={{ fontSize: 10, fontWeight: 400, color: "var(--tt-grey05)" }}>Optional</span>
@@ -2666,9 +2744,9 @@ function ReportsTab({ demoCase }) {
             placeholder="Add client name"
             placeholderStyle={{ color: "var(--tt-text-1)" }}
             disabled={previewSaved}
+            popover
             onSave={v => setPreview(p => ({ ...p, clientName: v }))}
             textStyle={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: preview.clientName ? "var(--tt-text-1)" : "var(--tt-grey05)", margin: 0 }}
-            inputStyle={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", width: 170 }}
           />
         </div>
       </div>
