@@ -582,6 +582,17 @@ const ActiveEditContext = createContext({ activeField: null, setActiveField: () 
 // scaffold to pin ActiveEditContext to — see hiddenMeasuringScaffold.
 const INERT_ACTIVE_EDIT = { activeField: null, setActiveField: () => {} };
 
+// Keeps a fixed-position caret popover from rendering underneath the draft
+// modal's own fixed chrome bar (Photo Limit / Cancel / Save) — without
+// this, a trigger scrolled up near the top of the body pushes its popover
+// to overlap the chrome instead of sitting below it. `#draft-chrome` is the
+// chrome bar's own id; falls back to 0 (no clamp) if it isn't mounted.
+function clampPopoverTop(top) {
+  const chrome = document.getElementById("draft-chrome");
+  const minTop = chrome ? chrome.getBoundingClientRect().bottom + 8 : 0;
+  return Math.max(top, minTop);
+}
+
 // ── Inline-editable text ──
 // No pencil icon — hovering shows a grey03 background to signal the field
 // is editable, and clicking swaps it for an input (or textarea) with
@@ -654,7 +665,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
     const reposition = () => {
       if (!triggerRef.current) return;
       const r = triggerRef.current.getBoundingClientRect();
-      setPopoverPos({ top: r.bottom + 8, left: r.left });
+      setPopoverPos({ top: clampPopoverTop(r.bottom + 8), left: r.left });
     };
     window.addEventListener("scroll", reposition, true);
     window.addEventListener("resize", reposition);
@@ -676,7 +687,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
       setDraft(value || "");
       if (triggerRef.current) {
         const r = triggerRef.current.getBoundingClientRect();
-        setPopoverPos({ top: r.bottom + 8, left: r.left });
+        setPopoverPos({ top: clampPopoverTop(r.bottom + 8), left: r.left });
       }
       setPopoverOpen(true);
     };
@@ -1125,7 +1136,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
     const reposition = () => {
       if (!captionTriggerRef.current) return;
       const r = captionTriggerRef.current.getBoundingClientRect();
-      setCaptionPos({ top: r.bottom + 8, left: r.left - 6 });
+      setCaptionPos({ top: clampPopoverTop(r.bottom + 8), left: r.left - 6 });
     };
     window.addEventListener("scroll", reposition, true);
     window.addEventListener("resize", reposition);
@@ -1187,7 +1198,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
                   e.stopPropagation();
                   captionTriggerRef.current = e.currentTarget;
                   const r = e.currentTarget.getBoundingClientRect();
-                  setCaptionPos({ top: r.bottom + 8, left: r.left - 6 });
+                  setCaptionPos({ top: clampPopoverTop(r.bottom + 8), left: r.left - 6 });
                   setOpenCaptionIdx(prev => prev === i ? null : i);
                 }}
                 className="opacity-0 transition-opacity group-hover:opacity-100"
@@ -3407,6 +3418,7 @@ function ReportsTab({ demoCase }) {
                 the document below, so the two line up instead of the bar
                 stretching edge-to-edge across the full screen. */}
             <div
+              id="draft-chrome"
               style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px",
                 borderBottom: "1px solid var(--tt-grey03)", flexShrink: 0, background: "white",
