@@ -620,8 +620,9 @@ function isHiddenByChrome(rect) {
 // input from the start. Every keystroke calls onSave directly (no deferred
 // draft, so there's nothing to cancel — no X here, only the click-to-edit
 // fields below get that). A single check button sits at the bottom-right
-// corner and is always visible, empty or not; clicking it just blurs the
-// field, signaling "done" without changing the already-live value.
+// corner and is always visible, empty or not; clicking it (or pressing
+// Enter — Shift+Enter still inserts a newline in the textarea) just blurs
+// the field, signaling "done" without changing the already-live value.
 // `disabled` still wins over this (a saved/locked report shows plain text).
 //
 // `popover` (company name/address, client name) opens a small 240px-wide
@@ -771,6 +772,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
             ref={alwaysEditingRef}
             value={value}
             onChange={ev => onSave(ev.target.value)}
+            onKeyDown={ev => { if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); done(); } }}
             placeholder={placeholder}
             rows={3}
             style={{ fontFamily: "inherit", paddingRight: 44, overflowY: "hidden", ...inputStyle }}
@@ -785,6 +787,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
           type="text"
           value={value}
           onChange={ev => onSave(ev.target.value)}
+          onKeyDown={ev => { if (ev.key === "Enter") { ev.preventDefault(); done(); } }}
           placeholder={placeholder}
           style={{ fontFamily: "inherit", padding: "0 44px 0 12px", ...inputStyle }}
         />
