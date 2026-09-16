@@ -1230,7 +1230,7 @@ function PhotoThumb({ src, onClick }) {
 // grid/scroll container), with a single input for the caption text. Only
 // one popover is open at a time across the grid.
 function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, onToggleSelect, captions, onCaptionChange, onSetPhotoExcluded }) {
-  const CAP = 4;
+  const CAP = 3;
   const [expanded, setExpanded] = useState(false);
   const [openCaptionIdx, setOpenCaptionIdx] = useState(null); // original photo index, or null
   const [captionPos, setCaptionPos] = useState({ top: 0, left: 0 });
@@ -1289,16 +1289,15 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
 
   return (
     <div>
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginTop: 10 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginTop: 10 }}>
       {visibleItems.map(({ k, i }, viewIdx) => {
         const selected = !!(selectedPhotos && selectedPhotos[`${entryKey}_${i}`]);
         const isCapCell = !expanded && remaining > 0 && viewIdx === visibleItems.length - 1;
         const canOpen = !!(IMG_MAP[k] && onOpen) && !isCapCell;
         const caption = captions && captions[`${entryKey}_${i}`];
         return (
+          <div key={i} className="group" style={{ display: "flex", flexDirection: "column" }}>
           <div
-            key={i}
-            className="group"
             style={{ position: "relative" }}
             onMouseEnter={e => { if (canOpen && !selected) e.currentTarget.lastElementChild.style.opacity = "1"; }}
             onMouseLeave={e => { if (canOpen) e.currentTarget.lastElementChild.style.opacity = "0"; }}
@@ -1424,6 +1423,12 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
                 </div>
               </div>
             )}
+          </div>
+          {!isCapCell && caption && (
+            <p style={{ fontSize: 11, color: "var(--tt-grey06)", margin: "4px 0 0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {caption}
+            </p>
+          )}
           </div>
         );
       })}
@@ -3844,8 +3849,8 @@ function ReportsTab({ demoCase }) {
                               <div className="tt-skeleton" style={{ width: "60%", height: 18, marginBottom: 8 }} />
                               <div className="tt-skeleton" style={{ width: 160, height: 11, marginBottom: 10 }} />
                               {e.photos.length > 0 && (
-                                <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
-                                  {[0, 1, 2, 3].map(pi => (
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
+                                  {[0, 1, 2].map(pi => (
                                     <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "4/3", borderRadius: 4 }} />
                                   ))}
                                 </div>
@@ -3897,7 +3902,7 @@ function ReportsTab({ demoCase }) {
                       <div style={{ width: PAGE_W, margin: "24px 0 0" }}>
                         <div className="tt-skeleton" style={{ width: "85%", height: 16, marginBottom: 10 }} />
                         {nextEntry && nextEntry.photos.length > 0 && (
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
                             {[0, 1, 2].map(pi => (
                               <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "4/3", borderRadius: 4 }} />
                             ))}
