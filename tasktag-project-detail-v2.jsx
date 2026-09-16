@@ -2984,9 +2984,9 @@ function ReportsTab({ demoCase }) {
         alwaysEditing
         multiline
         aboveWhenEditing={
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 4px", marginBottom: 8 }}>
+          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", padding: "0 4px", marginBottom: 8 }}>
             <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-2)", margin: 0 }}>Summary</p>
-            <span style={{ fontSize: 10, fontWeight: 400, color: "var(--tt-grey05)" }}>Optional</span>
+            <span style={{ fontSize: 10, fontWeight: 400, color: "var(--tt-grey05)", lineHeight: 1 }}>Optional</span>
           </div>
         }
         onSave={v => setPreview(p => ({ ...p, summary: v }))}
