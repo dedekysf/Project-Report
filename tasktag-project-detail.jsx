@@ -727,7 +727,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
             onChange={ev => onSave(ev.target.value)}
             placeholder={placeholder}
             rows={3}
-            style={{ fontFamily: "inherit", paddingRight: 44, paddingBottom: 40, minHeight: 116, overflowY: "hidden", ...inputStyle }}
+            style={{ fontFamily: "inherit", paddingRight: 44, overflowY: "hidden", ...inputStyle }}
           />
           <div style={{ position: "absolute", right: 6, bottom: 6 }}>{confirmButton}</div>
         </div>
