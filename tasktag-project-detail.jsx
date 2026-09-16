@@ -634,7 +634,14 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
             ref={el => { if (el) { el.focus(); const len = el.value.length; el.setSelectionRange(len, len); } }}
             value={draft}
             onChange={onChange}
-            onKeyDown={ev => { if (ev.key === "Escape") { ev.preventDefault(); cancel(); } }}
+            onKeyDown={ev => {
+              if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); commit(); }
+              // stopPropagation so this only cancels the field's own edit —
+              // without it, the keydown still bubbles to the preview
+              // modal's own document-level Escape listener and closes the
+              // whole modal right behind it.
+              if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); cancel(); }
+            }}
             rows={3}
             placeholder={placeholder}
             style={{ display: "block", width: "100%", fontFamily: "inherit", border: `1px solid ${error ? "var(--tt-red)" : "var(--tt-text-1)"}`, borderRadius: 8, outline: "none", resize: "none", padding: "8px 12px", boxSizing: "border-box", background: "white", ...inputStyle }}
@@ -647,7 +654,9 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
             onChange={onChange}
             onKeyDown={ev => {
               if (ev.key === "Enter") { ev.preventDefault(); commit(); }
-              if (ev.key === "Escape") { ev.preventDefault(); cancel(); }
+              // Same reasoning as the textarea above — stop this from also
+              // bubbling into the modal's own Escape-to-close listener.
+              if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); cancel(); }
             }}
             placeholder={placeholder}
             style={{ fieldSizing: "content", width: "100%", maxWidth: "100%", minWidth: 120, height: 40, padding: "0 76px 0 12px", border: `1px solid ${error ? "var(--tt-red)" : "var(--tt-text-1)"}`, borderRadius: 8, fontFamily: "inherit", outline: "none", boxSizing: "border-box", ...inputStyle }}
@@ -1688,6 +1697,18 @@ const IMG_MAP = {
 const toAbsoluteUrl = (src) => {
   try { return new URL(src, window.location.href).href; } catch (e) { return src; }
 };
+
+// Same transform the download filename already applies (see handleDownload)
+// — spaces to underscores, the en dash to a plain hyphen — so a copied
+// share link reads as cleanly as "Sep_4_-_Sep_10" instead of URL-encoding
+// the en dash out to "%E2%80%93" and spaces to "+". Reversible: period
+// strings are always system-generated (date ranges, "This week",
+// "September 2026", ...), never free text, so round-tripping through
+// desanitizePeriodFromUrl reconstructs the exact original — which matters
+// since parsePeriodDates re-parses this same string to recover the
+// original date range for "custom"/"since_last" shares.
+const sanitizePeriodForUrl = (period) => period.replace(/\s+/g, "_").replace(/–/g, "-");
+const desanitizePeriodFromUrl = (period) => period.replace(/_/g, " ").replace(/-/g, "–");
 
 // ── HTML report generator ──
 // Builds the same report content (header, meta, schedule status, task
@@ -2857,7 +2878,7 @@ function ReportsTab({ demoCase }) {
     // Company identity always reflects the latest save, not this report's
     // own (possibly older) snapshot — see companyIdentity.
     const html = buildReportHTML({ ...report, logo: companyIdentity.logo, companyName: companyIdentity.companyName, companyAddress: companyIdentity.companyAddress });
-    const fileName = "report_" + report.period.replace(/[\s]/g, "_").replace(/–/g, "-") + ".html";
+    const fileName = "report_" + sanitizePeriodForUrl(report.period) + ".html";
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -2878,7 +2899,7 @@ function ReportsTab({ demoCase }) {
     // snapshot) still shows them, and the two outputs would diverge.
     const params = new URLSearchParams({
       range: report.dateRange || "custom",
-      period: report.period,
+      period: sanitizePeriodForUrl(report.period),
     });
     if (report.includeSummary === false) params.set("summary", "0");
     if (report.includeNoPhotoTasks === false) params.set("nophotos", "0");
@@ -3636,7 +3657,8 @@ function ReportPage({ dateRange, period, includeSummary, includeNoPhotoTasks, no
 
 export default function ProjectDetail() {
   const params = new URLSearchParams(window.location.search);
-  const sharedPeriod = params.get("period");
+  const sharedPeriodRaw = params.get("period");
+  const sharedPeriod = sharedPeriodRaw ? desanitizePeriodFromUrl(sharedPeriodRaw) : sharedPeriodRaw;
   if (sharedPeriod) return (
     <ReportPage
       dateRange={params.get("range")}
