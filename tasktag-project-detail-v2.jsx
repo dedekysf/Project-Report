@@ -750,7 +750,10 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
                   onChange={ev => setDraft(ev.target.value)}
                   onKeyDown={ev => {
                     if (ev.key === "Enter") { ev.preventDefault(); commit(); }
-                    if (ev.key === "Escape") { ev.preventDefault(); setPopoverOpen(false); }
+                    // stopPropagation so this only closes the popover, not
+                    // the whole preview modal — same reasoning as the
+                    // click-to-edit fields' Escape handler.
+                    if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); setPopoverOpen(false); }
                   }}
                   placeholder={placeholder}
                   style={{ fontSize: 12, height: 32, padding: "0 36px 0 10px" }}
@@ -860,7 +863,13 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
             onChange={ev => onSave(ev.target.value)}
             onFocus={() => setAlwaysEditingFocused(true)}
             onBlur={() => setAlwaysEditingFocused(false)}
-            onKeyDown={ev => { if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); done(); } }}
+            onKeyDown={ev => {
+              if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); done(); }
+              // Same reasoning as the click-to-edit fields' Escape handler —
+              // stopPropagation so this only cancels this field's own edit,
+              // not the whole preview modal.
+              if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); cancelEdit(); }
+            }}
             placeholder={placeholder}
             rows={2}
             style={{ fontFamily: "inherit", paddingRight: showCancel ? 76 : 44, overflowY: "hidden", ...inputStyle }}
@@ -877,7 +886,10 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
           onChange={ev => onSave(ev.target.value)}
           onFocus={() => setAlwaysEditingFocused(true)}
           onBlur={() => setAlwaysEditingFocused(false)}
-          onKeyDown={ev => { if (ev.key === "Enter") { ev.preventDefault(); done(); } }}
+          onKeyDown={ev => {
+            if (ev.key === "Enter") { ev.preventDefault(); done(); }
+            if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); cancelEdit(); }
+          }}
           placeholder={placeholder}
           style={{ fontFamily: "inherit", padding: showCancel ? "0 76px 0 12px" : "0 44px 0 12px", ...inputStyle }}
         />
@@ -1371,7 +1383,12 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
                       value={caption || ""}
                       onChange={ev => onCaptionChange(i, ev.target.value)}
                       onKeyDown={ev => {
-                        if (ev.key === "Enter" || ev.key === "Escape") { ev.preventDefault(); setOpenCaptionIdx(null); }
+                        if (ev.key === "Enter") { ev.preventDefault(); setOpenCaptionIdx(null); }
+                        // Unlike Enter, Escape discards this session's
+                        // change — captions auto-save on every keystroke
+                        // (no deferred draft), so "cancel" means reverting
+                        // to whatever it held when the popover opened.
+                        if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); onCaptionChange(i, captionStartRef.current); setOpenCaptionIdx(null); }
                       }}
                       placeholder="Add a caption"
                       style={{ fontSize: 12, height: 32, padding: "0 36px 0 10px" }}
@@ -1814,7 +1831,10 @@ const PERIOD_RANGE = {
 
 // ── Dummy data ──
 const DUMMY_ENTRIES = [
-  { date: "2026-09-10", note: "Flooring installation started on the ground floor.", photos: ["img5", "img1", "img6", "img2", "img3", "img7", "img4", "img8"] },
+  // Deliberately over PER_ENTRY_PHOTO_LIMIT (12) — the most recent entry is
+  // always the first task item shown, so the swap-photos UI has something
+  // to demo without needing a specific date range.
+  { date: "2026-09-10", note: "Flooring installation started on the ground floor.", photos: ["img5", "img1", "img6", "img2", "img3", "img7", "img4", "img8", "img9", "img1", "img2", "img3", "img4", "img5"] },
   { date: "2026-09-09", note: "Exterior siding repairs completed on the south wall.", photos: ["img9", "img2", "img3", "img7", "img4", "img5", "img6"] },
   { date: "2026-09-08", note: "Final electrical connections completed in the main panel.", photos: ["img9", "img8"] },
   { date: "2026-09-07", note: "Plumbing fixtures installed in all bathrooms.", photos: [] },
