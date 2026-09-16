@@ -1200,7 +1200,7 @@ function PhotoThumb({ src, onClick }) {
   return (
     <div
       onClick={onClick}
-      style={{ position: "relative", width: "100%", aspectRatio: "4/3", borderRadius: 4, overflow: "hidden", cursor: onClick ? "pointer" : "default" }}
+      style={{ position: "relative", width: "100%", aspectRatio: "16/9", borderRadius: 4, overflow: "hidden", cursor: onClick ? "pointer" : "default" }}
     >
       {!loaded && <div className="tt-skeleton" style={{ position: "absolute", inset: 0, borderRadius: 0 }} />}
       <img
@@ -1487,7 +1487,7 @@ function PhotoManagerModal({ photos, excludedPhotos, entryKey, taskName, onSetPh
                 }}
                 style={{ position: "relative", padding: 0, border: "none", background: "none", cursor: capped ? "not-allowed" : "pointer", opacity: capped ? 0.45 : 1 }}
               >
-                <div style={{ position: "relative", width: "100%", aspectRatio: "4/3", borderRadius: 6, overflow: "hidden", outline: included ? "2px solid var(--tt-secondary)" : "2px solid transparent" }}>
+                <div style={{ position: "relative", width: "100%", aspectRatio: "16/9", borderRadius: 6, overflow: "hidden", outline: included ? "2px solid var(--tt-secondary)" : "2px solid transparent" }}>
                   <img src={IMG_MAP[k]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                   <span style={{ position: "absolute", top: 6, right: 6, width: 20, height: 20, borderRadius: "50%", background: included ? "var(--tt-secondary)" : "rgba(10,22,41,0.35)", border: included ? "none" : "1.5px solid white", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     {included && <Check size={12} color="white" strokeWidth={3} />}
@@ -2257,7 +2257,7 @@ const buildReportHTML = (report) => {
     const cells = (photos || []).map(k => {
       const src = IMG_MAP[k];
       return src
-        ? selfClose("img", { src: toAbsoluteUrl(src), style: "width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:4px;display:block;" })
+        ? selfClose("img", { src: toAbsoluteUrl(src), style: "width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:4px;display:block;" })
         : "";
     }).filter(Boolean);
     if (cells.length === 0) return "";
@@ -3882,7 +3882,7 @@ function ReportsTab({ demoCase }) {
                               {e.photos.length > 0 && (
                                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
                                   {[0, 1, 2, 3, 4, 5].map(pi => (
-                                    <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "4/3", borderRadius: 4 }} />
+                                    <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "16/9", borderRadius: 4 }} />
                                   ))}
                                 </div>
                               )}
@@ -3935,7 +3935,7 @@ function ReportsTab({ demoCase }) {
                         {nextEntry && nextEntry.photos.length > 0 && (
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
                             {[0, 1, 2].map(pi => (
-                              <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "4/3", borderRadius: 4 }} />
+                              <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "16/9", borderRadius: 4 }} />
                             ))}
                           </div>
                         )}
