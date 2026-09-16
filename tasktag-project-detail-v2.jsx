@@ -248,7 +248,7 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
     });
   };
 
-  // ── Fixed position: left-aligned to anchor, above/below based on window ──
+  // ── Fixed position: left-aligned to anchor, always below it ──
   const [pos, setPos] = useState({ top: 0, left: 0 });
   useLayoutEffect(() => {
     if (!anchorRef?.current || !calRef.current) return;
@@ -263,18 +263,10 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
     let left = anchor.left;
     left = Math.min(left, vw - CAL_W - MARGIN);
 
-    // prefer below; flip above if not enough space below
-    const spaceBelow = vh - anchor.bottom - MARGIN;
-    const spaceAbove = anchor.top - MARGIN;
-    let top;
-    if (spaceBelow >= CAL_H) {
-      top = anchor.bottom + MARGIN;
-    } else if (spaceAbove >= CAL_H) {
-      top = anchor.top - CAL_H - MARGIN;
-    } else {
-      // not enough space either way — center vertically in viewport
-      top = Math.max(MARGIN, (vh - CAL_H) / 2);
-    }
+    // Always opens below the anchor, never above it — only nudged up if it
+    // would otherwise overflow the bottom of the viewport.
+    let top = anchor.bottom + MARGIN;
+    top = Math.min(top, Math.max(MARGIN, vh - CAL_H - MARGIN));
 
     setPos({ top, left });
   }, [anchorRef]);
@@ -396,7 +388,7 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
 
           // seamless range band: full-width bg between start and end (inclusive of selected ends)
           const lo = rangeStart;
-          const hi = effectiveEnd && effectiveEnd > rangeStart ? effectiveEnd : rangeStart && !rangeEnd && hovering && hovering > rangeStart ? hovering : null;
+          const hi = singleDate ? null : effectiveEnd && effectiveEnd > rangeStart ? effectiveEnd : rangeStart && !rangeEnd && hovering && hovering > rangeStart ? hovering : null;
           const inBand = lo && hi && key >= lo && key <= hi;
 
           // band left/right caps for rounded ends
@@ -2101,12 +2093,20 @@ function ReportsTab({ demoCase }) {
   // The logo/company identity row is the only thing that repeats on every
   // page (see renderRunningHeader) — factored out so both variants render
   // it identically.
-  const renderCompanyIdentityRow = () => (
+  // `editable` is false for every repeat of this row on pages 2+ (and in the
+  // hidden measuring scaffold's running-header copy) — company name/address
+  // share a single fieldId, so if every repeat stayed interactive, clicking
+  // to edit on one page would flip every other page's copy into edit mode
+  // too (they all watch the same ActiveEditContext.activeField). Only the
+  // page-1 (full header) copy is ever actually editable; the rest just
+  // mirror its committed value as plain, non-interactive text/image.
+  const renderCompanyIdentityRow = (editable = true) => (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <LogoUploadBox
           src={preview.logo}
           onChange={url => setPreview(p => ({ ...p, logo: url }))}
+          disabled={!editable}
         />
         <div>
           {/* TODO(BE): replace with the firm's actual name from the API */}
@@ -2115,6 +2115,7 @@ function ReportsTab({ demoCase }) {
             value={preview.companyName}
             placeholder="Add company name"
             placeholderStyle={{ color: "var(--tt-text-1)" }}
+            disabled={!editable}
             onSave={v => setPreview(p => ({ ...p, companyName: v }))}
             textStyle={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 4px" }}
             inputStyle={{ fontSize: 14, fontWeight: 700 }}
@@ -2123,6 +2124,7 @@ function ReportsTab({ demoCase }) {
             fieldId="companyAddress"
             value={preview.companyAddress}
             placeholder="Add company address"
+            disabled={!editable}
             onSave={v => setPreview(p => ({ ...p, companyAddress: v }))}
             textStyle={{ fontSize: 11, fontWeight: 400, color: "var(--tt-grey05)", margin: 0 }}
             inputStyle={{ fontSize: 11, fontWeight: 400 }}
@@ -2236,7 +2238,7 @@ function ReportsTab({ demoCase }) {
   // page-1-only content, not repeated.
   const renderRunningHeader = () => (
     <div style={{ padding: `${PAGE_PAD}px ${PAGE_PAD}px 0` }}>
-      {renderCompanyIdentityRow()}
+      {renderCompanyIdentityRow(false)}
       <div style={{ height: 1, background: "var(--tt-grey03)", marginBottom: 24 }} />
     </div>
   );
