@@ -1403,7 +1403,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
             )}
           </div>
           {!isCapCell && caption && (
-            <p style={{ fontSize: 11, color: "var(--tt-grey06)", margin: "4px 0 0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            <p style={{ fontSize: 11, color: "var(--tt-grey06)", margin: "4px 0 4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {caption}
             </p>
           )}
