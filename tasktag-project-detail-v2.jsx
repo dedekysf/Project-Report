@@ -200,9 +200,15 @@ const PAGE_PAD = 40;
 // status field of its own. Most entries are simply completed (they're a
 // log of work already done); a deterministic minority are flagged
 // in_progress or past_due so the report shows all three states.
-function statusForEntry(dateStr) {
+function statusForEntry(e) {
+  const dateStr = typeof e === "string" ? e : e.date;
   const d = parseDate(dateStr);
   const daysAgo = Math.round((APP_TODAY - d) / 86400000);
+  // forcePastDue guarantees at least one Past Due example in every report
+  // (see buildReportData) — the daysAgo>14 condition below can never fire
+  // on its own for a short/recent period, since every entry in it is by
+  // definition within the last few days.
+  if (typeof e === "object" && e.forcePastDue) return { kind: "past_due", daysAgo };
   const bucket = d.getDate() % 5;
   if (bucket === 0) return { kind: daysAgo > 14 ? "past_due" : "in_progress", daysAgo };
   return { kind: "completed", daysAgo };
@@ -630,10 +636,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
             onKeyDown={ev => { if (ev.key === "Escape") { ev.preventDefault(); cancel(); } }}
             rows={3}
             placeholder={placeholder}
-            style={boxed
-              ? { display: "block", width: "100%", fontFamily: "inherit", border: "none", outline: "none", resize: "none", padding: 0, margin: 0, background: "none", boxSizing: "border-box", ...inputStyle }
-              : { display: "block", width: "100%", fontFamily: "inherit", border: `1px solid ${error ? "var(--tt-red)" : "var(--tt-text-1)"}`, borderRadius: 8, outline: "none", resize: "none", padding: "8px 12px", boxSizing: "border-box", ...inputStyle }
-            }
+            style={{ display: "block", width: "100%", fontFamily: "inherit", border: `1px solid ${error ? "var(--tt-red)" : "var(--tt-text-1)"}`, borderRadius: 8, outline: "none", resize: "none", padding: "8px 12px", boxSizing: "border-box", ...inputStyle }}
           />
         ) : (
           <input
@@ -1517,6 +1520,27 @@ function buildReportData(dateRange, periodStr, customRange, includeNoPhotoTasks 
   }));
   groups = applyPhotoCap(groups).filter(g => g.entries.length > 0);
 
+  // Guarantee at least one Past Due example in every generated report —
+  // the bucket-based status assignment's daysAgo>14 condition can never
+  // fire naturally for a short/recent period, since every entry in it is
+  // by definition from the last few days, so without this a "Last 7 days"
+  // (or similar) report could never show one. Forces it on the earliest
+  // entry in the period if nothing already qualifies on its own.
+  const hasPastDue = groups.some(g => g.entries.some(e => !e.isNote && statusForEntry(e).kind === "past_due"));
+  if (!hasPastDue) {
+    let oldest = null;
+    groups.forEach(g => g.entries.forEach(e => {
+      if (e.isNote) return;
+      if (!oldest || e.date < oldest.date) oldest = e;
+    }));
+    if (oldest) {
+      groups = groups.map(g => ({
+        ...g,
+        entries: g.entries.map(e => e === oldest ? { ...e, forcePastDue: true } : e),
+      }));
+    }
+  }
+
   // completed = entries actually attached to this report (countable from
   // what's shown below), total = the whole project's activity log — so the
   // number is always directly verifiable against the visible entries,
@@ -1684,17 +1708,24 @@ const buildReportHTML = (report) => {
         h("p", { style: "font-size:12px;font-style:italic;color:#303742;line-height:1.5;margin:0;padding:8px;border-radius:8px;" }, e.note)
       );
     }
-    const { kind, daysAgo } = statusForEntry(e.date);
+    const { kind, daysAgo } = statusForEntry(e);
     const statusMeta = STATUS_META[kind];
     const statusColor = STATUS_HEX[kind];
     const visiblePhotoCount = (e.photos || []).length;
     const dot = "<span style=\"display:inline-block;width:3px;height:3px;border-radius:50%;background:#bdbdbd;vertical-align:middle;margin:0 6px;\"></span>";
+    // Grouped-by-day sections already show the date in their group label
+    // right above (e.g. "SEP 10") — repeating "Due: Sep 10" on every entry
+    // underneath it is redundant, so this line-only skips it when grouping
+    // is "day" (week/month grouping still needs it, since the group label
+    // then only says "This week"/"September", not a specific date).
+    const dueHTML = grouping === "day"
+      ? ""
+      : `<span style="font-size:11px;font-weight:500;color:#828282;">Due: ${fmtDate(parseDate(e.date))}</span>` + dot;
     const metaLine =
       `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${statusColor};vertical-align:middle;margin-right:6px;"></span>` +
       `<span style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:${statusColor};">${statusMeta.label}${kind === "past_due" ? ` · ${daysAgo} days` : ""}</span>` +
       dot +
-      `<span style="font-size:11px;font-weight:500;color:#828282;">Due: ${fmtDate(parseDate(e.date))}</span>` +
-      dot +
+      dueHTML +
       `<span style="font-size:11px;font-weight:500;color:#828282;">${ownerForEntry(e.date)}</span>` +
       (!e.noPhotos && visiblePhotoCount > 0
         ? dot + `<span style="font-size:11px;font-weight:500;color:#828282;">${visiblePhotoCount} photo${visiblePhotoCount === 1 ? "" : "s"}</span>`
@@ -2122,7 +2153,7 @@ function ReportsTab({ demoCase }) {
           onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
           style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", padding: 0, marginTop: 10, cursor: "pointer", fontSize: 12, fontWeight: 500, color: "var(--tt-secondary)" }}
         >
-          <StickyNote size={13} strokeWidth={SW} /> Add a note
+          <StickyNote size={13} strokeWidth={SW} color="var(--tt-grey06)" /> Add a note
         </button>
       );
     }
@@ -2161,7 +2192,7 @@ function ReportsTab({ demoCase }) {
     // zero out an otherwise-photographed entry's photos — an entry merely
     // capped down to 0 photos must never be shown as photo-less here.
     const isPhotoless = e.noPhotos;
-    const { kind, daysAgo } = statusForEntry(e.date);
+    const { kind, daysAgo } = statusForEntry(e);
     const statusMeta = STATUS_META[kind];
     const visiblePhotoCount = (e.photos || []).filter(
       (_, i) => !(preview.excludedPhotos && preview.excludedPhotos[`${entryKey}_${i}`])
