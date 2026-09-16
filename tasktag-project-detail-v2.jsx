@@ -2660,6 +2660,7 @@ function ReportsTab({ demoCase }) {
               <div style={{
                 position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 200, minWidth: 220,
                 background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, overflow: "hidden",
+                boxShadow: "0 8px 24px rgba(10,22,41,0.16)",
               }}>
                 {PERIOD_OPTIONS.map(({ id }, i) => (
                   <div key={id}>
@@ -2866,7 +2867,7 @@ function ReportsTab({ demoCase }) {
                       style={{ flexShrink: 0, transform: `rotate(${previewPeriodOpen ? "180deg" : "0deg"})`, transition: "transform 0.15s" }} />
                   </button>
                   {previewPeriodOpen && (
-                    <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 200, minWidth: 220, background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, overflow: "hidden" }}>
+                    <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 200, minWidth: 220, background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, overflow: "hidden", boxShadow: "0 8px 24px rgba(10,22,41,0.16)" }}>
                       {PERIOD_OPTIONS.map(({ id }, i) => (
                         <div key={id}>
                           <div
