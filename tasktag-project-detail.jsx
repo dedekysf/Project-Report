@@ -1981,6 +1981,70 @@ function ReportsTab({ demoCase }) {
     });
   }
 
+  // Rendered under every entry's photo list (and once for the empty-period
+  // state). Notes commit immediately into preview.extraNotes as soon as the
+  // check icon is clicked — there's no deferred draft held until Save
+  // report anymore. Before any note exists, an "Add a note" trigger opens
+  // the EditableField straight into edit mode; once a note is saved,
+  // re-editing it is just hover (grey02) + click, same as every other
+  // EditableField on this page.
+  //
+  // Declared before renderEntryBlock/renderBlock (which call it) — those
+  // get invoked synchronously from inside the hiddenMeasuringScaffold
+  // useMemo further down, so if this were declared after that useMemo
+  // statement, calling it here would hit its temporal-dead-zone and throw
+  // "Cannot access 'renderNoteSlot' before initialization" the moment a
+  // report is actually generated.
+  const renderNoteSlot = (key) => {
+    // Locked once saved — Download/Copy link now act on the saved snapshot.
+    if (previewSaved) {
+      const savedNote = preview.extraNotes[key];
+      if (!savedNote) return null;
+      return (
+        <p style={{ fontSize: 12, fontStyle: "italic", color: "var(--tt-text-2)", lineHeight: "1.5", margin: "10px 0 0", background: "var(--tt-grey02)", padding: 8, borderRadius: 8 }}>{savedNote}</p>
+      );
+    }
+
+    const savedNote = preview.extraNotes[key];
+
+    if (!savedNote && !activeNoteFormKeys[key]) {
+      return (
+        <button
+          onClick={() => {
+            setActiveNoteFormKeys(prev => ({ ...prev, [key]: true }));
+            setActiveEditField(`note_${key}`);
+          }}
+          onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
+          onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", padding: 0, marginTop: 10, cursor: "pointer", fontSize: 12, fontWeight: 500, color: "var(--tt-secondary)" }}
+        >
+          <StickyNote size={13} strokeWidth={SW} /> Add a note
+        </button>
+      );
+    }
+
+    return (
+      <div style={{ marginTop: 10 }}>
+        <EditableField
+          fieldId={`note_${key}`}
+          value={savedNote || ""}
+          placeholder="Describe the note for this task"
+          onSave={v => {
+            setPreview(p => {
+              const next = { ...p.extraNotes };
+              if (v) next[key] = v; else delete next[key];
+              return { ...p, extraNotes: next };
+            });
+            setActiveNoteFormKeys(prev => { const next = { ...prev }; delete next[key]; return next; });
+          }}
+          onCancel={() => setActiveNoteFormKeys(prev => { const next = { ...prev }; delete next[key]; return next; })}
+          textStyle={{ display: "block", fontSize: 12, fontStyle: "italic", color: "var(--tt-text-2)", lineHeight: "1.5", margin: 0, padding: 8, borderRadius: 8 }}
+          inputStyle={{ fontSize: 12, height: 40 }}
+        />
+      </div>
+    );
+  };
+
   const renderGroupLabelBlock = (g) => (
     <p style={{ fontSize: 11, fontWeight: 600, color: "var(--tt-grey05)", letterSpacing: "0.06em", textTransform: "uppercase", padding: "8px 0", margin: 0 }}>
       {formatGroupLabel(g, previewData.grouping).toUpperCase()}
@@ -2381,63 +2445,6 @@ function ReportsTab({ demoCase }) {
   const handleDeleteSelectedPhotos = () => {
     setPreview(p => ({ ...p, excludedPhotos: { ...p.excludedPhotos, ...Object.fromEntries(Object.keys(selectedPhotos).map(k => [k, true])) } }));
     setSelectedPhotos({});
-  };
-
-  // Rendered under every entry's photo list (and once for the empty-period
-  // state). Notes commit immediately into preview.extraNotes as soon as the
-  // check icon is clicked — there's no deferred draft held until Save
-  // report anymore. Before any note exists, an "Add a note" trigger opens
-  // the EditableField straight into edit mode; once a note is saved,
-  // re-editing it is just hover (grey02) + click, same as every other
-  // EditableField on this page.
-  const renderNoteSlot = (key) => {
-    // Locked once saved — Download/Copy link now act on the saved snapshot.
-    if (previewSaved) {
-      const savedNote = preview.extraNotes[key];
-      if (!savedNote) return null;
-      return (
-        <p style={{ fontSize: 12, fontStyle: "italic", color: "var(--tt-text-2)", lineHeight: "1.5", margin: "10px 0 0", background: "var(--tt-grey02)", padding: 8, borderRadius: 8 }}>{savedNote}</p>
-      );
-    }
-
-    const savedNote = preview.extraNotes[key];
-
-    if (!savedNote && !activeNoteFormKeys[key]) {
-      return (
-        <button
-          onClick={() => {
-            setActiveNoteFormKeys(prev => ({ ...prev, [key]: true }));
-            setActiveEditField(`note_${key}`);
-          }}
-          onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
-          onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", padding: 0, marginTop: 10, cursor: "pointer", fontSize: 12, fontWeight: 500, color: "var(--tt-secondary)" }}
-        >
-          <StickyNote size={13} strokeWidth={SW} /> Add a note
-        </button>
-      );
-    }
-
-    return (
-      <div style={{ marginTop: 10 }}>
-        <EditableField
-          fieldId={`note_${key}`}
-          value={savedNote || ""}
-          placeholder="Describe the note for this task"
-          onSave={v => {
-            setPreview(p => {
-              const next = { ...p.extraNotes };
-              if (v) next[key] = v; else delete next[key];
-              return { ...p, extraNotes: next };
-            });
-            setActiveNoteFormKeys(prev => { const next = { ...prev }; delete next[key]; return next; });
-          }}
-          onCancel={() => setActiveNoteFormKeys(prev => { const next = { ...prev }; delete next[key]; return next; })}
-          textStyle={{ display: "block", fontSize: 12, fontStyle: "italic", color: "var(--tt-text-2)", lineHeight: "1.5", margin: 0, padding: 8, borderRadius: 8 }}
-          inputStyle={{ fontSize: 12, height: 40 }}
-        />
-      </div>
-    );
   };
 
   const handlePreviewDownload = () => {
