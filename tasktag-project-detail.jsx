@@ -710,6 +710,10 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
     };
     const commit = () => { onSave(draft.trim()); setPopoverOpen(false); };
     const popoverEmpty = !draft.trim();
+    // Same "nothing to confirm" rule as every other edit mode — disabled
+    // until the draft actually differs from the value this popover opened
+    // with (openPopover seeds `draft` from `value`, so this is a plain diff).
+    const confirmDisabled = popoverEmpty || draft.trim() === (value || "").trim();
     return (
       <div style={{ position: "relative" }}>
         <Tag
@@ -738,15 +742,15 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
                   style={{ fontSize: 12, height: 32, padding: "0 36px 0 10px" }}
                 />
                 <button
-                  disabled={popoverEmpty}
+                  disabled={confirmDisabled}
                   onClick={commit}
-                  onMouseEnter={ev => !popoverEmpty && (ev.currentTarget.style.opacity = "0.85")}
+                  onMouseEnter={ev => !confirmDisabled && (ev.currentTarget.style.opacity = "0.85")}
                   onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
                   style={{
                     position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)",
                     flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
-                    width: 24, height: 24, background: popoverEmpty ? "var(--tt-grey04)" : "var(--tt-text-1)",
-                    border: "none", borderRadius: 6, cursor: popoverEmpty ? "not-allowed" : "pointer", padding: 0,
+                    width: 24, height: 24, background: confirmDisabled ? "var(--tt-grey04)" : "var(--tt-text-1)",
+                    border: "none", borderRadius: 6, cursor: confirmDisabled ? "not-allowed" : "pointer", padding: 0,
                   }}
                 >
                   <Check size={13} strokeWidth={SW} color="white" />
@@ -763,6 +767,11 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
     // No text yet — nothing to confirm, so the button stays disabled
     // instead of blurring into an unchanged empty field.
     const isEmpty = !value || !value.trim();
+    // Same "nothing to confirm" rule as every other edit mode below —
+    // disabled until the value actually differs from what it was when this
+    // edit session started (editStartValueRef, set on the text-tag's
+    // onClick), not just whenever there's non-empty text.
+    const confirmDisabled = isEmpty || (value || "") === (editStartValueRef.current || "");
     const done = () => alwaysEditingRef.current?.blur();
     // Reverts to whatever the field held when this edit session started
     // (captured on the text-tag's onClick below) — same "cancel discards
@@ -773,11 +782,11 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
     const cancelEdit = () => { onSave(editStartValueRef.current || ""); alwaysEditingRef.current?.blur(); };
     const confirmButton = (
       <button
-        disabled={isEmpty}
+        disabled={confirmDisabled}
         onClick={done}
-        onMouseEnter={ev => !isEmpty && (ev.currentTarget.style.opacity = "0.85")}
+        onMouseEnter={ev => !confirmDisabled && (ev.currentTarget.style.opacity = "0.85")}
         onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
-        style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: isEmpty ? "var(--tt-grey04)" : "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: isEmpty ? "not-allowed" : "pointer", padding: 0, transition: "opacity 0.15s" }}
+        style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: confirmDisabled ? "var(--tt-grey04)" : "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: confirmDisabled ? "not-allowed" : "pointer", padding: 0, transition: "opacity 0.15s" }}
       >
         <Check size={15} strokeWidth={SW} color="white" />
       </button>
@@ -831,7 +840,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
             onBlur={() => setAlwaysEditingFocused(false)}
             onKeyDown={ev => { if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); done(); } }}
             placeholder={placeholder}
-            rows={3}
+            rows={2}
             style={{ fontFamily: "inherit", paddingRight: 76, overflowY: "hidden", ...inputStyle }}
           />
           <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>{cancelButton}{confirmButton}</div>
@@ -868,6 +877,10 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
     // No text typed yet — nothing to commit, so the check button stays
     // disabled (same rule as the always-editing fields below).
     const isEmpty = !draft.trim();
+    // Same "nothing to confirm" rule as every other edit mode — disabled
+    // until the draft actually differs from the committed value (draft
+    // starts seeded from `value` the moment editing begins).
+    const confirmDisabled = isEmpty || draft.trim() === (value || "").trim();
     return (
       <div key="editing" style={{ position: "relative", maxWidth: "100%", minWidth: 0, ...(!boxed ? { marginBottom: 8 } : {}), ...boxStyle }}>
         {multiline ? (
@@ -916,11 +929,11 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
             <X size={15} strokeWidth={SW} color="var(--tt-grey06)" />
           </button>
           <button
-            disabled={isEmpty}
+            disabled={confirmDisabled}
             onClick={commit}
-            onMouseEnter={ev => !isEmpty && (ev.currentTarget.style.opacity = "0.85")}
+            onMouseEnter={ev => !confirmDisabled && (ev.currentTarget.style.opacity = "0.85")}
             onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
-            style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: isEmpty ? "var(--tt-grey04)" : "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: isEmpty ? "not-allowed" : "pointer", padding: 0, transition: "opacity 0.15s" }}
+            style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: confirmDisabled ? "var(--tt-grey04)" : "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: confirmDisabled ? "not-allowed" : "pointer", padding: 0, transition: "opacity 0.15s" }}
           >
             <Check size={15} strokeWidth={SW} color="white" />
           </button>
@@ -1187,6 +1200,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
   const [captionPos, setCaptionPos] = useState({ top: 0, left: 0 });
   const captionTriggerRef = useRef(null); // the specific trigger button last clicked, for scroll repositioning
   const captionPopoverRef = useRef(null);
+  const captionStartRef = useRef(""); // caption text when the open popover was triggered, for the "no change" disabled check
   const [swapOpen, setSwapOpen] = useState(false);
 
   useEffect(() => {
@@ -1276,6 +1290,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
                 onClick={e => {
                   e.stopPropagation();
                   captionTriggerRef.current = e.currentTarget;
+                  captionStartRef.current = caption || "";
                   const r = e.currentTarget.getBoundingClientRect();
                   setCaptionPos({ top: r.bottom + 8, left: r.left - 6 });
                   setOpenCaptionIdx(prev => prev === i ? null : i);
@@ -1341,22 +1356,30 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
                     />
                     {/* Caption already auto-saves on every keystroke — this
                         button is just a "done" affordance (closes the
-                        popover), disabled until there's something typed. */}
-                    <button
-                      disabled={!caption}
-                      onClick={() => setOpenCaptionIdx(null)}
-                      onMouseEnter={ev => caption && (ev.currentTarget.style.opacity = "0.85")}
-                      onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
-                      style={{
-                        position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)",
-                        width: 24, height: 24, borderRadius: 6, border: "none",
-                        background: caption ? "var(--tt-text-1)" : "var(--tt-grey04)",
-                        cursor: caption ? "pointer" : "not-allowed",
-                        display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
-                      }}
-                    >
-                      <Check size={13} strokeWidth={SW} color="white" />
-                    </button>
+                        popover). Same "nothing to confirm" rule as every
+                        other edit mode: disabled while empty, and disabled
+                        again once it's unchanged from when this popover
+                        opened (captionStartRef). */}
+                    {(() => {
+                      const captionConfirmDisabled = !caption || caption === captionStartRef.current;
+                      return (
+                        <button
+                          disabled={captionConfirmDisabled}
+                          onClick={() => setOpenCaptionIdx(null)}
+                          onMouseEnter={ev => !captionConfirmDisabled && (ev.currentTarget.style.opacity = "0.85")}
+                          onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
+                          style={{
+                            position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)",
+                            width: 24, height: 24, borderRadius: 6, border: "none",
+                            background: captionConfirmDisabled ? "var(--tt-grey04)" : "var(--tt-text-1)",
+                            cursor: captionConfirmDisabled ? "not-allowed" : "pointer",
+                            display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+                          }}
+                        >
+                          <Check size={13} strokeWidth={SW} color="white" />
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
