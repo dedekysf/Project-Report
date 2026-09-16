@@ -1749,10 +1749,13 @@ function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onCl
             </button>
             <button
               onClick={() => setSelectedFilmstrip({})}
+              onMouseEnter={e => e.currentTarget.style.background = "rgba(10,22,41,0.9)"}
+              onMouseLeave={e => e.currentTarget.style.background = "rgba(10,22,41,0.75)"}
               style={{
                 width: 44, height: 44, borderRadius: "50%", background: "rgba(10,22,41,0.75)",
                 border: "1px solid rgba(255,255,255,0.2)", color: "white", display: "flex",
                 alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0,
+                transition: "background 0.15s",
               }}
             >
               <X size={18} strokeWidth={SW} />
@@ -3889,7 +3892,9 @@ function ReportsTab({ demoCase }) {
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <button
                         onClick={clearPhotoSelection}
-                        style={{ background: "none", border: "1.5px solid rgba(255,255,255,0.6)", borderRadius: "50%", width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "white", padding: 0, flexShrink: 0 }}
+                        onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}
+                        onMouseLeave={e => e.currentTarget.style.background = "none"}
+                        style={{ background: "none", border: "1.5px solid rgba(255,255,255,0.6)", borderRadius: "50%", width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "white", padding: 0, flexShrink: 0, transition: "background 0.15s" }}
                       >
                         <X size={13} strokeWidth={SW} />
                       </button>
