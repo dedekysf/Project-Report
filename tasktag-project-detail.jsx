@@ -2279,7 +2279,7 @@ function ReportsTab({ demoCase }) {
           <div>
             <p style={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 2px" }}>{POINT_OF_CONTACT_NAME}</p>
             {/* TODO(BE): replace with the contact's actual role/company from the API */}
-            <p style={{ fontSize: 12, fontWeight: 500, color: "var(--tt-secondary)", margin: 0 }}>
+            <p style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)", margin: 0 }}>
               {POINT_OF_CONTACT_ROLE} · {POINT_OF_CONTACT_COMPANY}
             </p>
           </div>
