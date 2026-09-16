@@ -2423,7 +2423,13 @@ function ReportsTab({ demoCase }) {
   }, [layoutDepsKey]);
 
   const visiblePages = useMemo(() => {
-    if (!pageLayout) return null;
+    // pageLayout is cleared by a useLayoutEffect that only runs AFTER this
+    // render commits — so on the very render where `preview` first becomes
+    // null (e.g. pressing Escape to close), this memo can still see the
+    // OLD, non-null pageLayout from before, and would go on to call
+    // renderFullHeader/renderRunningHeader (which read preview.* directly)
+    // with preview already null. Guard on both.
+    if (!pageLayout || !preview) return null;
     return pageLayout.pages.map((pageBlocks, pi) => {
       const isFirst = pi === 0;
       return (
