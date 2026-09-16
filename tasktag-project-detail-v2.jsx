@@ -784,19 +784,21 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
     // No text yet — nothing to confirm, so the button stays disabled
     // instead of blurring into an unchanged empty field.
     const isEmpty = !value || !value.trim();
-    // Same "nothing to confirm" rule as every other edit mode below —
-    // disabled until the value actually differs from what it was when this
+    // Typing only ever touches this local draft — onSave (writing into the
+    // parent's committed value) fires only from the confirm button or
+    // Enter, same as the click-to-edit `editing` branch below, never from
+    // onChange or blur.
+    const draftEmpty = !draft.trim();
+    const commit = () => { onSave(draft.trim()); alwaysEditingRef.current?.blur(); };
+    // Same "nothing to confirm" rule as every other edit mode — disabled
+    // until the draft actually differs from what the field held when this
     // edit session started (editStartValueRef, set on the text-tag's
-    // onClick), not just whenever there's non-empty text.
-    const confirmDisabled = isEmpty || (value || "") === (editStartValueRef.current || "");
-    const done = () => alwaysEditingRef.current?.blur();
-    // Reverts to whatever the field held when this edit session started
-    // (captured on the text-tag's onClick below) — same "cancel discards
-    // this session's changes" contract as the click-to-edit `editing`
-    // branch's X button, just without that branch's separate draft state
-    // (this field commits onSave on every keystroke, so "cancel" has to
-    // restore the prior committed value instead of dropping an unsaved one).
-    const cancelEdit = () => { onSave(editStartValueRef.current || ""); alwaysEditingRef.current?.blur(); };
+    // onClick below).
+    const confirmDisabled = draftEmpty || draft.trim() === (editStartValueRef.current || "").trim();
+    // Discards this session's draft and blurs without saving — same
+    // "cancel discards this session's changes" contract as the
+    // click-to-edit `editing` branch's X button/Escape.
+    const cancelEdit = () => { setDraft(editStartValueRef.current || ""); alwaysEditingRef.current?.blur(); };
     // The X only makes sense once there's a prior committed value to revert
     // to — i.e. this is a re-edit of existing content (editStartValueRef
     // was seeded from a non-empty value on the text-tag's onClick below),
@@ -805,7 +807,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
     const confirmButton = (
       <button
         disabled={confirmDisabled}
-        onClick={done}
+        onClick={commit}
         onMouseEnter={ev => !confirmDisabled && (ev.currentTarget.style.opacity = "0.85")}
         onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
         style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: confirmDisabled ? "var(--tt-grey04)" : "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: confirmDisabled ? "not-allowed" : "pointer", padding: 0, transition: "opacity 0.15s" }}
@@ -832,7 +834,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
     if (!isEmpty && !alwaysEditingFocused) {
       const textTag = (
         <Tag
-          onClick={() => { editStartValueRef.current = value; setAlwaysEditingFocused(true); }}
+          onClick={() => { editStartValueRef.current = value; setDraft(value || ""); setAlwaysEditingFocused(true); }}
           onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey03)"}
           onMouseLeave={ev => ev.currentTarget.style.background = "none"}
           style={{ display: "block", cursor: "pointer", borderRadius: 6, margin: 0, whiteSpace: multiline ? "pre-wrap" : "normal", ...textStyle }}
@@ -859,12 +861,12 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
         <div style={{ position: "relative" }}>
           <Textarea
             ref={el => { alwaysEditingRef.current = el; if (el && !isEmpty && el !== document.activeElement) focusAtEnd(el); }}
-            value={value}
-            onChange={ev => onSave(ev.target.value)}
+            value={draft}
+            onChange={ev => setDraft(ev.target.value)}
             onFocus={() => setAlwaysEditingFocused(true)}
             onBlur={() => setAlwaysEditingFocused(false)}
             onKeyDown={ev => {
-              if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); done(); }
+              if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); commit(); }
               // Same reasoning as the click-to-edit fields' Escape handler —
               // stopPropagation so this only cancels this field's own edit,
               // not the whole preview modal.
@@ -882,12 +884,12 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
         <Input
           ref={el => { alwaysEditingRef.current = el; if (el && !isEmpty && el !== document.activeElement) focusAtEnd(el); }}
           type="text"
-          value={value}
-          onChange={ev => onSave(ev.target.value)}
+          value={draft}
+          onChange={ev => setDraft(ev.target.value)}
           onFocus={() => setAlwaysEditingFocused(true)}
           onBlur={() => setAlwaysEditingFocused(false)}
           onKeyDown={ev => {
-            if (ev.key === "Enter") { ev.preventDefault(); done(); }
+            if (ev.key === "Enter") { ev.preventDefault(); commit(); }
             if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); cancelEdit(); }
           }}
           placeholder={placeholder}
