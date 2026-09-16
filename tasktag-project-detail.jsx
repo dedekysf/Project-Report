@@ -640,7 +640,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
         onClick={done}
         onMouseEnter={ev => !isEmpty && (ev.currentTarget.style.opacity = "0.85")}
         onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
-        style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: isEmpty ? "var(--tt-grey05)" : "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: isEmpty ? "not-allowed" : "pointer", padding: 0, transition: "opacity 0.15s" }}
+        style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: isEmpty ? "var(--tt-grey04)" : "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: isEmpty ? "not-allowed" : "pointer", padding: 0, transition: "opacity 0.15s" }}
       >
         <Check size={15} strokeWidth={SW} color="white" />
       </button>
@@ -654,7 +654,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
             onChange={ev => onSave(ev.target.value)}
             placeholder={placeholder}
             rows={3}
-            style={{ fontFamily: "inherit", paddingRight: 44, paddingBottom: 40, ...inputStyle }}
+            style={{ fontFamily: "inherit", paddingRight: 44, paddingBottom: 40, minHeight: 116, overflowY: "hidden", ...inputStyle }}
           />
           <div style={{ position: "absolute", right: 6, bottom: 6 }}>{confirmButton}</div>
         </div>
@@ -739,7 +739,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
             onClick={commit}
             onMouseEnter={ev => !isEmpty && (ev.currentTarget.style.opacity = "0.85")}
             onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
-            style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: isEmpty ? "var(--tt-grey05)" : "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: isEmpty ? "not-allowed" : "pointer", padding: 0, transition: "opacity 0.15s" }}
+            style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: isEmpty ? "var(--tt-grey04)" : "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: isEmpty ? "not-allowed" : "pointer", padding: 0, transition: "opacity 0.15s" }}
           >
             <Check size={15} strokeWidth={SW} color="white" />
           </button>
@@ -1070,13 +1070,13 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
                 className={`transition-opacity ${caption ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
                 style={{
                   position: "absolute", bottom: 6, left: 6, width: 20, height: 20, borderRadius: "50%",
-                  border: caption ? "none" : "1.5px solid white", background: caption ? "var(--tt-text-1)" : "rgba(10,22,41,0.35)",
+                  border: "none", background: "white",
                   display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
                   cursor: "pointer", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)",
                   zIndex: 2,
                 }}
               >
-                <MessageSquare size={11} color="white" strokeWidth={2.25} />
+                <MessageSquare size={11} color="var(--tt-grey06)" strokeWidth={2.25} />
               </button>
             )}
             {canOpen && (
@@ -1975,11 +1975,11 @@ const buildReportHTML = (report) => {
     : h("div", {}, "");
   const identityRowHTML = h("div", { style: "display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;" },
     identityLeft,
-    h("div", { style: "display:flex;align-items:flex-end;gap:6px;white-space:nowrap;margin-top:10px;" },
-      h("span", { style: "font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;line-height:1;" }, "PERIOD"),
-      h("p", { style: "font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#303742;margin:0;line-height:1;" }, report.period.toUpperCase())
+    h("div", { style: "white-space:nowrap;margin-top:10px;" },
+      h("span", { style: "font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;line-height:1;" }, "VIA TASKTAG")
     )
   );
+  const updateLineHTML = h("p", { style: "font-size:12px;font-weight:600;color:#828282;margin:0;" }, `Update No. ${report.version} \xB7 ${report.period}`);
 
   // Full (page 1) vs. running (page 2+) header — mirrors renderFullHeader/
   // renderRunningHeader/renderCompanyIdentityRow exactly, each self-padded
@@ -1990,7 +1990,8 @@ const buildReportHTML = (report) => {
   const fullHeaderHTML = h("div", { style: `padding:${PAGE_PAD}px ${PAGE_PAD}px 0;` },
     identityRowHTML +
     h("div", { style: "height:1px;background:#e8e8e6;margin-bottom:20px;" }, "") +
-    h("div", { style: "display:flex;flex-direction:column;gap:8px;margin-bottom:24px;" },
+    h("div", { style: "display:flex;flex-direction:column;gap:4px;margin-bottom:24px;" },
+      updateLineHTML,
       h("h2", { style: "font-size:28px;font-weight:700;color:#0a1629;line-height:1;margin:0;" }, projectName),
       h("p", { style: "font-size:13px;font-weight:400;color:#828282;line-height:1;margin:0;" }, address)
     ) +
@@ -2191,12 +2192,13 @@ function ReportsTab({ demoCase }) {
   // Adds a report to the results list (called only once the user confirms
   // via "Save report" in the preview modal — Generate no longer does this
   // directly).
-  const pushReport = ({ includeSummary, includeNoPhotoTasks, dateRange, period, data, extraNotes, excludedPhotos, titleOverrides, projectName, address, logo, companyName, companyAddress, summary, targetOpening, clientName }) => {
+  const pushReport = ({ includeSummary, includeNoPhotoTasks, dateRange, period, version, data, extraNotes, excludedPhotos, titleOverrides, projectName, address, logo, companyName, companyAddress, summary, targetOpening, clientName }) => {
     const id = Date.now();
     const newReport = {
       id,
       date: new Date().toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true }),
       period,
+      version,
       dateRange,
       status: "in_progress",
       includeSummary,
@@ -2268,6 +2270,9 @@ function ReportsTab({ demoCase }) {
         dateRange,
         period,
         customRange,
+        // This draft's position in the project's save history if it gets
+        // saved right now — see pushReport, which assigns the same number.
+        version: reports.length + 1,
         extraNotes: {},
         excludedPhotos: {},
         photoCaptions: {},
@@ -2564,13 +2569,13 @@ function ReportsTab({ demoCase }) {
           />
         </div>
       </div>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 6, whiteSpace: "nowrap", marginTop: 10 }}>
+      {/* Period now lives above the project name (the "Update No. X ·
+          period" row in renderFullHeader) — this slot is just a plain
+          attribution mark instead. */}
+      <div style={{ whiteSpace: "nowrap", marginTop: 10 }}>
         <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", lineHeight: 1 }}>
-          PERIOD
+          VIA TASKTAG
         </span>
-        <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-text-2)", margin: 0, lineHeight: 1 }}>
-          {preview.period.toUpperCase()}
-        </p>
       </div>
     </div>
   );
@@ -2580,15 +2585,22 @@ function ReportsTab({ demoCase }) {
       {renderCompanyIdentityRow()}
       <div style={{ height: 1, background: "var(--tt-grey03)", marginBottom: 20 }} />
 
-      {/* Row 1: period (not editable — mirrors the chrome's own period
-          control above; muted secondary text, not brand-colored). Row 2:
-          project name — editable the same way as a task name, and sized
-          like the old summary headline now that it's the document's real
-          title. Row 3: address, in normal (not all-caps) text, also
-          editable. Neither is required — an empty field just shows its
-          placeholder. Summary and its progress bar sit directly below,
-          with Target Opening/Prepared For after. */}
+      {/* "Update No. X · period" — X is this draft's position in the
+          project's save history (reports.length + 1, so the very first
+          save reads "Update No. 1"), not tied to the period itself: the
+          same period can be regenerated and saved more than once, so the
+          period alone can't tell two saves apart (see the results table,
+          which shows this same pairing for that reason). Row 2: project
+          name — editable the same way as a task name, and sized like the
+          old summary headline now that it's the document's real title.
+          Row 3: address, in normal (not all-caps) text, also editable.
+          Neither is required — an empty field just shows its placeholder.
+          Summary and its progress bar sit directly below, with Target
+          Opening/Prepared For after. */}
       <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 24 }}>
+        <p style={{ fontSize: 12, fontWeight: 600, color: "var(--tt-grey05)", margin: 0 }}>
+          Update No. {preview.version} · {preview.period}
+        </p>
         <EditableField
           fieldId="projectName"
           value={preview.projectName}
@@ -2917,12 +2929,12 @@ function ReportsTab({ demoCase }) {
 
   const handlePreviewDownload = () => {
     if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to export"); return; }
-    handleDownload({ includeSummary: preview.includeSummary, period: preview.period, data: { ...previewData, groups: previewFinalGroups } });
+    handleDownload({ includeSummary: preview.includeSummary, period: preview.period, version: preview.version, data: { ...previewData, groups: previewFinalGroups } });
   };
 
   const handlePreviewCopy = async () => {
     if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to export"); return; }
-    await handleCopy({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides });
+    await handleCopy({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, version: preview.version, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides });
     setPreviewCopied(true);
     setTimeout(() => setPreviewCopied(false), 2000);
   };
@@ -2943,7 +2955,7 @@ function ReportsTab({ demoCase }) {
         showToast("error", "Save failed. Try again.");
         return;
       }
-      pushReport({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, data: { ...previewData, groups: finalGroups }, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides, projectName: preview.projectName, address: preview.address, logo: preview.logo, companyName: preview.companyName, companyAddress: preview.companyAddress, summary: preview.summary, targetOpening: preview.targetOpening, clientName: preview.clientName });
+      pushReport({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, version: preview.version, data: { ...previewData, groups: finalGroups }, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides, projectName: preview.projectName, address: preview.address, logo: preview.logo, companyName: preview.companyName, companyAddress: preview.companyAddress, summary: preview.summary, targetOpening: preview.targetOpening, clientName: preview.clientName });
       setDateRange("since_last");
       // Closing is left to the user — the footer switches to Download/Copy
       // link so they can act on the just-saved report before dismissing it.
@@ -2988,6 +3000,7 @@ function ReportsTab({ demoCase }) {
     const params = new URLSearchParams({
       range: report.dateRange || "custom",
       period: sanitizePeriodForUrl(report.period),
+      version: String(report.version),
     });
     if (report.includeSummary === false) params.set("summary", "0");
     if (report.includeNoPhotoTasks === false) params.set("nophotos", "0");
@@ -3225,7 +3238,12 @@ function ReportsTab({ demoCase }) {
               {reports.map((r, i) => (
                 <tr key={r.id} style={{ background: r.id === lastSavedId ? "var(--tt-mint)" : "white", borderTop: i > 0 ? `1px solid var(--tt-grey03)` : "none", transition: "background 0.6s ease" }}>
                   <td style={{ padding: "0 16px", fontSize: 13, color: "var(--tt-text-2)", whiteSpace: "nowrap", height: 52, verticalAlign: "middle" }}>{r.date}</td>
-                  <td style={{ padding: "0 16px", fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", height: 52, verticalAlign: "middle" }}>{r.period}</td>
+                  <td style={{ padding: "0 16px", fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", height: 52, verticalAlign: "middle", whiteSpace: "nowrap" }}>
+                    {/* Update No. shown alongside the period since the same
+                        period can be regenerated and saved more than once —
+                        the period alone can't tell those saves apart. */}
+                    Update No. {r.version} · {r.period}
+                  </td>
                   <td style={{ padding: "0 14px 0 16px", textAlign: "right", height: 52, verticalAlign: "middle", width: 160 }}>
                     {r.status === "in_progress" ? (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--tt-text-2)" }}>
@@ -3293,12 +3311,13 @@ function ReportsTab({ demoCase }) {
                 </>
               ) : (
                 // TODO(BE): replace with the account's actual per-report photo cap and usage from the API
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ fontSize: 12, fontWeight: 500, color: "var(--tt-grey05)", whiteSpace: "nowrap" }}>Photo Limit</span>
-                  <div style={{ width: 120, height: 6, borderRadius: 99, background: "var(--tt-grey03)", overflow: "hidden" }}>
-                    <div style={{ width: `${Math.min(100, (previewPhotoCount / PHOTO_LIMIT) * 100)}%`, height: "100%", borderRadius: 99, background: "var(--tt-text-1)" }} />
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, width: 160 }}>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: 0, whiteSpace: "nowrap" }}>
+                    Photo Limit {previewPhotoCount} of {PHOTO_LIMIT}
+                  </p>
+                  <div style={{ height: 6, borderRadius: 99, background: "var(--tt-grey03)", overflow: "hidden" }}>
+                    <div style={{ width: `${Math.min(100, (previewPhotoCount / PHOTO_LIMIT) * 100)}%`, height: "100%", borderRadius: 99, background: "var(--tt-secondary)" }} />
                   </div>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--tt-text-1)", whiteSpace: "nowrap" }}>{previewPhotoCount} / {PHOTO_LIMIT}</span>
                 </div>
               )}
               </div>
@@ -3663,7 +3682,7 @@ function ReportPaywall() {
 // period, included sections, excluded photos, and any manually-added
 // notes) — rebuilt on the fly rather than fetched from storage, so a
 // shared link works on any device/browser and can never 404.
-function ReportPage({ dateRange, period, includeSummary, includeNoPhotoTasks, notesParam, excludedParam, titlesParam, projectName, address, logo, companyName, companyAddress, summaryText, targetOpening, clientName }) {
+function ReportPage({ dateRange, period, version, includeSummary, includeNoPhotoTasks, notesParam, excludedParam, titlesParam, projectName, address, logo, companyName, companyAddress, summaryText, targetOpening, clientName }) {
   let data = buildReportData(dateRange, period, null, includeNoPhotoTasks);
   let groups = data.groups;
   if (excludedParam) {
@@ -3686,7 +3705,7 @@ function ReportPage({ dateRange, period, includeSummary, includeNoPhotoTasks, no
     } catch { /* malformed/tampered param — ignore */ }
   }
   data = { ...data, groups };
-  const html = buildReportHTML({ includeSummary, period, data, projectName, address, logo, companyName, companyAddress, summary: summaryText, targetOpening, clientName });
+  const html = buildReportHTML({ includeSummary, period, version, data, projectName, address, logo, companyName, companyAddress, summary: summaryText, targetOpening, clientName });
 
   return (
     <iframe
@@ -3706,6 +3725,7 @@ export default function ProjectDetail() {
     <ReportPage
       dateRange={params.get("range")}
       period={sharedPeriod}
+      version={params.get("version")}
       includeSummary={params.get("summary") !== "0"}
       includeNoPhotoTasks={params.get("nophotos") !== "0"}
       notesParam={params.get("notes")}
