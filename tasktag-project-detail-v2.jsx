@@ -706,12 +706,43 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
   );
 }
 
+// Downscales an uploaded image to a small PNG data URL (longest side
+// capped at maxDim) instead of keeping the original file's full
+// resolution. The logo only ever displays at max-width:100px (in the
+// export) or 80px (live), so this loses nothing visible — but it's also
+// what keeps the resulting data URL small enough to embed in a "Copy
+// link" URL. A 160px cap still produced a ~43KB data URL for a
+// photographic test image, and a ~46,000-character URL built from it
+// failed to even navigate in Chrome (chrome-error://chromewebdata) — well
+// short of the ~2MB limits often quoted for data: URLs in isolation.
+// 64px keeps the same test image's data URL under 10KB.
+const resizeImageToDataURL = (file, maxDim = 64) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      const w = Math.max(1, Math.round(img.width * scale));
+      const h = Math.max(1, Math.round(img.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = reject;
+    img.src = reader.result;
+  };
+  reader.onerror = reject;
+  reader.readAsDataURL(file);
+});
+
 // ── Company logo upload box ──
-// Click opens a hidden file input; the chosen image is read as a data URL
-// (no upload endpoint yet) and handed back via onChange. Each instance
-// keeps its own input ref, since the same header (and this box with it)
-// renders once per page — a single shared ref would only ever point at
-// whichever page's copy mounted last.
+// Click opens a hidden file input; the chosen image is downscaled (see
+// resizeImageToDataURL) and handed back via onChange — no upload endpoint,
+// it's just a small data URL. Each instance keeps its own input ref, since
+// the same header (and this box with it) renders once per page — a single
+// shared ref would only ever point at whichever page's copy mounted last.
 //
 // Before a logo exists, this is a fixed 48x48 dashed placeholder. Once one
 // is uploaded, the box drops the placeholder chrome and just sizes to the
@@ -727,10 +758,9 @@ function LogoUploadBox({ src, onChange, disabled }) {
     ev.target.value = "";
     if (!file) return;
     setLoading(true);
-    const reader = new FileReader();
-    reader.onload = () => { onChange(reader.result); setLoading(false); };
-    reader.onerror = () => setLoading(false);
-    reader.readAsDataURL(file);
+    resizeImageToDataURL(file)
+      .then(url => { onChange(url); setLoading(false); })
+      .catch(() => setLoading(false));
   };
 
   return (
@@ -2832,14 +2862,14 @@ function ReportsTab({ demoCase }) {
     }
     // Header identity/summary fields — plain short strings, safe to carry
     // in the URL so the shared link renders the same document as the
-    // downloaded HTML instead of a stripped-down one missing them. The
-    // uploaded logo (a data URL) is the one exception: it can be large
-    // enough to blow past a URL's practical length limit, so it's simply
-    // not part of the shared link.
+    // downloaded HTML instead of a stripped-down one missing them.
     if (report.projectName) params.set("projectName", report.projectName);
     if (report.address) params.set("address", report.address);
     // Same reasoning as the download branch — the latest saved identity,
-    // not this report's own snapshot.
+    // not this report's own snapshot. The logo is a small (max 160px)
+    // downscaled data URL by the time it reaches here — see
+    // resizeImageToDataURL — so it's safe to carry in the URL too.
+    if (companyIdentity.logo) params.set("logo", companyIdentity.logo);
     if (companyIdentity.companyName) params.set("companyName", companyIdentity.companyName);
     if (companyIdentity.companyAddress) params.set("companyAddress", companyIdentity.companyAddress);
     // "summary" is already taken (the includeSummary toggle above) — the
@@ -3527,7 +3557,7 @@ function ReportPaywall() {
 // period, included sections, excluded photos, and any manually-added
 // notes) — rebuilt on the fly rather than fetched from storage, so a
 // shared link works on any device/browser and can never 404.
-function ReportPage({ dateRange, period, includeSummary, includeNoPhotoTasks, notesParam, excludedParam, titlesParam, projectName, address, companyName, companyAddress, summaryText, targetOpening, clientName }) {
+function ReportPage({ dateRange, period, includeSummary, includeNoPhotoTasks, notesParam, excludedParam, titlesParam, projectName, address, logo, companyName, companyAddress, summaryText, targetOpening, clientName }) {
   let data = buildReportData(dateRange, period, null, includeNoPhotoTasks);
   let groups = data.groups;
   if (excludedParam) {
@@ -3550,7 +3580,7 @@ function ReportPage({ dateRange, period, includeSummary, includeNoPhotoTasks, no
     } catch { /* malformed/tampered param — ignore */ }
   }
   data = { ...data, groups };
-  const html = buildReportHTML({ includeSummary, period, data, projectName, address, companyName, companyAddress, summary: summaryText, targetOpening, clientName });
+  const html = buildReportHTML({ includeSummary, period, data, projectName, address, logo, companyName, companyAddress, summary: summaryText, targetOpening, clientName });
 
   return (
     <iframe
@@ -3576,6 +3606,7 @@ export default function ProjectDetail() {
       titlesParam={params.get("titles")}
       projectName={params.get("projectName")}
       address={params.get("address")}
+      logo={params.get("logo")}
       companyName={params.get("companyName")}
       companyAddress={params.get("companyAddress")}
       summaryText={params.get("summaryText")}
