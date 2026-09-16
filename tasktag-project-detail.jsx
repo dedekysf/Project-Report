@@ -2361,6 +2361,7 @@ function ReportsTab({ demoCase }) {
     ? JSON.stringify({ ...preview, logo: preview.logo ? preview.logo.length : 0 })
       + "|" + JSON.stringify(titleOverrides)
       + "|" + JSON.stringify(activeNoteFormKeys)
+      + "|" + JSON.stringify(selectedPhotos)
       + "|" + previewSaved
       + "|" + flatBlocks.map(b => b.key).join(",")
     : "";
