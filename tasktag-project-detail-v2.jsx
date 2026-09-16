@@ -1829,7 +1829,7 @@ const buildReportHTML = (report) => {
         )
       ),
       h("div", { style: "text-align:right;" },
-        h("p", { style: "font-size:11px;color:#828282;margin:0 0 2px;" }, "Generated via TaskTag"),
+        h("p", { style: "font-size:11px;color:#828282;margin:0 0 4px;" }, "Generated via TaskTag"),
         h("p", { style: "font-size:11px;color:#828282;margin:0;" }, `Report ID: ${REPORT_ID}`)
       )
     )
@@ -2464,7 +2464,7 @@ function ReportsTab({ demoCase }) {
           </div>
         </div>
         <div style={{ textAlign: "right" }}>
-          <p style={{ fontSize: 11, color: "var(--tt-grey05)", margin: "0 0 2px" }}>Generated via TaskTag</p>
+          <p style={{ fontSize: 11, color: "var(--tt-grey05)", margin: "0 0 4px" }}>Generated via TaskTag</p>
           {/* TODO(BE): replace with the actual report ID from the API */}
           <p style={{ fontSize: 11, color: "var(--tt-grey05)", margin: 0 }}>Report ID: {REPORT_ID}</p>
         </div>
