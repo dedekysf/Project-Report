@@ -915,8 +915,8 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
             key={i}
             className="group"
             style={{ position: "relative" }}
-            onMouseEnter={e => { if (canOpen) e.currentTarget.lastElementChild.style.opacity = "1"; }}
-            onMouseLeave={e => { if (canOpen) e.currentTarget.lastElementChild.style.opacity = selected ? "1" : "0"; }}
+            onMouseEnter={e => { if (canOpen && !selected) e.currentTarget.lastElementChild.style.opacity = "1"; }}
+            onMouseLeave={e => { if (canOpen) e.currentTarget.lastElementChild.style.opacity = "0"; }}
           >
             <PhotoThumb src={IMG_MAP[k]} onClick={canOpen ? () => onOpen(visiblePhotoKeys, viewIdx, visibleOriginalIndices) : undefined} />
             {!isCapCell && IMG_MAP[k] && (
