@@ -1508,7 +1508,10 @@ function formatGroupLabel(g, grouping) {
   return new Date(y, m - 1, d).toLocaleDateString("en-US", { day: "numeric", month: "short" }).toUpperCase();
 }
 
-function applyPhotoCap(groups, maxPhotos = 45) {
+// TODO(BE): replace with the account's actual per-report photo cap from the API
+const PHOTO_LIMIT = 50;
+
+function applyPhotoCap(groups, maxPhotos = PHOTO_LIMIT) {
   // Count total photos
   let total = groups.reduce((sum, g) => sum + g.entries.reduce((s, e) => s + e.photos.length, 0), 0);
   if (total <= maxPhotos) return groups;
@@ -1590,21 +1593,6 @@ function buildReportData(dateRange, periodStr, customRange, includeNoPhotoTasks 
   const pct = Math.round(completed / total * 100);
 
   return { groups, grouping, completed, total, pct };
-}
-
-// Default text for the report's editable headline/body — seeded from
-// DUMMY_TASKS' status mix and the most recent activity entry, so there's
-// always a sensible starting point without the user having to write one
-// from scratch. Purely a starting point: both fields are freely editable
-// afterward and never regenerated once the draft is open.
-function buildDefaultSummary(groups) {
-  const inProgress = DUMMY_TASKS.filter(t => t.status === "in_progress");
-  const focus = inProgress.slice().sort((a, b) => (a.dueDate || "9999") < (b.dueDate || "9999") ? -1 : 1)[0];
-  const headline = inProgress.length > 0
-    ? `${inProgress.length} task${inProgress.length > 1 ? "s" : ""} still in progress — ${focus.category.toLowerCase()} is the current focus. Everything else is on schedule.`
-    : "All tracked tasks are complete or upcoming — nothing in progress this period.";
-  const latestEntry = groups[0]?.entries[0];
-  return latestEntry ? `${headline} ${latestEntry.note}` : headline;
 }
 
 // Photos checked off in the side panel are excluded from the final output
@@ -2031,8 +2019,8 @@ function ReportsTab({ demoCase }) {
   const [selectedPhotos, setSelectedPhotos] = useState({}); // { [entryKey_photoIndex]: photoKey } — in-progress checkbox selection, not yet deleted
   const periodRef     = useRef(null);
   const chipRef       = useRef(null);
-  // Same reasoning as previewPeriodPos below — fixed positioning so this
-  // dropdown isn't clipped by an ancestor's overflow/scrollbarGutter.
+  // Fixed positioning so this dropdown isn't clipped by an ancestor's
+  // overflow/scrollbarGutter.
   const [openPeriodPos, setOpenPeriodPos] = useState({ top: 0, left: 0 });
   useLayoutEffect(() => {
     if (!openPeriod || !periodRef.current) return;
@@ -2044,8 +2032,6 @@ function ReportsTab({ demoCase }) {
   // { includeSummary, includeNoPhotoTasks, dateRange, period, customRange, extraNotes } | null
   // extraNotes: { [entryKey]: noteText } — one note per entry/photo-list at most
   const [preview,          setPreview]          = useState(null);
-  const [previewPeriodOpen, setPreviewPeriodOpen] = useState(false);
-  const [previewShowCal,   setPreviewShowCal]   = useState(false);
   const [activeNoteFormKeys, setActiveNoteFormKeys] = useState({}); // { [entryKey]: true } — entries currently in note-edit mode (no saved note yet)
   const [titleOverrides,   setTitleOverrides]    = useState({}); // { [entryKey]: overriddenTitle } — per-entry task name edits, this report only
   const [previewLoading,   setPreviewLoading]    = useState(false);
@@ -2053,18 +2039,7 @@ function ReportsTab({ demoCase }) {
   const [loadingMore,      setLoadingMore]       = useState(false);
   const [generating,       setGenerating]        = useState(false); // Generate button's own disabled/spinner state, before the inline view appears
   const [saving,           setSaving]             = useState(false); // Save report button's own disabled/spinner state, before the toast appears
-  const previewPeriodRef = useRef(null);
   const previewPanelRef = useRef(null);
-  // Fixed (viewport-relative, not CSS position:absolute) so this dropdown
-  // escapes the toolbar's own scrollbarGutter/overflow — an absolutely
-  // positioned popup there gets clipped to nothing once the toolbar has
-  // overflow set, since it extends below the toolbar's own small box.
-  const [previewPeriodPos, setPreviewPeriodPos] = useState({ top: 0, left: 0 });
-  useLayoutEffect(() => {
-    if (!previewPeriodOpen || !previewPeriodRef.current) return;
-    const r = previewPeriodRef.current.getBoundingClientRect();
-    setPreviewPeriodPos({ top: r.bottom + 4, left: r.left });
-  }, [previewPeriodOpen]);
   // Which EditableField/TargetOpeningField (by fieldId) is currently in
   // edit mode — only one at a time across the whole document. Handed down
   // via ActiveEditContext instead of threading it through every render
@@ -2185,12 +2160,10 @@ function ReportsTab({ demoCase }) {
         logo: companyIdentity.logo,
         companyName: companyIdentity.companyName,
         companyAddress: companyIdentity.companyAddress,
-        summary: buildDefaultSummary(data.groups),
+        summary: "",
         targetOpening: "",
         clientName: "",
       });
-      setPreviewPeriodOpen(false);
-      setPreviewShowCal(false);
       setActiveNoteFormKeys({});
       setActiveEditField(null);
       setTitleOverrides({});
@@ -2205,8 +2178,6 @@ function ReportsTab({ demoCase }) {
   // to its normal "Choose what this report includes" + results table view.
   const closePreview = () => {
     setPreview(null);
-    setPreviewPeriodOpen(false);
-    setPreviewShowCal(false);
     setActiveNoteFormKeys({});
     setActiveEditField(null);
     setTitleOverrides({});
@@ -2266,6 +2237,11 @@ function ReportsTab({ demoCase }) {
   const previewFinalGroups = previewData
     ? applyExtraNotesToGroups(applyTitleOverrides(applyPhotoExclusions(previewData.groups, preview.excludedPhotos), titleOverrides), preview.extraNotes)
     : [];
+  // Photos actually included in this draft (post-cap) vs. the account's
+  // per-report limit — shown in the modal chrome's Photo Limit indicator.
+  const previewPhotoCount = previewData
+    ? previewData.groups.reduce((s, g) => s + g.entries.reduce((es, e) => es + e.photos.length, 0), 0)
+    : 0;
 
   // Infinite scroll over the *displayed* groups (not previewFinalGroups —
   // manual notes are only spliced in for real output, not the live modal).
@@ -3143,12 +3119,13 @@ function ReportsTab({ demoCase }) {
             }}
           >
 
-            {/* Modal chrome — just app controls (period + cancel/save). The
-                document itself (below) carries its own title/branding, so
-                this bar isn't part of the "report". Its content is capped
-                to the same reading width as the document below, so the two
-                line up instead of the bar stretching edge-to-edge across
-                the full screen. */}
+            {/* Modal chrome — Photo Limit usage on the left, Cancel + Save
+                Report on the right. The period is locked in once Generate
+                is clicked from the results page, so there's no back button
+                or period control here — closing the draft is explicit via
+                Cancel. Its content is capped to the same reading width as
+                the document below, so the two line up instead of the bar
+                stretching edge-to-edge across the full screen. */}
             <div
               style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px",
@@ -3157,80 +3134,30 @@ function ReportsTab({ demoCase }) {
               }}
             >
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: 800, width: "100%", margin: "0 auto" }}>
-              <div style={{ display: "flex", alignItems: "center" }}>
-              <button
-                onClick={closePreview}
-                onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
-                onMouseLeave={e => e.currentTarget.style.background = "white"}
-                style={{ width: 40, height: 40, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, cursor: "pointer", color: "var(--tt-text-2)", transition: "background 0.15s", marginRight: 8 }}
-              >
-                <ChevronLeft size={18} strokeWidth={SW} />
-              </button>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
-                {/* Period dropdown — sized/bordered like the initial filter
-                    on the results page, so the two line up visually. */}
-                <div style={{ position: "relative" }} ref={previewPeriodRef}>
-                  <button
-                    onClick={() => setPreviewPeriodOpen(o => !o)}
-                    onMouseEnter={e => e.currentTarget.style.borderColor = "var(--tt-text-1)"}
-                    onMouseLeave={e => e.currentTarget.style.borderColor = previewPeriodOpen ? "var(--tt-text-1)" : "var(--tt-grey03)"}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 4,
-                      background: "white", border: `1px solid ${previewPeriodOpen ? "var(--tt-text-1)" : "var(--tt-grey03)"}`, borderRadius: 8,
-                      height: 40, margin: 0, padding: "0 12px", cursor: "pointer",
-                      fontSize: 13, fontWeight: 500, color: "var(--tt-text-1)",
-                      transition: "border-color 0.15s",
-                    }}
-                  >
-                    <span>{preview.period}</span>
-                    <ChevronDown size={14} strokeWidth={SW} color="var(--tt-grey05)"
-                      style={{ flexShrink: 0, transform: `rotate(${previewPeriodOpen ? "180deg" : "0deg"})`, transition: "transform 0.15s" }} />
-                  </button>
-                  {previewPeriodOpen && (
-                    <div style={{ position: "fixed", top: previewPeriodPos.top, left: previewPeriodPos.left, zIndex: 200, minWidth: 220, background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, overflow: "hidden", boxShadow: "0 8px 24px rgba(10,22,41,0.16)" }}>
-                      {PERIOD_OPTIONS.map(({ id }, i) => (
-                        <div key={id}>
-                          <div
-                            onClick={() => {
-                              // "Custom date" only opens the calendar — dateRange/period
-                              // (and the data load they trigger) stay untouched until an
-                              // actual range is applied, not merely selected from this list.
-                              if (id === "custom") {
-                                setPreviewShowCal(true);
-                                setPreviewPeriodOpen(false);
-                                return;
-                              }
-                              setPreview(p => ({ ...p, dateRange: id, period: getPeriodRange(id, p.customRange) }));
-                              setPreviewShowCal(false);
-                              setPreviewPeriodOpen(false);
-                            }}
-                            style={{
-                              padding: "10px 12px", cursor: "pointer",
-                              background: preview.dateRange === id ? "var(--tt-grey02)" : "white",
-                              display: "flex", alignItems: "center", justifyContent: "space-between",
-                              transition: "background 0.1s",
-                            }}
-                            onMouseEnter={e => { if (preview.dateRange !== id) e.currentTarget.style.background = "var(--tt-grey02)"; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = preview.dateRange === id ? "var(--tt-grey02)" : "white"; }}
-                          >
-                            <span style={{ fontSize: 13, fontWeight: 500, color: "var(--tt-text-1)", whiteSpace: "nowrap" }}>
-                              {renderPeriodLabel(id, preview.customRange)}
-                            </span>
-                            {preview.dateRange === id && <Check size={14} color="var(--tt-secondary)" strokeWidth={2} style={{ flexShrink: 0, marginLeft: 12 }} />}
-                          </div>
-                          {i < PERIOD_OPTIONS.length - 1 && <div style={{ height: 1, background: "var(--tt-grey03)", margin: "0 12px" }} />}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+              {/* TODO(BE): replace with the account's actual per-report photo cap and usage from the API */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--tt-grey05)", whiteSpace: "nowrap" }}>Photo Limit</span>
+                <div style={{ width: 120, height: 6, borderRadius: 99, background: "var(--tt-grey03)", overflow: "hidden" }}>
+                  <div style={{ width: `${Math.min(100, (previewPhotoCount / PHOTO_LIMIT) * 100)}%`, height: "100%", borderRadius: 99, background: "var(--tt-text-1)" }} />
                 </div>
-              </div>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--tt-text-1)", whiteSpace: "nowrap" }}>{previewPhotoCount} / {PHOTO_LIMIT}</span>
               </div>
 
-              {/* In place of a plain close X: just Save report — Back
-                  (before the period control, above) now covers what Cancel
-                  used to do, so there's no separate Cancel button here. */}
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <button
+                  disabled={previewLoading || saving}
+                  onClick={closePreview}
+                  onMouseEnter={e => !(previewLoading || saving) && (e.currentTarget.style.background = "var(--tt-grey02)")}
+                  onMouseLeave={e => e.currentTarget.style.background = "white"}
+                  style={{
+                    height: 40, padding: "0 20px", borderRadius: 8, border: "1px solid var(--tt-grey03)",
+                    background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)",
+                    cursor: (previewLoading || saving) ? "not-allowed" : "pointer",
+                    opacity: (previewLoading || saving) ? 0.5 : 1, transition: "background 0.15s",
+                  }}
+                >
+                  Cancel
+                </button>
                 <button
                   disabled={previewLoading || saving}
                   onClick={handlePreviewSave}
@@ -3262,7 +3189,7 @@ function ReportsTab({ demoCase }) {
                 padding lives on the outer wrapper (matching the chrome's
                 own padding) rather than on the maxWidth:800 box itself, so
                 the document's left/right edges line up exactly with the
-                chrome's period control and Cancel/Save buttons above. */}
+                chrome's Photo Limit indicator and Cancel/Save buttons above. */}
             <div style={{ overflowY: "auto", scrollbarGutter: "stable", flex: 1 }} onScroll={handleModalScroll}>
               <div style={{ padding: "24px 20px" }}>
               <div style={{ maxWidth: 800, margin: "0 auto" }}>
@@ -3411,27 +3338,6 @@ function ReportsTab({ demoCase }) {
               </div>
             </div>
 
-            {/* Custom date calendar for editing the period inside the modal.
-                dateRange/period are only touched on a successful Apply — closing
-                or applying with nothing picked leaves the preview exactly as it
-                was, so no data reload happens for an incomplete filter. */}
-            {previewShowCal && (
-              <DateRangeCalendar
-                anchorRef={previewPeriodRef}
-                onClose={() => setPreviewShowCal(false)}
-                onApply={(start, end) => {
-                  if (start && end) {
-                    const fmt = (s) => {
-                      const [y, m, d] = s.split("-");
-                      return new Date(y, m-1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-                    };
-                    const cr = { start: fmt(start), end: fmt(end) };
-                    setPreview(p => ({ ...p, dateRange: "custom", customRange: cr, period: getPeriodRange("custom", cr) }));
-                  }
-                  setPreviewShowCal(false);
-                }}
-              />
-            )}
           </div>
         </ActiveEditContext.Provider>
       )}
