@@ -627,8 +627,11 @@ function isHiddenByChrome(rect) {
 // pressing Enter — Shift+Enter still inserts a newline) just blurs the
 // field, which is what triggers the flip to plain text. No X here — there's
 // no deferred draft to discard, only the click-to-edit fields below get
-// that. `disabled` still wins over all of this (a saved/locked report
-// shows plain text unconditionally).
+// that. `aboveWhenEditing` (Summary's "Summary"/"Optional" label row) only
+// renders alongside the live textarea/input — it disappears the moment the
+// field flips to plain text, same as once the whole report locks.
+// `disabled` still wins over all of this (a saved/locked report shows
+// plain text unconditionally, with no `aboveWhenEditing` either).
 //
 // `popover` (company name/address, client name) opens a small 240px-wide
 // caret popover off the trigger's own bounding rect instead of swapping
@@ -643,7 +646,7 @@ function isHiddenByChrome(rect) {
 // non-boxed field's own wrapper carries that as marginBottom, multiline's
 // check/cancel row sits 8px under the textarea, and the error message (if
 // any) sits 8px under that.
-function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, onCancel, multiline, disabled, boxed, required, errorMessage, textStyle, inputStyle, as: Tag = "p", alwaysEditing, popover }) {
+function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, onCancel, multiline, disabled, boxed, required, errorMessage, textStyle, inputStyle, as: Tag = "p", alwaysEditing, popover, aboveWhenEditing }) {
   const { activeField, setActiveField } = useContext(ActiveEditContext);
   const [draft, setDraft] = useState(value || "");
   const [error, setError] = useState(false);
@@ -794,9 +797,13 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
     // `!isEmpty` guards the focus() call — it only needs to fire on the
     // transition from the text tag above into this textarea/input (a fresh
     // mount, so nothing is focused yet), not on an empty field a user
-    // hasn't clicked into on its own.
+    // hasn't clicked into on its own. `aboveWhenEditing` (Summary's
+    // "Summary"/"Optional" label row) only makes sense while the field is
+    // actually live — it disappears along with the textarea once the value
+    // flips to plain text above.
     return multiline ? (
       <div style={boxStyle}>
+        {aboveWhenEditing}
         <div style={{ position: "relative" }}>
           <Textarea
             ref={el => { alwaysEditingRef.current = el; if (el && !isEmpty) el.focus(); }}
@@ -2831,13 +2838,11 @@ function ReportsTab({ demoCase }) {
           same box (not above it). The box is owned here, not by
           EditableField's `boxed` (which would nest the label outside the
           card), so the textarea fills the card directly underneath the
-          label. Locked to plain text once the report is saved
-          (`disabled`) — the box still wraps that locked text the same way. */}
+          label. The label itself is passed in as `aboveWhenEditing` rather
+          than rendered here directly — EditableField only shows it
+          alongside the live textarea, hiding it once summary flips to
+          plain text (confirmed, or the whole report saved/`disabled`). */}
       <div style={{ background: "var(--tt-grey02)", borderRadius: 12, padding: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 4px", marginBottom: 8 }}>
-          <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-2)", margin: 0 }}>Summary</p>
-          <span style={{ fontSize: 10, fontWeight: 400, color: "var(--tt-grey05)" }}>Optional</span>
-        </div>
         <EditableField
         fieldId="summary"
         value={preview.summary}
@@ -2845,6 +2850,12 @@ function ReportsTab({ demoCase }) {
         disabled={previewSaved}
         alwaysEditing
         multiline
+        aboveWhenEditing={
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 4px", marginBottom: 8 }}>
+            <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-2)", margin: 0 }}>Summary</p>
+            <span style={{ fontSize: 10, fontWeight: 400, color: "var(--tt-grey05)" }}>Optional</span>
+          </div>
+        }
         onSave={v => setPreview(p => ({ ...p, summary: v }))}
         textStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, margin: 0 }}
         inputStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6 }}
