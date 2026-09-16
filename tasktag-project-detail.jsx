@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect, useEffect } from "react";
+import { useState, useRef, useLayoutEffect, useEffect, useMemo, useContext, createContext } from "react";
 import { createPortal } from "react-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -551,13 +551,24 @@ function ReportCheckbox({ active, label, onClick }) {
   );
 }
 
+// ── Exclusive edit-mode coordination ──
+// Only one EditableField (or TargetOpeningField) may be in edit mode at a
+// time across the whole document — opening one closes whichever other
+// field was open, the same way a browser only lets one <details> in a
+// group stay open. Backed by a single { activeField, setActiveField } pair
+// held in ReportsTab and handed down via context (rather than threading
+// activeField/onActivate/onDeactivate through every call site by hand),
+// with each field identified by its own fieldId string.
+const ActiveEditContext = createContext({ activeField: null, setActiveField: () => {} });
+
 // ── Inline-editable text ──
 // No pencil icon — hovering shows a grey02 background to signal the field
 // is editable, and clicking swaps it for an input (or textarea) with
 // check/cancel icons matching the task-name rename pattern (inside the
 // input for single-line fields, below it in-flow for multiline ones, since
-// icons can't sit inside wrapped text). Manages its own draft/editing
-// state, so any number of these can be open independently at once. When
+// icons can't sit inside wrapped text). `fieldId` plugs it into the
+// exclusive edit-mode coordination above — only the field whose fieldId
+// matches the shared activeField is ever actually in edit mode. When
 // disabled, renders as inert plain text (used once a report preview is
 // locked read-only after saving).
 //
@@ -575,10 +586,11 @@ function ReportCheckbox({ active, label, onClick }) {
 // non-boxed field's own wrapper carries that as marginBottom, multiline's
 // check/cancel row sits 8px under the textarea, and the error message (if
 // any) sits 8px under that.
-function EditableField({ value, placeholder, onSave, onCancel, multiline, disabled, autoEdit, boxed, required, errorMessage, textStyle, inputStyle, as: Tag = "p" }) {
-  const [editing, setEditing] = useState(!!autoEdit);
+function EditableField({ fieldId, value, placeholder, onSave, onCancel, multiline, disabled, boxed, required, errorMessage, textStyle, inputStyle, as: Tag = "p" }) {
+  const { activeField, setActiveField } = useContext(ActiveEditContext);
   const [draft, setDraft] = useState(value || "");
   const [error, setError] = useState(false);
+  const editing = !disabled && activeField === fieldId;
 
   const boxStyle = boxed ? { background: "var(--tt-grey02)", borderRadius: 8, padding: 16 } : {};
 
@@ -592,10 +604,10 @@ function EditableField({ value, placeholder, onSave, onCancel, multiline, disabl
       const trimmed = draft.trim();
       if (required && !trimmed) { setError(true); return; }
       onSave(trimmed);
-      setEditing(false);
+      setActiveField(null);
       setError(false);
     };
-    const cancel = () => { setEditing(false); setError(false); if (onCancel) onCancel(); };
+    const cancel = () => { setActiveField(null); setError(false); if (onCancel) onCancel(); };
     const onChange = ev => { setDraft(ev.target.value); if (error) setError(false); };
     return (
       <div style={{ position: "relative", maxWidth: "100%", minWidth: 0, ...(!boxed ? { marginBottom: 8 } : {}), ...boxStyle }}>
@@ -659,7 +671,7 @@ function EditableField({ value, placeholder, onSave, onCancel, multiline, disabl
   return (
     <div style={boxStyle}>
       <Tag
-        onClick={() => { setDraft(value || ""); setEditing(true); setError(false); }}
+        onClick={() => { setDraft(value || ""); setActiveField(fieldId); setError(false); }}
         onMouseEnter={ev => { if (!boxed) ev.currentTarget.style.background = "var(--tt-grey02)"; }}
         onMouseLeave={ev => ev.currentTarget.style.background = "none"}
         style={{ display: "block", cursor: "pointer", borderRadius: 6, transition: "background 0.15s", ...textStyle }}
@@ -712,13 +724,15 @@ function LogoUploadBox({ src, onChange, disabled }) {
 }
 
 // ── Target Opening — single-date field ──
-// Its own component (not just inline JSX) so the calendar's anchor ref
-// and open/closed state are per-instance — needed now that the full
-// header (this field included) renders once per page rather than once
-// for the whole document.
-function TargetOpeningField({ value, disabled, onApply }) {
+// Its own component (not just inline JSX) so the calendar's anchor ref is
+// per-instance — needed now that the full header (this field included)
+// renders once per page rather than once for the whole document. Plugs
+// into the same exclusive edit-mode coordination as EditableField (see
+// ActiveEditContext above), via its own fieldId.
+function TargetOpeningField({ fieldId, value, disabled, onApply }) {
+  const { activeField, setActiveField } = useContext(ActiveEditContext);
   const anchorRef = useRef(null);
-  const [open, setOpen] = useState(false);
+  const open = !disabled && activeField === fieldId;
 
   if (disabled) {
     return <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", margin: 0 }}>{value || "—"}</p>;
@@ -727,7 +741,7 @@ function TargetOpeningField({ value, disabled, onApply }) {
   return (
     <div style={{ position: "relative" }} ref={anchorRef}>
       <p
-        onClick={() => setOpen(o => !o)}
+        onClick={() => setActiveField(open ? null : fieldId)}
         onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
         onMouseLeave={ev => ev.currentTarget.style.background = "none"}
         style={{ fontSize: 14, fontWeight: 600, color: value ? "var(--tt-text-1)" : "var(--tt-grey05)", margin: 0, cursor: "pointer", borderRadius: 6, transition: "background 0.15s" }}
@@ -739,13 +753,13 @@ function TargetOpeningField({ value, disabled, onApply }) {
           anchorRef={anchorRef}
           allowFuture
           singleDate
-          onClose={() => setOpen(false)}
+          onClose={() => setActiveField(null)}
           onApply={(start) => {
             if (start) {
               const [y, m, d] = start.split("-");
               onApply(new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }));
             }
-            setOpen(false);
+            setActiveField(null);
           }}
         />
       )}
@@ -1709,6 +1723,12 @@ function ReportsTab({ demoCase }) {
   const [saving,           setSaving]             = useState(false); // Save report button's own disabled/spinner state, before the toast appears
   const previewPeriodRef = useRef(null);
   const previewPanelRef = useRef(null);
+  // Which EditableField/TargetOpeningField (by fieldId) is currently in
+  // edit mode — only one at a time across the whole document. Handed down
+  // via ActiveEditContext instead of threading it through every render
+  // function's props.
+  const [activeEditField, setActiveEditField] = useState(null);
+  const activeEditCtxValue = useMemo(() => ({ activeField: activeEditField, setActiveField: setActiveEditField }), [activeEditField]);
 
   useEffect(() => {
     if (!openPeriod) return;
@@ -1822,6 +1842,7 @@ function ReportsTab({ demoCase }) {
       setPreviewPeriodOpen(false);
       setPreviewShowCal(false);
       setActiveNoteFormKeys({});
+      setActiveEditField(null);
       setTitleOverrides({});
       setPreviewSaved(false);
       setPreviewCopied(false);
@@ -1839,6 +1860,7 @@ function ReportsTab({ demoCase }) {
     setPreviewPeriodOpen(false);
     setPreviewShowCal(false);
     setActiveNoteFormKeys({});
+    setActiveEditField(null);
     setTitleOverrides({});
     setPreviewSaved(false);
     setPreviewCopied(false);
@@ -1883,9 +1905,15 @@ function ReportsTab({ demoCase }) {
     return () => clearTimeout(t);
   }, [preview?.period]);
 
-  const previewData = preview
-    ? buildReportData(preview.dateRange, preview.period, preview.customRange, preview.includeNoPhotoTasks)
-    : null;
+  // Filters/sorts/groups the whole DUMMY_ENTRIES set — memoized so it only
+  // reruns when one of these four inputs actually changes, instead of on
+  // every render of this tab (every keystroke elsewhere, every scroll-
+  // triggered state update, etc.).
+  const previewData = useMemo(() => (
+    preview
+      ? buildReportData(preview.dateRange, preview.period, preview.customRange, preview.includeNoPhotoTasks)
+      : null
+  ), [preview?.dateRange, preview?.period, preview?.customRange, preview?.includeNoPhotoTasks]);
   // Final groups with excluded photos filtered out, edited task names
   // applied, and manually-added notes spliced in at their entry — what
   // actually gets downloaded / copy-linked / saved.
@@ -1947,6 +1975,7 @@ function ReportsTab({ demoCase }) {
             original task/entry text is never modified. No pencil icon —
             hover shows the grey02 affordance, click edits. */}
         <EditableField
+          fieldId={`title_${entryKey}`}
           value={displayTitle}
           disabled={previewSaved}
           onSave={v => {
@@ -2010,6 +2039,7 @@ function ReportsTab({ demoCase }) {
         <div>
           {/* TODO(BE): replace with the firm's actual name from the API */}
           <EditableField
+            fieldId="companyName"
             value={preview.companyName}
             placeholder={POINT_OF_CONTACT_COMPANY}
             disabled={previewSaved}
@@ -2018,6 +2048,7 @@ function ReportsTab({ demoCase }) {
             inputStyle={{ fontSize: 14, fontWeight: 700 }}
           />
           <EditableField
+            fieldId="companyAddress"
             value={preview.companyAddress}
             placeholder={COMPANY_ADDRESS}
             disabled={previewSaved}
@@ -2050,6 +2081,7 @@ function ReportsTab({ demoCase }) {
         Period: {preview.period}
       </p>
       <EditableField
+        fieldId="projectName"
         value={preview.projectName}
         placeholder={PROJECT_NAME}
         disabled={previewSaved}
@@ -2058,6 +2090,7 @@ function ReportsTab({ demoCase }) {
         inputStyle={{ fontSize: 28, fontWeight: 700 }}
       />
       <EditableField
+        fieldId="address"
         value={preview.address}
         placeholder={PROJECT_ADDRESS}
         disabled={previewSaved}
@@ -2071,6 +2104,7 @@ function ReportsTab({ demoCase }) {
           editing swaps the same card for a textarea instead of nesting a
           separate bordered box inside it. */}
       <EditableField
+        fieldId="summary"
         value={preview.summary}
         placeholder="Summarize how the project is going this period"
         disabled={previewSaved}
@@ -2105,6 +2139,7 @@ function ReportsTab({ demoCase }) {
         <div style={{ flex: "1 1 0", display: "flex", alignItems: "center", gap: 8 }}>
           <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: 0, flexShrink: 0 }}>Target Opening</p>
           <TargetOpeningField
+            fieldId="targetOpening"
             value={preview.targetOpening}
             disabled={previewSaved}
             onApply={formatted => setPreview(p => ({ ...p, targetOpening: formatted }))}
@@ -2113,6 +2148,7 @@ function ReportsTab({ demoCase }) {
         <div style={{ flex: "1 1 0", display: "flex", alignItems: "center", gap: 8 }}>
           <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: 0, flexShrink: 0 }}>Prepared For</p>
           <EditableField
+            fieldId="clientName"
             value={preview.clientName}
             placeholder="Add client name"
             disabled={previewSaved}
@@ -2132,7 +2168,7 @@ function ReportsTab({ demoCase }) {
   const renderRunningHeader = () => (
     <div style={{ padding: `${PAGE_PAD}px ${PAGE_PAD}px 0` }}>
       {renderCompanyIdentityRow()}
-      <div style={{ height: 1, background: "var(--tt-grey03)" }} />
+      <div style={{ height: 1, background: "var(--tt-grey03)", marginBottom: 24 }} />
     </div>
   );
 
@@ -2229,6 +2265,56 @@ function ReportsTab({ demoCase }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layoutDepsKey]);
 
+  // The hidden scaffold and the visible pages both call renderFullHeader/
+  // renderBlock/etc. for potentially dozens of entries and their photos —
+  // memoized on the same signature as the layout effect above, so an
+  // unrelated re-render of this tab reuses the same React elements instead
+  // of rebuilding (and having React reconcile) this whole subtree again.
+  const hiddenMeasuringScaffold = useMemo(() => (
+    <div aria-hidden="true" style={{ visibility: "hidden", height: 0, overflow: "hidden" }}>
+      <div style={{ width: PAGE_W }}>
+        <div ref={headerMeasureRef}>{renderFullHeader()}</div>
+        <div ref={runningHeaderMeasureRef}>{renderRunningHeader()}</div>
+        <div ref={footerMeasureRef}>{renderPageFooter()}</div>
+        {flatBlocks.map(block => (
+          <div key={block.key} ref={el => { blockMeasureRefs.current[block.key] = el; }} style={{ width: PAGE_W - PAGE_PAD * 2 }}>
+            {renderBlock(block)}
+          </div>
+        ))}
+      </div>
+    </div>
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [layoutDepsKey]);
+
+  const visiblePages = useMemo(() => {
+    if (!pageLayout) return null;
+    return pageLayout.pages.map((pageBlocks, pi) => {
+      const isFirst = pi === 0;
+      return (
+        <div
+          key={pi}
+          style={{
+            width: PAGE_W, minHeight: PAGE_H, margin: isFirst ? 0 : "24px 0 0",
+            boxSizing: "border-box",
+            background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 12,
+            boxShadow: "0 1px 3px rgba(10,22,41,0.08)",
+            display: "flex", flexDirection: "column",
+            contentVisibility: "auto",
+            containIntrinsicSize: `${PAGE_W}px ${PAGE_H}px`,
+          }}
+        >
+          {isFirst ? renderFullHeader() : renderRunningHeader()}
+          <div style={{ padding: `0 ${PAGE_PAD}px`, flex: 1 }}>
+            {isFirst && previewData.groups.length === 0 && renderNoteSlot("empty")}
+            {pageBlocks.map(block => <div key={block.key}>{renderBlock(block)}</div>)}
+          </div>
+          {renderPageFooter()}
+        </div>
+      );
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageLayout, layoutDepsKey]);
+
   const handleModalScroll = (e) => {
     if (previewLoading || loadingMore || !hasMoreEntries) return;
     const el = e.currentTarget;
@@ -2283,7 +2369,10 @@ function ReportsTab({ demoCase }) {
     if (!savedNote && !activeNoteFormKeys[key]) {
       return (
         <button
-          onClick={() => setActiveNoteFormKeys(prev => ({ ...prev, [key]: true }))}
+          onClick={() => {
+            setActiveNoteFormKeys(prev => ({ ...prev, [key]: true }));
+            setActiveEditField(`note_${key}`);
+          }}
           onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
           onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
           style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", padding: 0, marginTop: 10, cursor: "pointer", fontSize: 12, fontWeight: 500, color: "var(--tt-secondary)" }}
@@ -2296,9 +2385,9 @@ function ReportsTab({ demoCase }) {
     return (
       <div style={{ marginTop: 10 }}>
         <EditableField
+          fieldId={`note_${key}`}
           value={savedNote || ""}
           placeholder="Describe the note for this task"
-          autoEdit={!savedNote}
           onSave={v => {
             setPreview(p => {
               const next = { ...p.extraNotes };
@@ -2349,6 +2438,7 @@ function ReportsTab({ demoCase }) {
       // link so they can act on the just-saved report before dismissing it.
       setPreviewSaved(true);
       setActiveNoteFormKeys({});
+      setActiveEditField(null);
       setPreviewPeriodOpen(false);
       setSaving(false);
       setSelectedPhotos({});
@@ -2634,6 +2724,7 @@ function ReportsTab({ demoCase }) {
       {/* ── Generate preview — a full-screen takeover, same as the photo
           lightbox, not a docked panel over the still-visible page. ── */}
       {preview && (
+        <ActiveEditContext.Provider value={activeEditCtxValue}>
           <div
             ref={previewPanelRef}
             style={{
@@ -2789,19 +2880,10 @@ function ReportsTab({ demoCase }) {
                         useLayoutEffect above). height:0 + overflow hidden on
                         the outer wrapper keeps it from affecting
                         scroll/layout while its children still get a normal,
-                        measurable layout pass underneath. */}
-                    <div aria-hidden="true" style={{ visibility: "hidden", height: 0, overflow: "hidden" }}>
-                      <div style={{ width: PAGE_W }}>
-                        <div ref={headerMeasureRef}>{renderFullHeader()}</div>
-                        <div ref={runningHeaderMeasureRef}>{renderRunningHeader()}</div>
-                        <div ref={footerMeasureRef}>{renderPageFooter()}</div>
-                        {flatBlocks.map(block => (
-                          <div key={block.key} ref={el => { blockMeasureRefs.current[block.key] = el; }} style={{ width: PAGE_W - PAGE_PAD * 2 }}>
-                            {renderBlock(block)}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                        measurable layout pass underneath. Memoized above
+                        (hiddenMeasuringScaffold) alongside the layout
+                        effect it feeds. */}
+                    {hiddenMeasuringScaffold}
 
                     {/* Real, visible pages — stacked A4 sheets, each with
                         its own header/footer, so the preview reads like a
@@ -2813,31 +2895,8 @@ function ReportsTab({ demoCase }) {
                         grids) — without it, scrolling a long report got
                         noticeably janky. containIntrinsicSize keeps the
                         scrollbar/scroll position stable while a page is
-                        skipped. */}
-                    {pageLayout && pageLayout.pages.map((pageBlocks, pi) => {
-                      const isFirst = pi === 0;
-                      return (
-                        <div
-                          key={pi}
-                          style={{
-                            width: PAGE_W, minHeight: PAGE_H, margin: isFirst ? 0 : "24px 0 0",
-                            boxSizing: "border-box",
-                            background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 12,
-                            boxShadow: "0 1px 3px rgba(10,22,41,0.08)",
-                            display: "flex", flexDirection: "column",
-                            contentVisibility: "auto",
-                            containIntrinsicSize: `${PAGE_W}px ${PAGE_H}px`,
-                          }}
-                        >
-                          {isFirst ? renderFullHeader() : renderRunningHeader()}
-                          <div style={{ padding: `0 ${PAGE_PAD}px`, flex: 1 }}>
-                            {isFirst && previewData.groups.length === 0 && renderNoteSlot("empty")}
-                            {pageBlocks.map(block => <div key={block.key}>{renderBlock(block)}</div>)}
-                          </div>
-                          {renderPageFooter()}
-                        </div>
-                      );
-                    })}
+                        skipped. Memoized above (visiblePages). */}
+                    {visiblePages}
 
                     {/* Infinite scroll: one skeleton item while the next batch "loads" */}
                     {loadingMore && (
@@ -2965,6 +3024,7 @@ function ReportsTab({ demoCase }) {
               />
             )}
           </div>
+        </ActiveEditContext.Provider>
       )}
 
       {/* Toast — success (secondary green accent + check) / error (red accent + cross) */}
