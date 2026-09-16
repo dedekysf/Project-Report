@@ -405,11 +405,13 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
             ? `${isLeft ? "50%" : "0"} ${isRight ? "50%" : "0"} ${isRight ? "50%" : "0"} ${isLeft ? "50%" : "0"}`
             : "0";
 
-          // singleDate has no band to preview, but every date still needs
-          // its own plain hover cue — without this, hovering did nothing at
-          // all since inBand (the only thing driving hover background) can
-          // never be true in this mode.
-          const isSingleHover = singleDate && !disabled && !selected && hovering === key;
+          // Any date not already covered by the band preview still needs its
+          // own plain hover cue — this covers singleDate mode (which has no
+          // band at all), and range mode before a start date is picked, or
+          // when hovering a day the in-progress band doesn't cover (e.g.
+          // before rangeStart) — without it, those cases showed no hover
+          // feedback whatsoever.
+          const plainHover = !disabled && !selected && hovering === key && !inBand;
 
           return (
             <div
@@ -422,9 +424,9 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
                 height: CELL, width: CELL,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 cursor: disabled ? "not-allowed" : "pointer",
-                // seamless band background (or the plain single-date hover cue)
-                background: (inBand || isSingleHover) ? "var(--tt-grey03)" : "transparent",
-                borderRadius: isSingleHover ? "50%" : bandRadius,
+                // seamless band background (or the plain per-day hover cue)
+                background: (inBand || plainHover) ? "var(--tt-grey03)" : "transparent",
+                borderRadius: plainHover ? "50%" : bandRadius,
               }}
             >
               {/* The actual date circle */}
@@ -434,7 +436,7 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
                 borderRadius: "50%",
                 background: selected ? "var(--tt-text-1)" : "transparent",
                 border: isToday && !selected ? "1.5px solid var(--tt-text-1)" : "none",
-                color: selected ? "#fff" : (inBand || isSingleHover) ? "var(--tt-text-1)" : disabled ? "var(--tt-grey04)" : otherMonth ? "var(--tt-grey03)" : isToday ? "var(--tt-text-1)" : "var(--tt-text-2)",
+                color: selected ? "#fff" : (inBand || plainHover) ? "var(--tt-text-1)" : disabled ? "var(--tt-grey04)" : otherMonth ? "var(--tt-grey03)" : isToday ? "var(--tt-text-1)" : "var(--tt-text-2)",
                 fontSize: 13,
                 fontWeight: selected || isToday ? 600 : 400,
                 zIndex: 1,
@@ -2644,7 +2646,7 @@ function ReportsTab({ demoCase }) {
             </div>
             {openPeriod && (
               <div style={{
-                position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 200,
+                position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 200, minWidth: 220,
                 background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, overflow: "hidden",
               }}>
                 {PERIOD_OPTIONS.map(({ id }, i) => (
@@ -2665,10 +2667,10 @@ function ReportsTab({ demoCase }) {
                       onMouseEnter={e => { if (dateRange !== id) e.currentTarget.style.background = "var(--tt-grey02)"; }}
                       onMouseLeave={e => { e.currentTarget.style.background = dateRange === id ? "var(--tt-grey02)" : "white"; }}
                     >
-                      <span style={{ fontSize: 13, fontWeight: 500, color: "var(--tt-text-1)" }}>
+                      <span style={{ fontSize: 13, fontWeight: 500, color: "var(--tt-text-1)", whiteSpace: "nowrap" }}>
                         {renderPeriodLabel(id)}
                       </span>
-                      {dateRange === id && <Check size={14} color="var(--tt-secondary)" strokeWidth={2} />}
+                      {dateRange === id && <Check size={14} color="var(--tt-secondary)" strokeWidth={2} style={{ flexShrink: 0, marginLeft: 12 }} />}
                     </div>
                     {i < PERIOD_OPTIONS.length - 1 && (
                       <div style={{ height: 1, background: "var(--tt-grey03)", margin: "0 12px" }} />
