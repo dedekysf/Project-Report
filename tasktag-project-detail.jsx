@@ -2277,9 +2277,9 @@ function ReportsTab({ demoCase }) {
             <span style={{ fontSize: 13, fontWeight: 700, color: "white" }}>{initialsOf(POINT_OF_CONTACT_NAME)}</span>
           </div>
           <div>
-            <p style={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 2px" }}>{POINT_OF_CONTACT_NAME}</p>
+            <p style={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", lineHeight: 1, margin: "0 0 4px" }}>{POINT_OF_CONTACT_NAME}</p>
             {/* TODO(BE): replace with the contact's actual role/company from the API */}
-            <p style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)", margin: 0 }}>
+            <p style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)", lineHeight: 1, margin: 0 }}>
               {POINT_OF_CONTACT_ROLE} · {POINT_OF_CONTACT_COMPANY}
             </p>
           </div>
