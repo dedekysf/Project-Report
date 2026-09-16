@@ -1214,7 +1214,7 @@ function PhotoThumb({ src, onClick }) {
   );
 }
 
-// Photo grid capped to one row of 3 — beyond that, the last visible cell
+// Photo grid capped to 2 rows of 3 — beyond that, the last visible cell
 // becomes a "+N more" overlay that expands the grid in place to show every
 // photo (no cap), rather than jumping into the lightbox. Each visible photo
 // also carries a select checkbox in its top-right corner; checking one or
@@ -1231,7 +1231,9 @@ function PhotoThumb({ src, onClick }) {
 // grid/scroll container), with a single input for the caption text. Only
 // one popover is open at a time across the grid.
 function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, onToggleSelect, captions, onCaptionChange }) {
-  const CAP = 3;
+  const COLS = 3;
+  const ROWS = 2;
+  const CAP = COLS * ROWS; // 2 rows of 3 before the last visible cell becomes "+N more"
   const [expanded, setExpanded] = useState(false);
   const [openCaptionIdx, setOpenCaptionIdx] = useState(null); // original photo index, or null
   const [captionPos, setCaptionPos] = useState({ top: 0, left: 0 });
@@ -1283,7 +1285,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
   const visibleOriginalIndices = items.map(it => it.i);
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginTop: 10 }}>
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${COLS},1fr)`, gap: 8, marginTop: 10 }}>
       {visibleItems.map(({ k, i }, viewIdx) => {
         const selected = !!(selectedPhotos && selectedPhotos[`${entryKey}_${i}`]);
         const isCapCell = !expanded && remaining > 0 && viewIdx === visibleItems.length - 1;
@@ -1415,20 +1417,32 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
 }
 
 // Full photo list for a task item over the per-task cap — opened from the
-// meta line's "X of Y photos" link (see renderEntryBlock). Unlike the old
-// swap flow, every photo shows here (both included and excluded) and each
-// is freely checkable/uncheckable, with no cap enforced in this view itself
-// — PER_ENTRY_PHOTO_LIMIT only decides the default selection a fresh report
-// starts with (see defaultOverflowExclusions).
+// meta line's "X of Y photos" link (see renderEntryBlock). Every photo
+// shows here (both included and excluded) as a freely checkable/uncheckable
+// thumbnail — but checking one more once already at PER_ENTRY_PHOTO_LIMIT
+// selected is blocked with a warning instead of silently going over,
+// same limit defaultOverflowExclusions uses for a fresh report's default
+// selection.
 function PhotoManagerModal({ photos, excludedPhotos, entryKey, taskName, onSetPhotoExcluded, onClose }) {
   const items = (photos || []).map((k, i) => ({ k, i })).filter(({ k }) => IMG_MAP[k]);
   const includedCount = items.filter(({ i }) => !(excludedPhotos && excludedPhotos[`${entryKey}_${i}`])).length;
+  const [limitWarning, setLimitWarning] = useState(false);
+  const warningTimerRef = useRef(null);
 
   useEffect(() => {
     const handler = e => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
+
+  // Auto-dismisses the warning a couple seconds after the blocked attempt
+  // that raised it, rather than leaving it stuck until the user notices.
+  useEffect(() => () => { if (warningTimerRef.current) clearTimeout(warningTimerRef.current); }, []);
+  const flashLimitWarning = () => {
+    setLimitWarning(true);
+    if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
+    warningTimerRef.current = setTimeout(() => setLimitWarning(false), 2500);
+  };
 
   return (
     <div
@@ -1454,14 +1468,24 @@ function PhotoManagerModal({ photos, excludedPhotos, entryKey, taskName, onSetPh
         <p style={{ fontSize: 12, fontWeight: 600, color: "var(--tt-text-2)", margin: "0 0 12px" }}>
           {includedCount} of {items.length} selected
         </p>
+        {limitWarning && (
+          <p style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500, color: "var(--tt-red)", background: "rgba(229,72,77,0.08)", borderRadius: 6, padding: "8px 10px", margin: "0 0 12px" }}>
+            <AlertTriangle size={13} strokeWidth={SW} style={{ flexShrink: 0 }} />
+            You can select up to {PER_ENTRY_PHOTO_LIMIT} photos — uncheck one first.
+          </p>
+        )}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
           {items.map(({ k, i }) => {
             const included = !(excludedPhotos && excludedPhotos[`${entryKey}_${i}`]);
+            const capped = !included && includedCount >= PER_ENTRY_PHOTO_LIMIT;
             return (
               <button
                 key={i}
-                onClick={() => onSetPhotoExcluded(i, included)}
-                style={{ position: "relative", padding: 0, border: "none", background: "none", cursor: "pointer" }}
+                onClick={() => {
+                  if (capped) { flashLimitWarning(); return; }
+                  onSetPhotoExcluded(i, included);
+                }}
+                style={{ position: "relative", padding: 0, border: "none", background: "none", cursor: capped ? "not-allowed" : "pointer", opacity: capped ? 0.45 : 1 }}
               >
                 <div style={{ position: "relative", width: "100%", aspectRatio: "4/3", borderRadius: 6, overflow: "hidden", outline: included ? "2px solid var(--tt-secondary)" : "2px solid transparent" }}>
                   <img src={IMG_MAP[k]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
@@ -2025,7 +2049,7 @@ function applyPhotoCap(groups, maxPhotos = PHOTO_LIMIT) {
 }
 
 // TODO(BE): replace with the account's actual per-task-item photo cap from the API
-const PER_ENTRY_PHOTO_LIMIT = 12;
+const PER_ENTRY_PHOTO_LIMIT = 15;
 
 // Marks everything past the first PER_ENTRY_PHOTO_LIMIT photos in each entry
 // as excluded by default, using the exact same excludedPhotos shape (and
@@ -3857,7 +3881,7 @@ function ReportsTab({ demoCase }) {
                               <div className="tt-skeleton" style={{ width: 160, height: 11, marginBottom: 10 }} />
                               {e.photos.length > 0 && (
                                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
-                                  {[0, 1, 2].map(pi => (
+                                  {[0, 1, 2, 3, 4, 5].map(pi => (
                                     <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "4/3", borderRadius: 4 }} />
                                   ))}
                                 </div>
