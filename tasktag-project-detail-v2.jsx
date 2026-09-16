@@ -644,6 +644,25 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [popoverOpen]);
+  // The popover is `position: fixed`, so its top/left are only ever
+  // correct for the scroll position at the moment it opened — without
+  // this, scrolling the modal's body leaves it stranded while the trigger
+  // moves on. `true` (capture phase) is what lets this catch scroll on the
+  // modal's own scroll container, not just window-level scroll.
+  useEffect(() => {
+    if (!popoverOpen) return;
+    const reposition = () => {
+      if (!triggerRef.current) return;
+      const r = triggerRef.current.getBoundingClientRect();
+      setPopoverPos({ top: r.bottom + 8, left: r.left });
+    };
+    window.addEventListener("scroll", reposition, true);
+    window.addEventListener("resize", reposition);
+    return () => {
+      window.removeEventListener("scroll", reposition, true);
+      window.removeEventListener("resize", reposition);
+    };
+  }, [popoverOpen]);
 
   const boxStyle = boxed ? { position: "relative", background: "var(--tt-grey02)", borderRadius: 8, padding: 8 } : {};
 
@@ -1081,13 +1100,13 @@ function PhotoThumb({ src, onClick }) {
 // is already set. Clicking it opens a small caret popover, fixed-positioned
 // off the trigger's own bounding rect (so it isn't clipped by the
 // grid/scroll container), with a single input for the caption text. Only
-// one popover is open at a time
-// across the grid.
+// one popover is open at a time across the grid.
 function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, onToggleSelect, captions, onCaptionChange }) {
   const CAP = 4;
   const [expanded, setExpanded] = useState(false);
   const [openCaptionIdx, setOpenCaptionIdx] = useState(null); // original photo index, or null
   const [captionPos, setCaptionPos] = useState({ top: 0, left: 0 });
+  const captionTriggerRef = useRef(null); // the specific trigger button last clicked, for scroll repositioning
   const captionPopoverRef = useRef(null);
 
   useEffect(() => {
@@ -1095,6 +1114,25 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
     const handler = e => { if (captionPopoverRef.current && !captionPopoverRef.current.contains(e.target)) setOpenCaptionIdx(null); };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
+  }, [openCaptionIdx]);
+  // The popover is `position: fixed`, so its top/left are only ever
+  // correct for the scroll position at the moment it opened — without
+  // this, scrolling the modal's body leaves it stranded while the trigger
+  // moves on. `true` (capture phase) is what lets this catch scroll on the
+  // modal's own scroll container, not just window-level scroll.
+  useEffect(() => {
+    if (openCaptionIdx === null) return;
+    const reposition = () => {
+      if (!captionTriggerRef.current) return;
+      const r = captionTriggerRef.current.getBoundingClientRect();
+      setCaptionPos({ top: r.bottom + 8, left: r.left - 6 });
+    };
+    window.addEventListener("scroll", reposition, true);
+    window.addEventListener("resize", reposition);
+    return () => {
+      window.removeEventListener("scroll", reposition, true);
+      window.removeEventListener("resize", reposition);
+    };
   }, [openCaptionIdx]);
 
   const items = (photos || [])
@@ -1147,6 +1185,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
               <button
                 onClick={e => {
                   e.stopPropagation();
+                  captionTriggerRef.current = e.currentTarget;
                   const r = e.currentTarget.getBoundingClientRect();
                   setCaptionPos({ top: r.bottom + 8, left: r.left - 6 });
                   setOpenCaptionIdx(prev => prev === i ? null : i);
