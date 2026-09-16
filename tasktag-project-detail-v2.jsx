@@ -12,7 +12,7 @@ import {
   Activity, Users, BarChart2, SlidersHorizontal,
   ArrowUpDown, Calendar, AlignJustify, Clock,
   UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, Crown, AlertTriangle,
-  RotateCw, ZoomIn, ZoomOut, Folder, ArrowLeft, ArrowRight, Info,
+  RotateCw, ZoomIn, ZoomOut, Folder, ArrowLeft, ArrowRight, Info, MessageSquare,
 } from "lucide-react";
 
 import logoImg from "./src/Img/tasktag-logo.13f1babda8fdbb1b7251572a0fe11f9e.png";
@@ -639,7 +639,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
         onClick={done}
         onMouseEnter={ev => !isEmpty && (ev.currentTarget.style.opacity = "0.85")}
         onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
-        style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: isEmpty ? "not-allowed" : "pointer", padding: 0, opacity: isEmpty ? 0.4 : 1, transition: "opacity 0.15s" }}
+        style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: isEmpty ? "var(--tt-grey05)" : "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: isEmpty ? "not-allowed" : "pointer", padding: 0, transition: "opacity 0.15s" }}
       >
         <Check size={15} strokeWidth={SW} color="white" />
       </button>
@@ -738,7 +738,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
             onClick={commit}
             onMouseEnter={ev => !isEmpty && (ev.currentTarget.style.opacity = "0.85")}
             onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
-            style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: isEmpty ? "not-allowed" : "pointer", padding: 0, opacity: isEmpty ? 0.4 : 1, transition: "opacity 0.15s" }}
+            style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: isEmpty ? "var(--tt-grey05)" : "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: isEmpty ? "not-allowed" : "pointer", padding: 0, transition: "opacity 0.15s" }}
           >
             <Check size={15} strokeWidth={SW} color="white" />
           </button>
@@ -991,9 +991,27 @@ function PhotoThumb({ src, onClick }) {
 // (excludedPhotos), so remaining photos keep the same index-based keys
 // even after some are removed. An entry with zero visible photos renders
 // nothing.
-function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, onToggleSelect }) {
+//
+// A second, matching circle in the bottom-left corner is the caption
+// trigger — hover-only unless a caption is already set (same visibility
+// rule as the checkbox's "selected" state). Clicking it opens a small
+// caret popover, fixed-positioned off the trigger's own bounding rect (so
+// it isn't clipped by the grid/scroll container), with a single input for
+// the caption text. Only one popover is open at a time across the grid.
+function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, onToggleSelect, captions, onCaptionChange }) {
   const CAP = 4;
   const [expanded, setExpanded] = useState(false);
+  const [openCaptionIdx, setOpenCaptionIdx] = useState(null); // original photo index, or null
+  const [captionPos, setCaptionPos] = useState({ top: 0, left: 0 });
+  const captionPopoverRef = useRef(null);
+
+  useEffect(() => {
+    if (openCaptionIdx === null) return;
+    const handler = e => { if (captionPopoverRef.current && !captionPopoverRef.current.contains(e.target)) setOpenCaptionIdx(null); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [openCaptionIdx]);
+
   const items = (photos || [])
     .map((k, i) => ({ k, i }))
     .filter(({ i }) => !(excludedPhotos && excludedPhotos[`${entryKey}_${i}`]));
@@ -1014,6 +1032,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
         const selected = !!(selectedPhotos && selectedPhotos[`${entryKey}_${i}`]);
         const isCapCell = !expanded && remaining > 0 && viewIdx === visibleItems.length - 1;
         const canOpen = !!(IMG_MAP[k] && onOpen) && !isCapCell;
+        const caption = captions && captions[`${entryKey}_${i}`];
         return (
           <div
             key={i}
@@ -1039,6 +1058,26 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
                 {selected && <Check size={12} color="white" strokeWidth={3} />}
               </button>
             )}
+            {!isCapCell && IMG_MAP[k] && onCaptionChange && (
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  const r = e.currentTarget.getBoundingClientRect();
+                  setCaptionPos({ top: r.bottom + 8, left: r.left - 6 });
+                  setOpenCaptionIdx(prev => prev === i ? null : i);
+                }}
+                className={`transition-opacity ${caption ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+                style={{
+                  position: "absolute", bottom: 6, left: 6, width: 20, height: 20, borderRadius: "50%",
+                  border: caption ? "none" : "1.5px solid white", background: caption ? "var(--tt-text-1)" : "rgba(10,22,41,0.35)",
+                  display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+                  cursor: "pointer", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)",
+                  zIndex: 2,
+                }}
+              >
+                <MessageSquare size={11} color="white" strokeWidth={2.25} />
+              </button>
+            )}
             {canOpen && (
               <div style={{ position: "absolute", inset: 0, borderRadius: 4, background: "rgba(10,22,41,0.25)", opacity: 0, transition: "opacity 0.15s", pointerEvents: "none", zIndex: 1 }} />
             )}
@@ -1053,6 +1092,23 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
               >
                 +{remaining} more
               </button>
+            )}
+            {openCaptionIdx === i && (
+              <div ref={captionPopoverRef} style={{ position: "fixed", top: captionPos.top, left: captionPos.left, zIndex: 300, width: 220 }}>
+                <div style={{ position: "absolute", top: -5, left: 12, width: 10, height: 10, background: "white", border: "1px solid var(--tt-grey03)", borderRight: "none", borderBottom: "none", transform: "rotate(45deg)" }} />
+                <div style={{ position: "relative", background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, padding: 8, boxShadow: "0 8px 24px rgba(10,22,41,0.16)" }}>
+                  <Input
+                    autoFocus
+                    value={caption || ""}
+                    onChange={ev => onCaptionChange(i, ev.target.value)}
+                    onKeyDown={ev => {
+                      if (ev.key === "Enter" || ev.key === "Escape") { ev.preventDefault(); setOpenCaptionIdx(null); }
+                    }}
+                    placeholder="Add a caption"
+                    style={{ fontSize: 12, height: 32 }}
+                  />
+                </div>
+              </div>
             )}
           </div>
         );
@@ -2211,6 +2267,7 @@ function ReportsTab({ demoCase }) {
         customRange,
         extraNotes: {},
         excludedPhotos: {},
+        photoCaptions: {},
         // System-generated starting point — freely editable from here, and
         // never regenerated for the life of this draft.
         projectName: PROJECT_NAME,
@@ -2353,7 +2410,7 @@ function ReportsTab({ demoCase }) {
   // report is actually generated.
   const renderNoteSlot = (key) => {
     return (
-      <div style={{ marginTop: 24 }}>
+      <div style={{ marginTop: 12, marginBottom: 12 }}>
         <EditableField
           fieldId={`note_${key}`}
           value={preview.extraNotes[key] || ""}
@@ -2439,6 +2496,8 @@ function ReportsTab({ demoCase }) {
             entryKey={entryKey}
             selectedPhotos={selectedPhotos}
             onToggleSelect={(idx, photoKey) => togglePhotoSelected(entryKey, idx, photoKey)}
+            captions={preview.photoCaptions}
+            onCaptionChange={(idx, text) => setPhotoCaption(entryKey, idx, text)}
           />
         )}
       </div>
@@ -2539,7 +2598,7 @@ function ReportsTab({ demoCase }) {
           EditableField's `boxed` (which would nest the label outside the
           card), so the textarea fills the card directly underneath the
           label. */}
-      <div style={{ background: "var(--tt-grey02)", borderRadius: 8, padding: 8 }}>
+      <div style={{ background: "var(--tt-grey02)", borderRadius: 8, padding: 16 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 4px", marginBottom: 8 }}>
           <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-2)", margin: 0 }}>Summary</p>
           <span style={{ fontSize: 10, fontWeight: 400, color: "var(--tt-grey05)" }}>Optional</span>
@@ -2814,6 +2873,18 @@ function ReportsTab({ demoCase }) {
   };
 
   const clearPhotoSelection = () => setSelectedPhotos({});
+
+  // Keyed the same way as excludedPhotos/extraNotes — `${entryKey}_${photoIndex}`
+  // against the original, unspliced entry — so it survives note-splicing and
+  // stays aligned with a photo even as others around it get excluded.
+  const setPhotoCaption = (entryKey, photoIndex, text) => {
+    setPreview(p => {
+      const key = `${entryKey}_${photoIndex}`;
+      const next = { ...p.photoCaptions };
+      if (text) next[key] = text; else delete next[key];
+      return { ...p, photoCaptions: next };
+    });
+  };
 
   const handleDeleteSelectedPhotos = () => {
     setPreview(p => ({ ...p, excludedPhotos: { ...p.excludedPhotos, ...Object.fromEntries(Object.keys(selectedPhotos).map(k => [k, true])) } }));
