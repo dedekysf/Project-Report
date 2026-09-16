@@ -2185,9 +2185,9 @@ function ReportsTab({ demoCase }) {
 
       <div style={{ height: 1, background: "var(--tt-grey03)", margin: "16px 0 24px" }} />
 
-      <div style={{ display: "flex", flexWrap: "nowrap", gap: 32 }}>
+      <div style={{ display: "flex", flexWrap: "nowrap", gap: 24 }}>
         <div style={{ flex: "1 1 0", display: "flex", alignItems: "center", gap: 8 }}>
-          <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: 0, flexShrink: 0 }}>Target Opening</p>
+          <p style={{ fontSize: 14, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: 0, flexShrink: 0 }}>Target Opening</p>
           <TargetOpeningField
             fieldId="targetOpening"
             value={preview.targetOpening}
@@ -2195,7 +2195,7 @@ function ReportsTab({ demoCase }) {
           />
         </div>
         <div style={{ flex: "1 1 0", display: "flex", alignItems: "center", gap: 8 }}>
-          <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: 0, flexShrink: 0 }}>Prepared For</p>
+          <p style={{ fontSize: 14, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: 0, flexShrink: 0 }}>Prepared For</p>
           <EditableField
             fieldId="clientName"
             value={preview.clientName}
