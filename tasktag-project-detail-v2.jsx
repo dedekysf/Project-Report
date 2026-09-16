@@ -1703,12 +1703,19 @@ const buildReportHTML = (report) => {
   // Manual notes are spliced into groups as {isNote:true} pseudo-entries
   // (see applyExtraNotesToGroups) right after the entry they're attached
   // to — same as the live view, styled the same italic, padded way.
-  const entryHTML = (e) => {
-    if (e.isNote) {
-      return h("div", { style: "margin-top:8px;" },
-        h("p", { style: "font-size:12px;font-style:italic;color:#303742;line-height:1.5;margin:0;padding:8px;border-radius:8px;" }, e.note)
-      );
-    }
+  // A manual note is nested INSIDE its entry's own wrapper div (right
+  // after the photos), same as the live view nests renderNoteSlot inside
+  // renderEntryBlock — not appended as a separate sibling block. Sibling
+  // divs' margins collapse to their MAX, not their sum, so a standalone
+  // note block with its own marginTop:8 sitting next to the entry's
+  // marginBottom:24 rendered as a 24px gap instead of 8px; nesting it
+  // avoids that collapse entirely and gives each gap its exact value.
+  const noteHTML = (note) =>
+    h("div", { style: "margin-top:8px;" },
+      h("p", { style: "font-size:12px;font-style:italic;color:#303742;line-height:1.5;margin:0;padding:8px;border-radius:8px;" }, note.note)
+    );
+
+  const entryHTML = (e, attachedNoteHTML) => {
     const { kind, daysAgo } = statusForEntry(e);
     const statusMeta = STATUS_META[kind];
     const statusColor = STATUS_HEX[kind];
@@ -1732,20 +1739,32 @@ const buildReportHTML = (report) => {
     return h("div", { style: "margin-bottom:24px;" },
       h("p", { style: "font-size:18px;font-weight:600;color:#0a1629;line-height:1.35;margin:0;" }, e.note),
       h("div", { style: "margin-top:8px;" }, metaLine),
-      e.noPhotos ? "" : renderPhotos(e.photos)
+      e.noPhotos ? "" : renderPhotos(e.photos),
+      attachedNoteHTML || ""
     );
   };
 
   // Flat list of page-able blocks — a label block per group (skipped for
   // day grouping, same reasoning as before) followed by one block per
-  // entry — mirrors the live view's own flatBlocks list, which is what
-  // gets packed onto A4 pages below.
+  // real entry — mirrors the live view's own flatBlocks list, which is
+  // what gets packed onto A4 pages below. A manual note is spliced into
+  // g.entries right after the entry it's attached to (isNote:true
+  // pseudo-entry) — it's consumed here into that entry's own block
+  // instead of becoming its own block in the list.
   const blocks = groups.length === 0
     ? [h("p", { style: "font-size:13px;color:#828282;text-align:center;padding:32px 0;" }, "No activity entries for this period.")]
-    : groups.flatMap(g => [
-        grouping === "day" ? "" : h("p", { style: "font-size:11px;font-weight:600;color:#828282;letter-spacing:.06em;text-transform:uppercase;padding:8px 0;margin:0;" }, groupLabel(g).toUpperCase()),
-        ...g.entries.map(entryHTML)
-      ].filter(Boolean));
+    : groups.flatMap(g => {
+        const groupBlocks = [];
+        if (grouping !== "day") {
+          groupBlocks.push(h("p", { style: "font-size:11px;font-weight:600;color:#828282;letter-spacing:.06em;text-transform:uppercase;padding:8px 0;margin:0;" }, groupLabel(g).toUpperCase()));
+        }
+        g.entries.forEach((e, i) => {
+          if (e.isNote) return;
+          const next = g.entries[i + 1];
+          groupBlocks.push(entryHTML(e, next && next.isNote ? noteHTML(next) : ""));
+        });
+        return groupBlocks;
+      });
 
   const progressHTML = report.includeSummary
     ? h("div", { style: "display:flex;align-items:center;gap:16px;margin-bottom:40px;" },
@@ -1909,12 +1928,19 @@ const buildReportHTML = (report) => {
   // proportions — 800 × round(800×297/210)) rather than a loose max-width,
   // and the shadow matches the live page card's own
   // "0 1px 3px rgba(10,22,41,0.08)".
-  const css = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;background:#f7f8fa;min-height:100vh;padding:32px 24px}.card{background:white;border:1px solid #e8e8e6;border-radius:12px;overflow:hidden;width:${PAGE_W}px;min-height:${PAGE_H}px;margin:0 auto}.card+.card{margin-top:24px}`;
+  // display:flex + flex-direction:column on .card, with flex:1 on the
+  // content area, is what actually pins the footer to the bottom of the
+  // page — matching the live view's own page card (which uses the same
+  // flex column + flex:1 content div). Without it, a page whose content
+  // doesn't fill the full min-height just leaves the footer sitting right
+  // after the last block, with the page's remaining empty space stranded
+  // below the footer instead of above it.
+  const css = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;background:#f7f8fa;min-height:100vh;padding:32px 24px}.card{background:white;border:1px solid #e8e8e6;border-radius:12px;overflow:hidden;width:${PAGE_W}px;min-height:${PAGE_H}px;margin:0 auto;display:flex;flex-direction:column}.card+.card{margin-top:24px}.card__body{padding:0 ${PAGE_PAD}px;flex:1}`;
 
   const cardsHTML = pages.map((pageBlocks, pi) =>
     h("div", { class: "card", style: "box-shadow:0 1px 3px rgba(10,22,41,0.08);" },
       pi === 0 ? fullHeaderHTML : runningHeaderHTML,
-      h("div", { style: `padding:0 ${PAGE_PAD}px;` }, pageBlocks.join("")),
+      h("div", { class: "card__body" }, pageBlocks.join("")),
       footerHTML
     )
   ).join("");
