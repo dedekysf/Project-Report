@@ -668,7 +668,6 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
           onBlur={() => setFocused(false)}
           placeholder={placeholder}
           rows={3}
-          className="min-h-0 resize-none border-none bg-transparent p-0 shadow-none focus-visible:border-none"
           style={{ fontFamily: "inherit", ...inputStyle }}
         />
         {focused && <div style={{ display: "flex", justifyContent: "flex-end", gap: 4, marginTop: 8 }}>{iconButtons}</div>}
