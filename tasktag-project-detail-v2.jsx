@@ -13,6 +13,7 @@ import {
   ArrowUpDown, Calendar, AlignJustify, Clock,
   UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, Crown, AlertTriangle,
   RotateCw, ZoomIn, ZoomOut, Folder, ArrowLeft, ArrowRight, Info, MessageSquare,
+  ExternalLink,
 } from "lucide-react";
 
 import logoImg from "./src/Img/tasktag-logo.13f1babda8fdbb1b7251572a0fe11f9e.png";
@@ -1213,7 +1214,7 @@ function PhotoThumb({ src, onClick }) {
   );
 }
 
-// Photo grid capped to one row of 4 — beyond that, the last visible cell
+// Photo grid capped to one row of 3 — beyond that, the last visible cell
 // becomes a "+N more" overlay that expands the grid in place to show every
 // photo (no cap), rather than jumping into the lightbox. Each visible photo
 // also carries a select checkbox in its top-right corner; checking one or
@@ -1229,7 +1230,7 @@ function PhotoThumb({ src, onClick }) {
 // off the trigger's own bounding rect (so it isn't clipped by the
 // grid/scroll container), with a single input for the caption text. Only
 // one popover is open at a time across the grid.
-function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, onToggleSelect, captions, onCaptionChange, onSetPhotoExcluded }) {
+function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, onToggleSelect, captions, onCaptionChange }) {
   const CAP = 3;
   const [expanded, setExpanded] = useState(false);
   const [openCaptionIdx, setOpenCaptionIdx] = useState(null); // original photo index, or null
@@ -1237,7 +1238,6 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
   const captionTriggerRef = useRef(null); // the specific trigger button last clicked, for scroll repositioning
   const captionPopoverRef = useRef(null);
   const captionStartRef = useRef(""); // caption text when the open popover was triggered, for the "no change" disabled check
-  const [swapTriggerIdx, setSwapTriggerIdx] = useState(null); // original index of the included photo a swap was started from, or null
 
   useEffect(() => {
     if (openCaptionIdx === null) return;
@@ -1281,14 +1281,8 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
   // order as visiblePhotoKeys — lets the lightbox map a filmstrip
   // selection back to this entry's real excludedPhotos keys.
   const visibleOriginalIndices = items.map(it => it.i);
-  // More candidate photos than the per-task cap allows in at once — the
-  // swap trigger (and panel below the grid) only make sense once there's
-  // actually something to swap in. `onSetPhotoExcluded` is undefined once
-  // the report is saved, same gate as onToggleSelect/onCaptionChange.
-  const overLimit = !!onSetPhotoExcluded && (photos || []).length > PER_ENTRY_PHOTO_LIMIT;
 
   return (
-    <div>
     <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginTop: 10 }}>
       {visibleItems.map(({ k, i }, viewIdx) => {
         const selected = !!(selectedPhotos && selectedPhotos[`${entryKey}_${i}`]);
@@ -1340,22 +1334,6 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
                 }}
               >
                 <MessageSquare size={11} color="var(--tt-grey06)" strokeWidth={2.25} />
-              </button>
-            )}
-            {!isCapCell && IMG_MAP[k] && overLimit && (
-              <button
-                onClick={e => { e.stopPropagation(); setSwapTriggerIdx(prev => prev === i ? null : i); }}
-                className="opacity-0 transition-opacity group-hover:opacity-100"
-                style={{
-                  position: "absolute", bottom: 6, left: 30,
-                  width: 20, height: 20, borderRadius: "50%",
-                  border: "none", background: "white",
-                  display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
-                  cursor: "pointer", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)",
-                  zIndex: 2,
-                }}
-              >
-                <ArrowUpDown size={11} color="var(--tt-grey06)" strokeWidth={2.25} />
               </button>
             )}
             {canOpen && (
@@ -1433,55 +1411,69 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
         );
       })}
     </div>
-    {overLimit && swapTriggerIdx !== null && (() => {
-      // Only the photos NOT currently included are worth showing here —
-      // the ones already in are exactly what this list exists to swap
-      // one of them out for, so listing them too would just be noise.
-      const available = (photos || [])
-        .map((k, i) => ({ k, i }))
-        .filter(({ i, k }) => IMG_MAP[k] && !!(excludedPhotos && excludedPhotos[`${entryKey}_${i}`]));
-      return (
-        <div style={{ marginTop: 10, border: "1px solid var(--tt-grey03)", borderRadius: 8, padding: 16, background: "var(--tt-grey01)" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <p style={{ fontSize: 12, fontWeight: 600, color: "var(--tt-text-2)", margin: 0 }}>
-                Available to swap
-              </p>
-              <span style={{ display: "flex", alignItems: "center", justifyContent: "center", minWidth: 20, height: 20, padding: "0 4px", borderRadius: "50%", background: "var(--tt-grey03)", fontSize: 11, fontWeight: 700, color: "var(--tt-text-1)" }}>
-                {available.length}
-              </span>
-            </div>
-            <button
-              onClick={() => setSwapTriggerIdx(null)}
-              onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey03)"}
-              onMouseLeave={ev => ev.currentTarget.style.background = "none"}
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "background 0.15s" }}
-            >
-              <X size={14} strokeWidth={SW} color="var(--tt-grey06)" />
-            </button>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 6 }}>
-            {available.map(({ k, i }) => (
+  );
+}
+
+// Full photo list for a task item over the per-task cap — opened from the
+// meta line's "X of Y photos" link (see renderEntryBlock). Unlike the old
+// swap flow, every photo shows here (both included and excluded) and each
+// is freely checkable/uncheckable, with no cap enforced in this view itself
+// — PER_ENTRY_PHOTO_LIMIT only decides the default selection a fresh report
+// starts with (see defaultOverflowExclusions).
+function PhotoManagerModal({ photos, excludedPhotos, entryKey, taskName, onSetPhotoExcluded, onClose }) {
+  const items = (photos || []).map((k, i) => ({ k, i })).filter(({ k }) => IMG_MAP[k]);
+  const includedCount = items.filter(({ i }) => !(excludedPhotos && excludedPhotos[`${entryKey}_${i}`])).length;
+
+  useEffect(() => {
+    const handler = e => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 5100, background: "rgba(10,22,41,0.45)", display: "flex", alignItems: "center", justifyContent: "center" }}
+      onClick={onClose}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ width: 560, maxWidth: "calc(100vw - 32px)", maxHeight: "calc(100vh - 64px)", overflowY: "auto", background: "white", borderRadius: 16, padding: 24, boxShadow: "0 16px 48px rgba(10,22,41,0.25)" }}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+          <p style={{ fontSize: 20, fontWeight: 700, color: "var(--tt-text-1)", margin: 0 }}>Manage photos</p>
+          <button
+            onClick={onClose}
+            onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+            onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--tt-text-1)", padding: 4, display: "flex", borderRadius: 6, transition: "background 0.15s" }}
+          >
+            <X size={20} strokeWidth={SW} />
+          </button>
+        </div>
+        {taskName && <p style={{ fontSize: 13, color: "var(--tt-grey05)", margin: "0 0 16px" }}>{taskName}</p>}
+        <p style={{ fontSize: 12, fontWeight: 600, color: "var(--tt-text-2)", margin: "0 0 12px" }}>
+          {includedCount} of {items.length} selected
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
+          {items.map(({ k, i }) => {
+            const included = !(excludedPhotos && excludedPhotos[`${entryKey}_${i}`]);
+            return (
               <button
                 key={i}
-                onClick={() => {
-                  // 1-for-1 swap: the clicked (available) photo comes in,
-                  // the one whose swap button opened this panel goes out.
-                  onSetPhotoExcluded(swapTriggerIdx, true);
-                  onSetPhotoExcluded(i, false);
-                  setSwapTriggerIdx(null);
-                }}
+                onClick={() => onSetPhotoExcluded(i, included)}
                 style={{ position: "relative", padding: 0, border: "none", background: "none", cursor: "pointer" }}
               >
-                <div style={{ width: "100%", aspectRatio: "4/3", borderRadius: 4, overflow: "hidden" }}>
+                <div style={{ position: "relative", width: "100%", aspectRatio: "4/3", borderRadius: 6, overflow: "hidden", outline: included ? "2px solid var(--tt-secondary)" : "2px solid transparent" }}>
                   <img src={IMG_MAP[k]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  <span style={{ position: "absolute", top: 6, right: 6, width: 20, height: 20, borderRadius: "50%", background: included ? "var(--tt-secondary)" : "rgba(10,22,41,0.35)", border: included ? "none" : "1.5px solid white", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {included && <Check size={12} color="white" strokeWidth={3} />}
+                  </span>
                 </div>
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
-      );
-    })()}
+      </div>
     </div>
   );
 }
@@ -2531,6 +2523,7 @@ function ReportsTab({ demoCase }) {
   const [deleteTarget, setDeleteTarget] = useState(null); // report pending delete confirmation
   const [lightbox, setLightbox] = useState(null); // { photos, index, caption } | null — full-screen photo viewer
   const [selectedPhotos, setSelectedPhotos] = useState({}); // { [entryKey_photoIndex]: photoKey } — in-progress checkbox selection, not yet deleted
+  const [photoManager, setPhotoManager] = useState(null); // { entryKey, photos, taskName } | null — full photo list modal for an over-the-cap task item
   const periodRef     = useRef(null);
   const chipRef       = useRef(null);
   // Fixed positioning so this dropdown isn't clipped by an ancestor's
@@ -2704,14 +2697,15 @@ function ReportsTab({ demoCase }) {
     setVisibleCount(10);
     setLoadingMore(false);
     setSelectedPhotos({});
+    setPhotoManager(null);
   };
 
   useEffect(() => {
-    if (!preview || lightbox || deleteTarget) return;
+    if (!preview || lightbox || deleteTarget || photoManager) return;
     const handler = (e) => { if (e.key === "Escape") closePreview(); };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [preview, lightbox, deleteTarget]);
+  }, [preview, lightbox, deleteTarget, photoManager]);
 
   // This screen is a full-screen takeover with its own scroll container —
   // the page behind it has no reason to scroll (or show its own scrollbar)
@@ -2896,9 +2890,23 @@ function ReportsTab({ demoCase }) {
           {!isPhotoless && visiblePhotoCount > 0 && (
             <>
               <span style={{ width: 3, height: 3, borderRadius: "50%", background: "var(--tt-grey04)", flexShrink: 0 }} />
-              <span style={{ fontSize: 11, fontWeight: 500, color: "var(--tt-grey05)" }}>
-                {visiblePhotoCount} photo{visiblePhotoCount === 1 ? "" : "s"}
-              </span>
+              {/* Over the per-task cap: the plain count becomes a link into
+                  the full photo manager modal, since there's more going on
+                  than the row can show — everything else still just reads
+                  as text. */}
+              {!previewSaved && e.photos.length > PER_ENTRY_PHOTO_LIMIT ? (
+                <button
+                  onClick={() => setPhotoManager({ entryKey, photos: e.photos, taskName: displayTitle })}
+                  style={{ display: "flex", alignItems: "center", gap: 3, background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, fontWeight: 500, color: "var(--tt-secondary)" }}
+                >
+                  {visiblePhotoCount} of {e.photos.length} photos
+                  <ExternalLink size={11} strokeWidth={SW} />
+                </button>
+              ) : (
+                <span style={{ fontSize: 11, fontWeight: 500, color: "var(--tt-grey05)" }}>
+                  {visiblePhotoCount} photo{visiblePhotoCount === 1 ? "" : "s"}
+                </span>
+              )}
             </>
           )}
         </div>
@@ -2916,7 +2924,6 @@ function ReportsTab({ demoCase }) {
             onToggleSelect={previewSaved ? undefined : (idx, photoKey) => togglePhotoSelected(entryKey, idx, photoKey)}
             captions={preview.photoCaptions}
             onCaptionChange={previewSaved ? undefined : (idx, text) => setPhotoCaption(entryKey, idx, text)}
-            onSetPhotoExcluded={previewSaved ? undefined : (idx, excluded) => setPreview(p => ({ ...p, excludedPhotos: { ...p.excludedPhotos, [`${entryKey}_${idx}`]: excluded } }))}
           />
         )}
       </div>
@@ -4049,6 +4056,17 @@ function ReportsTab({ demoCase }) {
             }));
             setLightbox(null);
           }}
+        />
+      )}
+
+      {photoManager && (
+        <PhotoManagerModal
+          photos={photoManager.photos}
+          excludedPhotos={preview.excludedPhotos}
+          entryKey={photoManager.entryKey}
+          taskName={photoManager.taskName}
+          onSetPhotoExcluded={(idx, excluded) => setPreview(p => ({ ...p, excludedPhotos: { ...p.excludedPhotos, [`${photoManager.entryKey}_${idx}`]: excluded } }))}
+          onClose={() => setPhotoManager(null)}
         />
       )}
     </div>
