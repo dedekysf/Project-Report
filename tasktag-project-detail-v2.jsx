@@ -2322,6 +2322,8 @@ function ReportsTab({ demoCase }) {
   const [preview,          setPreview]          = useState(null);
   const [titleOverrides,   setTitleOverrides]    = useState({}); // { [entryKey]: overriddenTitle } — per-entry task name edits, this report only
   const [previewLoading,   setPreviewLoading]    = useState(false);
+  const [previewSaved,     setPreviewSaved]      = useState(false); // chrome switches from Cancel/Save to back/Download/Copy link once true
+  const [previewCopied,    setPreviewCopied]     = useState(false); // Copy link button shows "Link copied" briefly
   const [visibleCount,     setVisibleCount]      = useState(10); // infinite scroll — entries revealed so far
   const [loadingMore,      setLoadingMore]       = useState(false);
   const [generating,       setGenerating]        = useState(false); // Generate button's own disabled/spinner state, before the inline view appears
@@ -2471,6 +2473,8 @@ function ReportsTab({ demoCase }) {
     setPreview(null);
     setActiveEditField(null);
     setTitleOverrides({});
+    setPreviewSaved(false);
+    setPreviewCopied(false);
     setVisibleCount(10);
     setLoadingMore(false);
     setSelectedPhotos({});
@@ -2584,6 +2588,15 @@ function ReportsTab({ demoCase }) {
   // "Cannot access 'renderNoteSlot' before initialization" the moment a
   // report is actually generated.
   const renderNoteSlot = (key) => {
+    // Locked once saved — Download/Copy link now act on the saved snapshot.
+    if (previewSaved) {
+      const savedNote = preview.extraNotes[key];
+      if (!savedNote) return null;
+      return (
+        <p style={{ fontSize: 12, fontStyle: "italic", color: "var(--tt-text-2)", lineHeight: "1.5", margin: "10px 0 0", background: "var(--tt-grey02)", padding: 8, borderRadius: 8 }}>{savedNote}</p>
+      );
+    }
+
     return (
       <div style={{ marginTop: 16, marginBottom: 12 }}>
         <EditableField
@@ -2629,6 +2642,7 @@ function ReportsTab({ demoCase }) {
         <EditableField
           fieldId={`title_${entryKey}`}
           value={displayTitle}
+          disabled={previewSaved}
           onSave={v => {
             setTitleOverrides(prev => {
               if (v && v.trim()) return { ...prev, [entryKey]: v.trim() };
@@ -2670,9 +2684,9 @@ function ReportsTab({ demoCase }) {
             excludedPhotos={preview.excludedPhotos}
             entryKey={entryKey}
             selectedPhotos={selectedPhotos}
-            onToggleSelect={(idx, photoKey) => togglePhotoSelected(entryKey, idx, photoKey)}
+            onToggleSelect={previewSaved ? undefined : (idx, photoKey) => togglePhotoSelected(entryKey, idx, photoKey)}
             captions={preview.photoCaptions}
-            onCaptionChange={(idx, text) => setPhotoCaption(entryKey, idx, text)}
+            onCaptionChange={previewSaved ? undefined : (idx, text) => setPhotoCaption(entryKey, idx, text)}
           />
         )}
       </div>
@@ -2699,7 +2713,7 @@ function ReportsTab({ demoCase }) {
         <LogoUploadBox
           src={preview.logo}
           onChange={url => setPreview(p => ({ ...p, logo: url }))}
-          disabled={!editable}
+          disabled={!editable || previewSaved}
         />
         <div>
           {/* TODO(BE): replace with the firm's actual name from the API */}
@@ -2708,7 +2722,7 @@ function ReportsTab({ demoCase }) {
             value={preview.companyName}
             placeholder="Add company name"
             placeholderStyle={{ color: "var(--tt-text-1)" }}
-            disabled={!editable}
+            disabled={!editable || previewSaved}
             popover
             onSave={v => setPreview(p => ({ ...p, companyName: v }))}
             textStyle={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 2px" }}
@@ -2717,7 +2731,7 @@ function ReportsTab({ demoCase }) {
             fieldId="companyAddress"
             value={preview.companyAddress}
             placeholder="Add company address"
-            disabled={!editable}
+            disabled={!editable || previewSaved}
             popover
             onSave={v => setPreview(p => ({ ...p, companyAddress: v }))}
             textStyle={{ fontSize: 11, fontWeight: 400, color: "var(--tt-grey05)", margin: 0 }}
@@ -2761,6 +2775,7 @@ function ReportsTab({ demoCase }) {
             fieldId="projectName"
             value={preview.projectName}
             placeholder={PROJECT_NAME}
+            disabled={previewSaved}
             onSave={v => setPreview(p => ({ ...p, projectName: v }))}
             textStyle={{ fontSize: 28, fontWeight: 700, color: "var(--tt-text-1)", lineHeight: 1, margin: 0 }}
             inputStyle={{ fontSize: 28, fontWeight: 700, lineHeight: 1, color: "var(--tt-text-1)" }}
@@ -2769,6 +2784,7 @@ function ReportsTab({ demoCase }) {
             fieldId="address"
             value={preview.address}
             placeholder={PROJECT_ADDRESS}
+            disabled={previewSaved}
             onSave={v => setPreview(p => ({ ...p, address: v }))}
             textStyle={{ fontSize: 13, fontWeight: 400, color: "var(--tt-grey05)", lineHeight: 1, margin: 0 }}
             inputStyle={{ fontSize: 13, fontWeight: 400, lineHeight: 1, color: "var(--tt-grey05)" }}
@@ -2781,7 +2797,8 @@ function ReportsTab({ demoCase }) {
           same box (not above it). The box is owned here, not by
           EditableField's `boxed` (which would nest the label outside the
           card), so the textarea fills the card directly underneath the
-          label. */}
+          label. Locked to plain text once the report is saved (`disabled`)
+          — the box still wraps that locked text the same way. */}
       <div style={{ background: "var(--tt-grey02)", borderRadius: 12, padding: 16 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 4px", marginBottom: 8 }}>
           <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-2)", margin: 0 }}>Summary</p>
@@ -2791,6 +2808,7 @@ function ReportsTab({ demoCase }) {
         fieldId="summary"
         value={preview.summary}
         placeholder="Add a high-level overview of the progress made during this period..."
+        disabled={previewSaved}
         alwaysEditing
         multiline
         onSave={v => setPreview(p => ({ ...p, summary: v }))}
@@ -2805,6 +2823,7 @@ function ReportsTab({ demoCase }) {
           <TargetOpeningField
             fieldId="targetOpening"
             value={preview.targetOpening}
+            disabled={previewSaved}
             onApply={formatted => setPreview(p => ({ ...p, targetOpening: formatted }))}
           />
         </div>
@@ -2815,6 +2834,7 @@ function ReportsTab({ demoCase }) {
             value={preview.clientName}
             placeholder="Add client name"
             placeholderStyle={{ color: "var(--tt-text-1)" }}
+            disabled={previewSaved}
             popover
             onSave={v => setPreview(p => ({ ...p, clientName: v }))}
             textStyle={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: preview.clientName ? "var(--tt-text-1)" : "var(--tt-grey05)", margin: 0 }}
@@ -2906,6 +2926,7 @@ function ReportsTab({ demoCase }) {
     ? JSON.stringify({ ...preview, logo: preview.logo ? preview.logo.length : 0 })
       + "|" + JSON.stringify(titleOverrides)
       + "|" + JSON.stringify(selectedPhotos)
+      + "|" + previewSaved
       + "|" + flatBlocks.map(b => b.key).join(",")
     : "";
 
@@ -3075,9 +3096,21 @@ function ReportsTab({ demoCase }) {
     setSelectedPhotos({});
   };
 
-  // Saving pushes the report into the results table and returns straight
-  // to the normal view — Download/Copy link for it are already available
-  // per-row in that table, so there's no separate post-save state here.
+  const handlePreviewDownload = () => {
+    if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to export"); return; }
+    handleDownload({ includeSummary: preview.includeSummary, period: preview.period, version: preview.version, data: { ...previewData, groups: previewFinalGroups } });
+  };
+
+  const handlePreviewCopy = async () => {
+    if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to export"); return; }
+    await handleCopy({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, version: preview.version, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides });
+    setPreviewCopied(true);
+    setTimeout(() => setPreviewCopied(false), 2000);
+  };
+
+  // Saving locks the draft into a read-only view (chrome swaps to a back
+  // button + Download/Copy link) instead of closing outright — closing is
+  // left to the user, same as the click-to-edit fields locking in place.
   const handlePreviewSave = () => {
     if (saving) return;
     // Notes already live in preview.extraNotes — every EditableField note
@@ -3096,8 +3129,10 @@ function ReportsTab({ demoCase }) {
       }
       pushReport({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, version: preview.version, data: { ...previewData, groups: finalGroups }, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides, projectName: preview.projectName, address: preview.address, logo: preview.logo, companyName: preview.companyName, companyAddress: preview.companyAddress, summary: preview.summary, targetOpening: preview.targetOpening, clientName: preview.clientName });
       setDateRange("since_last");
+      setPreviewSaved(true);
+      setActiveEditField(null);
       setSaving(false);
-      closePreview();
+      setSelectedPhotos({});
       showToast("success", "Report saved");
     }, 900);
   };
@@ -3422,13 +3457,15 @@ function ReportsTab({ demoCase }) {
             }}
           >
 
-            {/* Modal chrome — Photo Limit usage on the left, Cancel + Save
-                Report on the right. The period is locked in once Generate
-                is clicked from the results page, so there's no back button
-                or period control here — closing the draft is explicit via
-                Cancel. Its content is capped to the same reading width as
-                the document below, so the two line up instead of the bar
-                stretching edge-to-edge across the full screen. */}
+            {/* Modal chrome. Draft: Photo Limit usage on the left, Cancel +
+                Save Report on the right — the period is locked in once
+                Generate is clicked from the results page, so there's no
+                back button or period control here, and closing is explicit
+                via Cancel. Once saved: back button + the locked period on
+                the left, Download/Copy link on the right — closing is then
+                left to the user. Its content is capped to the same reading
+                width as the document below, so the two line up instead of
+                the bar stretching edge-to-edge across the full screen. */}
             <div
               id="draft-chrome"
               style={{
@@ -3438,48 +3475,96 @@ function ReportsTab({ demoCase }) {
               }}
             >
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: 800, width: "100%", margin: "0 auto" }}>
-              {/* TODO(BE): replace with the account's actual per-report photo cap and usage from the API */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, width: 160 }}>
-                <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: 0, whiteSpace: "nowrap" }}>
-                  Photo Limit {previewPhotoCount} of {PHOTO_LIMIT}
-                </p>
-                <div style={{ height: 6, borderRadius: 99, background: "var(--tt-grey03)", overflow: "hidden" }}>
-                  <div style={{ width: `${Math.min(100, (previewPhotoCount / PHOTO_LIMIT) * 100)}%`, height: "100%", borderRadius: 99, background: "var(--tt-secondary)" }} />
+              {previewSaved ? (
+                <div style={{ display: "flex", alignItems: "center" }}>
+                  <button
+                    onClick={closePreview}
+                    onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "white"}
+                    style={{ width: 40, height: 40, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, cursor: "pointer", color: "var(--tt-text-2)", transition: "background 0.15s", marginRight: 8 }}
+                  >
+                    <ChevronLeft size={18} strokeWidth={SW} />
+                  </button>
+                  <div style={{
+                    display: "flex", alignItems: "center",
+                    background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8,
+                    height: 40, padding: "0 12px",
+                    fontSize: 13, fontWeight: 500, color: "var(--tt-text-1)",
+                  }}>
+                    <span>{preview.period}</span>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                // TODO(BE): replace with the account's actual per-report photo cap and usage from the API
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, width: 160 }}>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: 0, whiteSpace: "nowrap" }}>
+                    Photo Limit {previewPhotoCount} of {PHOTO_LIMIT}
+                  </p>
+                  <div style={{ height: 6, borderRadius: 99, background: "var(--tt-grey03)", overflow: "hidden" }}>
+                    <div style={{ width: `${Math.min(100, (previewPhotoCount / PHOTO_LIMIT) * 100)}%`, height: "100%", borderRadius: 99, background: "var(--tt-secondary)" }} />
+                  </div>
+                </div>
+              )}
 
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <button
-                  disabled={previewLoading || saving}
-                  onClick={closePreview}
-                  onMouseEnter={e => !(previewLoading || saving) && (e.currentTarget.style.background = "var(--tt-grey02)")}
-                  onMouseLeave={e => e.currentTarget.style.background = "white"}
-                  style={{
-                    height: 40, padding: "0 20px", borderRadius: 8, border: "1px solid var(--tt-grey03)",
-                    background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)",
-                    cursor: (previewLoading || saving) ? "not-allowed" : "pointer",
-                    opacity: (previewLoading || saving) ? 0.5 : 1, transition: "background 0.15s",
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  disabled={previewLoading || saving}
-                  onClick={handlePreviewSave}
-                  onMouseEnter={e => !(previewLoading || saving) && (e.currentTarget.style.opacity = "0.85")}
-                  onMouseLeave={e => e.currentTarget.style.opacity = (previewLoading || saving) ? 0.5 : 1}
-                  style={{
-                    height: 40, padding: "0 24px", minWidth: isWide ? 120 : "auto", borderRadius: 8, border: "none",
-                    background: "var(--tt-text-1)", fontSize: 13, fontWeight: 500, color: "white",
-                    display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center",
-                    cursor: (previewLoading || saving) ? "not-allowed" : "pointer",
-                    opacity: (previewLoading || saving) ? 0.5 : 1, transition: "opacity 0.15s",
-                  }}
-                >
-                  {saving
-                    ? <span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.35)", borderTopColor: "white", display: "inline-block", animation: "tt-spin 0.75s linear infinite" }} />
-                    : "Save Report"}
-                </button>
+                {previewSaved ? (
+                  <>
+                    <button
+                      disabled={previewLoading}
+                      onClick={handlePreviewDownload}
+                      onMouseEnter={e => !previewLoading && (e.currentTarget.style.background = "var(--tt-grey02)")}
+                      onMouseLeave={e => e.currentTarget.style.background = "white"}
+                      style={{ height: 40, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "0 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "background 0.15s" }}
+                    >
+                      <Download size={14} strokeWidth={SW} /> Download
+                    </button>
+                    <button
+                      disabled={previewLoading}
+                      onClick={handlePreviewCopy}
+                      onMouseEnter={e => !previewLoading && (e.currentTarget.style.background = "var(--tt-grey02)")}
+                      onMouseLeave={e => e.currentTarget.style.background = "white"}
+                      style={{ height: 40, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "0 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "background 0.15s" }}
+                    >
+                      {previewCopied
+                        ? <><Check size={14} strokeWidth={SW} /> Link copied</>
+                        : <><Link size={14} strokeWidth={SW} /> Copy link</>}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      disabled={previewLoading || saving}
+                      onClick={closePreview}
+                      onMouseEnter={e => !(previewLoading || saving) && (e.currentTarget.style.background = "var(--tt-grey02)")}
+                      onMouseLeave={e => e.currentTarget.style.background = "white"}
+                      style={{
+                        height: 40, padding: "0 20px", borderRadius: 8, border: "1px solid var(--tt-grey03)",
+                        background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)",
+                        cursor: (previewLoading || saving) ? "not-allowed" : "pointer",
+                        opacity: (previewLoading || saving) ? 0.5 : 1, transition: "background 0.15s",
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      disabled={previewLoading || saving}
+                      onClick={handlePreviewSave}
+                      onMouseEnter={e => !(previewLoading || saving) && (e.currentTarget.style.opacity = "0.85")}
+                      onMouseLeave={e => e.currentTarget.style.opacity = (previewLoading || saving) ? 0.5 : 1}
+                      style={{
+                        height: 40, padding: "0 24px", minWidth: isWide ? 120 : "auto", borderRadius: 8, border: "none",
+                        background: "var(--tt-text-1)", fontSize: 13, fontWeight: 500, color: "white",
+                        display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center",
+                        cursor: (previewLoading || saving) ? "not-allowed" : "pointer",
+                        opacity: (previewLoading || saving) ? 0.5 : 1, transition: "opacity 0.15s",
+                      }}
+                    >
+                      {saving
+                        ? <span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.35)", borderTopColor: "white", display: "inline-block", animation: "tt-spin 0.75s linear infinite" }} />
+                        : "Save Report"}
+                    </button>
+                  </>
+                )}
               </div>
               </div>
             </div>
