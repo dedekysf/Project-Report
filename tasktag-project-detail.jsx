@@ -295,13 +295,11 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
   const handleDay = (key) => {
     if (!allowFuture && key > todayKey) return; // dates after today can't be selected
     if (singleDate) {
+      // Just selects/highlights the day — committing it is a separate,
+      // explicit Apply click (see the footer button below), so there's
+      // no ambiguity about whether merely clicking a date saved it.
       setRangeStart(key);
       setRangeEnd(null);
-      // Commits the actual value immediately and unconditionally — the
-      // caller is responsible for any delay before it closes/unmounts this
-      // calendar (see TargetOpeningField), so the picked date is never
-      // dependent on a timer to actually be saved.
-      if (onApply) onApply(key, null);
       return;
     }
     if (!rangeStart || rangeEnd) {
@@ -452,7 +450,7 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
       </div>
 
       {/* Footer */}
-      {!singleDate && <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--tt-grey03)" }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--tt-grey03)" }}>
         <button
           onClick={onClose}
           onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
@@ -463,15 +461,17 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
             fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s",
           }}>Cancel</button>
         <button
-          onClick={() => onApply ? onApply(rangeStart, rangeEnd) : onClose()}
-          onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
+          onClick={() => { if (rangeStart && onApply) onApply(rangeStart, rangeEnd); }}
+          disabled={!rangeStart}
+          onMouseEnter={e => { if (rangeStart) e.currentTarget.style.opacity = "0.85"; }}
           onMouseLeave={e => e.currentTarget.style.opacity = "1"}
           style={{
             padding: "6px 16px", borderRadius: 8,
             border: "none", background: "var(--tt-text-1)",
-            fontSize: 13, fontWeight: 500, color: "#fff", cursor: "pointer", transition: "opacity 0.15s",
+            fontSize: 13, fontWeight: 500, color: "#fff",
+            cursor: rangeStart ? "pointer" : "not-allowed", opacity: rangeStart ? 1 : 0.5, transition: "opacity 0.15s",
           }}>Apply</button>
-      </div>}
+      </div>
     </div>
   );
 }
@@ -799,14 +799,10 @@ function TargetOpeningField({ fieldId, value, disabled, onApply }) {
             if (start) {
               const [y, m, d] = start.split("-");
               const formatted = new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-              // Both commit immediately, synchronously, on the click itself
-              // — closing is what's deferred (below), never the save.
               setDisplayValue(formatted);
               onApply(formatted);
-              setTimeout(() => setActiveField(null), 160);
-            } else {
-              setActiveField(null);
             }
+            setActiveField(null);
           }}
         />
       )}
@@ -2829,7 +2825,7 @@ function ReportsTab({ demoCase }) {
                 content is capped to the same reading width as the
                 document below, so the two line up instead of the bar
                 stretching edge-to-edge across the full screen. */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid var(--tt-grey03)", flexShrink: 0, background: "white" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid var(--tt-grey03)", flexShrink: 0, background: "white", overflowY: "auto", scrollbarGutter: "stable" }}>
               <div style={{ display: "flex", alignItems: "center", maxWidth: 800, width: "100%", margin: "0 auto" }}>
               <button
                 onClick={closePreview}
@@ -2913,7 +2909,7 @@ function ReportsTab({ demoCase }) {
                 own padding) rather than on the maxWidth:800 box itself, so
                 the document's left/right edges line up exactly with the
                 chrome's period control and Cancel/Save buttons above. */}
-            <div style={{ overflowY: "auto", flex: 1 }} onScroll={handleModalScroll}>
+            <div style={{ overflowY: "auto", scrollbarGutter: "stable", flex: 1 }} onScroll={handleModalScroll}>
               <div style={{ padding: "24px 20px" }}>
               <div style={{ maxWidth: 800, margin: "0 auto" }}>
                 {previewLoading ? (
