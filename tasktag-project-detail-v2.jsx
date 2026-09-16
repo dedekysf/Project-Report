@@ -1482,10 +1482,10 @@ function PhotoManagerModal({ photos, excludedPhotos, entryKey, taskName, onSetPh
                   onSetPhotoExcluded(i, included);
                 }}
                 onMouseEnter={capped ? e => {
-                  const r = e.currentTarget.getBoundingClientRect();
-                  setCappedTooltipPos({ top: r.top - 8, left: r.left + r.width / 2 });
+                  setCappedTooltipPos({ top: e.clientY, left: e.clientX });
                   setCappedTooltipIdx(i);
                 } : undefined}
+                onMouseMove={capped ? e => setCappedTooltipPos({ top: e.clientY, left: e.clientX }) : undefined}
                 onMouseLeave={capped ? () => setCappedTooltipIdx(null) : undefined}
                 style={{ position: "relative", padding: 0, border: "none", background: "none", cursor: capped ? "not-allowed" : "pointer", opacity: capped ? 0.45 : 1 }}
               >
@@ -1503,8 +1503,7 @@ function PhotoManagerModal({ photos, excludedPhotos, entryKey, taskName, onSetPh
       {cappedTooltipIdx !== null && (
         <div style={{
           position: "fixed", zIndex: 5200,
-          top: cappedTooltipPos.top, left: cappedTooltipPos.left,
-          transform: "translate(-50%, -100%)",
+          top: cappedTooltipPos.top + 16, left: cappedTooltipPos.left + 12,
           background: "var(--tt-text-1)", color: "white",
           fontSize: 11, fontWeight: 500, whiteSpace: "nowrap",
           padding: "4px 8px", borderRadius: 4,
