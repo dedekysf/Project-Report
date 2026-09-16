@@ -2134,7 +2134,7 @@ function ReportsTab({ demoCase }) {
             placeholderStyle={{ color: "var(--tt-text-1)" }}
             disabled={previewSaved}
             onSave={v => setPreview(p => ({ ...p, companyName: v }))}
-            textStyle={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: 0 }}
+            textStyle={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 4px" }}
             inputStyle={{ fontSize: 14, fontWeight: 700 }}
           />
           <EditableField
