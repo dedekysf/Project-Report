@@ -627,16 +627,16 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
     const cancel = () => { setActiveField(null); setError(false); if (onCancel) onCancel(); };
     const onChange = ev => { setDraft(ev.target.value); if (error) setError(false); };
     return (
-      <div style={{ position: "relative", maxWidth: "100%", minWidth: 0, ...(!boxed ? { marginBottom: 8 } : {}), ...boxStyle }}>
+      <div key="editing" style={{ position: "relative", maxWidth: "100%", minWidth: 0, ...(!boxed ? { marginBottom: 8 } : {}), ...boxStyle }}>
         {multiline ? (
           <textarea
-            ref={el => { if (el) el.focus(); }}
+            ref={el => { if (el) { el.focus(); const len = el.value.length; el.setSelectionRange(len, len); } }}
             value={draft}
             onChange={onChange}
             onKeyDown={ev => { if (ev.key === "Escape") { ev.preventDefault(); cancel(); } }}
             rows={3}
             placeholder={placeholder}
-            style={{ display: "block", width: "100%", fontFamily: "inherit", border: `1px solid ${error ? "var(--tt-red)" : "var(--tt-text-1)"}`, borderRadius: 8, outline: "none", resize: "none", padding: "8px 12px", boxSizing: "border-box", ...inputStyle }}
+            style={{ display: "block", width: "100%", fontFamily: "inherit", border: `1px solid ${error ? "var(--tt-red)" : "var(--tt-text-1)"}`, borderRadius: 8, outline: "none", resize: "none", padding: "8px 12px", boxSizing: "border-box", background: "white", ...inputStyle }}
           />
         ) : (
           <input
@@ -688,6 +688,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
   // since the Tag alone wouldn't cover the padded edges of the card.
   return (
     <div
+      key="display"
       className="tt-editable-wrap"
       onMouseEnter={boxed ? (ev => ev.currentTarget.style.background = "var(--tt-grey03)") : undefined}
       onMouseLeave={boxed ? (ev => ev.currentTarget.style.background = "var(--tt-grey02)") : undefined}
@@ -1758,30 +1759,28 @@ const buildReportHTML = (report) => {
       )
     : "";
 
-  const targetOpeningCell = report.targetOpening
-    ? h("div", { style: "display:flex;align-items:center;gap:8px;" },
+  // Row/box/divider structure always renders (matching the live page's
+  // fixed layout exactly, spacing included) — only the individual text
+  // values are conditional, since an "Add target date"-style placeholder
+  // prompt has no meaning in a static, non-editable export.
+  const targetRowHTML =
+    h("div", { style: "display:flex;flex-wrap:nowrap;gap:24px;margin-top:16px;align-items:center;margin-bottom:24px;" },
+      h("div", { style: "display:flex;align-items:center;gap:8px;" },
         h("span", { style: "font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;" }, "Target Opening"),
-        h("span", { style: "font-size:12px;font-weight:600;text-transform:uppercase;color:#0a1629;" }, report.targetOpening)
-      )
-    : "";
-  const clientNameCell = report.clientName
-    ? h("div", { style: "display:flex;align-items:center;gap:8px;" },
+        report.targetOpening ? h("span", { style: "font-size:12px;font-weight:600;text-transform:uppercase;color:#0a1629;" }, report.targetOpening) : ""
+      ),
+      h("div", { style: "display:flex;align-items:center;gap:8px;" },
         h("span", { style: "font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;" }, "Prepared For"),
-        h("span", { style: "font-size:12px;font-weight:600;text-transform:uppercase;color:#0a1629;" }, report.clientName)
+        report.clientName ? h("span", { style: "font-size:12px;font-weight:600;text-transform:uppercase;color:#0a1629;" }, report.clientName) : ""
       )
-    : "";
-  const targetRowHTML = (targetOpeningCell || clientNameCell)
-    ? h("div", { style: "display:flex;flex-wrap:nowrap;gap:24px;margin-top:16px;align-items:center;margin-bottom:24px;" }, targetOpeningCell, clientNameCell) +
-      h("div", { style: "height:1px;background:#e8e8e6;margin:0 0 24px;" }, "")
-    : "";
+    ) +
+    h("div", { style: "height:1px;background:#e8e8e6;margin:0 0 24px;" }, "");
 
   const projectName = report.projectName || PROJECT_NAME;
   const address = report.address || PROJECT_ADDRESS;
-  const summaryHTML = report.summary
-    ? h("div", { style: "background:#f7f8fa;border-radius:8px;padding:16px;margin-bottom:24px;" },
-        h("p", { style: "font-size:14px;color:#303742;line-height:1.6;margin:0;" }, report.summary)
-      )
-    : "";
+  const summaryHTML = h("div", { style: "background:#f7f8fa;border-radius:8px;padding:16px;" },
+    report.summary ? h("p", { style: "font-size:14px;color:#303742;line-height:1.6;margin:0;" }, report.summary) : ""
+  );
 
   const logoHTML = report.logo
     ? selfClose("img", { src: report.logo, alt: "Company logo", style: "display:block;max-width:100px;height:auto;" })
@@ -1836,7 +1835,13 @@ const buildReportHTML = (report) => {
     )
   );
 
-  const css = "*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;background:#f7f8fa;min-height:100vh;padding:32px 24px}.card{background:white;border:1px solid #e8e8e6;border-radius:12px;overflow:hidden;max-width:800px;margin:0 auto}.card__header{padding:40px 40px 0}.card__body{padding:0 40px 40px}";
+  // width/min-height match PAGE_W/PAGE_H exactly (the live view's own A4
+  // proportions — 800 × round(800×297/210)) rather than a loose max-width,
+  // and the shadow matches the live page card's own
+  // "0 1px 3px rgba(10,22,41,0.08)" — a short report still reads as one
+  // full A4 sheet; a long one just grows taller than it, same as it would
+  // if printed to multiple pages.
+  const css = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;background:#f7f8fa;min-height:100vh;padding:32px 24px}.card{background:white;border:1px solid #e8e8e6;border-radius:12px;overflow:hidden;width:${PAGE_W}px;min-height:${PAGE_H}px;margin:0 auto;box-shadow:0 1px 3px rgba(10,22,41,0.08)}.card__header{padding:${PAGE_PAD}px ${PAGE_PAD}px 0}.card__body{padding:0 ${PAGE_PAD}px}`;
 
   const card = h("div", { class: "card" },
     h("div", { class: "card__header" }, header),
@@ -1873,6 +1878,14 @@ function ReportsTab({ demoCase }) {
   const [selectedPhotos, setSelectedPhotos] = useState({}); // { [entryKey_photoIndex]: photoKey } — in-progress checkbox selection, not yet deleted
   const periodRef     = useRef(null);
   const chipRef       = useRef(null);
+  // Same reasoning as previewPeriodPos below — fixed positioning so this
+  // dropdown isn't clipped by an ancestor's overflow/scrollbarGutter.
+  const [openPeriodPos, setOpenPeriodPos] = useState({ top: 0, left: 0 });
+  useLayoutEffect(() => {
+    if (!openPeriod || !periodRef.current) return;
+    const r = periodRef.current.getBoundingClientRect();
+    setOpenPeriodPos({ top: r.bottom + 4, left: r.left });
+  }, [openPeriod]);
 
   // ── Generate preview modal ──
   // { includeSummary, includeNoPhotoTasks, dateRange, period, customRange, extraNotes } | null
@@ -1889,6 +1902,16 @@ function ReportsTab({ demoCase }) {
   const [saving,           setSaving]             = useState(false); // Save report button's own disabled/spinner state, before the toast appears
   const previewPeriodRef = useRef(null);
   const previewPanelRef = useRef(null);
+  // Fixed (viewport-relative, not CSS position:absolute) so this dropdown
+  // escapes the toolbar's own scrollbarGutter/overflow — an absolutely
+  // positioned popup there gets clipped to nothing once the toolbar has
+  // overflow set, since it extends below the toolbar's own small box.
+  const [previewPeriodPos, setPreviewPeriodPos] = useState({ top: 0, left: 0 });
+  useLayoutEffect(() => {
+    if (!previewPeriodOpen || !previewPeriodRef.current) return;
+    const r = previewPeriodRef.current.getBoundingClientRect();
+    setPreviewPeriodPos({ top: r.bottom + 4, left: r.left });
+  }, [previewPeriodOpen]);
   // Which EditableField/TargetOpeningField (by fieldId) is currently in
   // edit mode — only one at a time across the whole document. Handed down
   // via ActiveEditContext instead of threading it through every render
@@ -2151,9 +2174,9 @@ function ReportsTab({ demoCase }) {
           }}
           onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
           onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", padding: 0, marginTop: 10, cursor: "pointer", fontSize: 12, fontWeight: 500, color: "var(--tt-secondary)" }}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", padding: 0, marginTop: 10, cursor: "pointer", fontSize: 12, fontWeight: 500, color: "var(--tt-text-1)" }}
         >
-          <StickyNote size={13} strokeWidth={SW} color="var(--tt-grey06)" /> Add a note
+          <StickyNote size={13} strokeWidth={SW} color="var(--tt-text-1)" /> Add a note
         </button>
       );
     }
@@ -2791,7 +2814,7 @@ function ReportsTab({ demoCase }) {
             </div>
             {openPeriod && (
               <div style={{
-                position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 200, minWidth: 220,
+                position: "fixed", top: openPeriodPos.top, left: openPeriodPos.left, zIndex: 200, minWidth: 220,
                 background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, overflow: "hidden",
                 boxShadow: "0 8px 24px rgba(10,22,41,0.16)",
               }}>
@@ -2966,6 +2989,7 @@ function ReportsTab({ demoCase }) {
               style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px",
                 borderBottom: "1px solid var(--tt-grey03)", flexShrink: 0, background: "white",
+                overflowY: "auto", scrollbarGutter: "stable",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: 800, width: "100%", margin: "0 auto" }}>
@@ -2999,7 +3023,7 @@ function ReportsTab({ demoCase }) {
                       style={{ flexShrink: 0, transform: `rotate(${previewPeriodOpen ? "180deg" : "0deg"})`, transition: "transform 0.15s" }} />
                   </button>
                   {previewPeriodOpen && (
-                    <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 200, minWidth: 220, background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, overflow: "hidden", boxShadow: "0 8px 24px rgba(10,22,41,0.16)" }}>
+                    <div style={{ position: "fixed", top: previewPeriodPos.top, left: previewPeriodPos.left, zIndex: 200, minWidth: 220, background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, overflow: "hidden", boxShadow: "0 8px 24px rgba(10,22,41,0.16)" }}>
                       {PERIOD_OPTIONS.map(({ id }, i) => (
                         <div key={id}>
                           <div
@@ -3058,7 +3082,7 @@ function ReportsTab({ demoCase }) {
                 >
                   {saving
                     ? <span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.35)", borderTopColor: "white", display: "inline-block", animation: "tt-spin 0.75s linear infinite" }} />
-                    : "Save report"}
+                    : "Save Report"}
                 </button>
               </div>
               </div>
