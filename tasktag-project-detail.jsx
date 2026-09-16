@@ -1696,7 +1696,7 @@ const buildReportHTML = (report) => {
         : "";
     }).filter(Boolean);
     if (cells.length === 0) return "";
-    return h("div", { style: "display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:10px;" }, ...cells);
+    return h("div", { style: "display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:8px;" }, ...cells);
   };
 
   const groupLabel = (g) => formatGroupLabel(g, grouping);
@@ -1706,7 +1706,7 @@ const buildReportHTML = (report) => {
   // to — same as the live view, styled the same italic, padded way.
   const entryHTML = (e) => {
     if (e.isNote) {
-      return h("div", { style: "margin-top:10px;" },
+      return h("div", { style: "margin-top:8px;" },
         h("p", { style: "font-size:12px;font-style:italic;color:#303742;line-height:1.5;margin:0;padding:8px;border-radius:8px;" }, e.note)
       );
     }
@@ -1730,7 +1730,7 @@ const buildReportHTML = (report) => {
       (!e.noPhotos && visiblePhotoCount > 0
         ? dot + `<span style="font-size:11px;font-weight:500;color:#828282;">${visiblePhotoCount} photo${visiblePhotoCount === 1 ? "" : "s"}</span>`
         : "");
-    return h("div", { style: "margin-bottom:40px;" },
+    return h("div", { style: "margin-bottom:24px;" },
       h("p", { style: "font-size:18px;font-weight:600;color:#0a1629;line-height:1.35;margin:0;" }, e.note),
       h("div", { style: "margin-top:8px;" }, metaLine),
       e.noPhotos ? "" : renderPhotos(e.photos)
