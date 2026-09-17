@@ -1612,7 +1612,7 @@ function LightboxIconBtn({ label, onClick, disabled, children }) {
   );
 }
 
-function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalIndices, captions, onCaptionChange, onIndexChange, onClose, onDeleteSelected }) {
+function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalIndices, captions, onCaptionChange, onIndexChange, onClose, onDeleteSelected, onDownload, onCopyLink, linkCopied, actionsDisabled }) {
   const [rotation, setRotation] = useState(0);
   const [zoom, setZoom] = useState(100);
   const [showFileDetails, setShowFileDetails] = useState(false);
@@ -1718,14 +1718,14 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0, justifySelf: "end" }}>
-          <LightboxIconBtn label="Download">
+          <LightboxIconBtn label="Download" disabled={actionsDisabled} onClick={onDownload}>
             <Download size={16} strokeWidth={SW} />
           </LightboxIconBtn>
           <LightboxIconBtn label="Share">
             <Forward size={16} strokeWidth={SW} />
           </LightboxIconBtn>
-          <LightboxIconBtn label="Copy link to share">
-            <Link size={16} strokeWidth={SW} />
+          <LightboxIconBtn label={linkCopied ? "Link copied" : "Copy link to share"} disabled={actionsDisabled} onClick={onCopyLink}>
+            {linkCopied ? <Check size={16} strokeWidth={SW} /> : <Link size={16} strokeWidth={SW} />}
           </LightboxIconBtn>
           <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.15)", margin: "0 6px" }} />
           <LightboxIconBtn label="Rotate" onClick={() => setRotation(r => (r + 90) % 360)}>
@@ -4621,6 +4621,10 @@ function ReportsTab({ demoCase }) {
           onCaptionChange={previewSaved ? undefined : (idx, text) => setPhotoCaption(lightbox.entryKey, idx, text)}
           onIndexChange={i => setLightbox(lb => ({ ...lb, index: i }))}
           onClose={() => setLightbox(null)}
+          onDownload={handlePreviewDownload}
+          onCopyLink={handlePreviewCopy}
+          linkCopied={previewCopied}
+          actionsDisabled={previewLoading}
           onDeleteSelected={(indices) => {
             // originalIndices map filmstrip position -> this entry's real
             // photo index, so the exclusion lands on the same keys the
