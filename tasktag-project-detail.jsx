@@ -1932,42 +1932,283 @@ const DUMMY_ENTRIES = [
   // something to demo without needing a specific date range.
   {
     date: "2026-09-10", note: "Flooring installation started on the ground floor.",
+    // Deliberately 7 items — more than the 5 the UI shows, to demo the
+    // "only the last 5" truncation on the first (most visible) entry.
     checklist: [
       { text: "Remove old flooring throughout the ground floor" },
       { text: "Level and inspect subfloor for damage" },
+      { text: "Order hardwood plank materials" },
       { text: "Begin hardwood plank installation in living room" },
+      { text: "Install underlayment in hallway" },
+      { text: "Fit transition strips between rooms" },
+      { text: "Clean and inspect finished flooring" },
     ],
     photos: ["img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5"],
   },
-  { date: "2026-09-09", note: "Exterior siding repairs completed on the south wall.", photos: ["img9", "img2", "img3", "img7", "img4", "img5", "img6"] },
-  { date: "2026-09-08", note: "Final electrical connections completed in the main panel.", photos: ["img9", "img8"] },
-  { date: "2026-09-07", note: "Plumbing fixtures installed in all bathrooms.", photos: [] },
-  { date: "2026-09-06", note: "Ceiling lights installed and tested.", photos: ["img8", "img7"] },
-  { date: "2026-09-06", note: "Final walkthrough completed with the client — no issues noted.", photos: [] },
-  { date: "2026-09-05", note: "Bathroom tile installation completed on the second floor.", photos: [] },
-  { date: "2026-09-04", note: "Kitchen cabinet hardware installed.", photos: ["img6", "img1", "img9", "img2", "img3", "img4", "img8"] },
-  { date: "2026-09-03", note: "Interior door hardware fitted — knobs and locks in place.", photos: ["img6", "img7"] },
-  { date: "2026-09-02", note: "Drywall patching completed in the hallway.", photos: ["img4"] },
-  { date: "2026-09-01", note: "Exterior paint touch-ups finished on the west elevation.", photos: ["img2", "img5", "img7", "img1"] },
-  { date: "2026-08-31", note: "HVAC ductwork inspection passed.", photos: ["img8", "img9"] },
-  { date: "2026-08-28", note: "Cracked wall sections patched and primed.", photos: ["img1", "img3", "img4"] },
-  { date: "2026-08-25", note: "Garage door opener installed and tested.", photos: ["img6"] },
-  { date: "2026-08-21", note: "Brickwork reinforcement completed on the north facade.", photos: ["img2", "img1"] },
-  { date: "2026-08-18", note: "Landscaping grading completed around the foundation.", photos: ["img2", "img3"] },
-  { date: "2026-08-14", note: "Peeling paint removed and surface prepared for recoat.", photos: ["img5", "img4", "img3"] },
-  { date: "2026-08-11", note: "Window trim installed on the front facade.", photos: ["img5", "img1", "img4"] },
-  { date: "2026-08-07", note: "Door frame replaced in the storage room.", photos: ["img7", "img6"] },
-  { date: "2026-08-04", note: "Insulation installed in the attic space.", photos: ["img7", "img8"] },
-  { date: "2026-07-31", note: "Structural assessment completed — no major issues found.", photos: ["img2"] },
-  { date: "2026-07-28", note: "Roof shingles replaced on the north slope.", photos: ["img9", "img2", "img6", "img3"] },
-  { date: "2026-07-24", note: "Scaffolding erected on the west side.", photos: ["img9", "img1"] },
-  { date: "2026-07-21", note: "Electrical panel upgrade completed.", photos: ["img1"] },
-  { date: "2026-07-17", note: "Waterproofing membrane applied to basement walls.", photos: ["img3", "img5"] },
-  { date: "2026-07-14", note: "Foundation waterproofing sealant applied.", photos: ["img4", "img5"] },
-  { date: "2026-07-10", note: "Project kickoff — site survey and initial documentation.", photos: ["img2", "img9", "img6"] },
-  { date: "2026-06-30", note: "Framing inspection passed for the second-floor addition.", photos: ["img3", "img7", "img9"] },
-  { date: "2026-06-23", note: "Site utilities connected — water and sewer lines.", photos: ["img2"] },
-  { date: "2026-06-16", note: "Excavation completed for the new foundation footprint.", photos: ["img8", "img6", "img5", "img1", "img9"] },
+  {
+    date: "2026-09-09", note: "Exterior siding repairs completed on the south wall.",
+    checklist: [
+      { text: "Remove damaged siding panels" },
+      { text: "Repair underlying sheathing" },
+      { text: "Install new siding panels" },
+      { text: "Caulk and seal all seams" },
+    ],
+    photos: ["img9", "img2", "img3", "img7", "img4", "img5", "img6"],
+  },
+  {
+    date: "2026-09-08", note: "Final electrical connections completed in the main panel.",
+    checklist: [
+      { text: "Install main breaker panel" },
+      { text: "Connect circuit wiring" },
+      { text: "Label all breakers" },
+      { text: "Test panel for proper voltage" },
+    ],
+    photos: ["img9", "img8"],
+  },
+  {
+    date: "2026-09-07", note: "Plumbing fixtures installed in all bathrooms.",
+    checklist: [
+      { text: "Install sinks and faucets" },
+      { text: "Install toilets" },
+      { text: "Connect shower and tub fixtures" },
+      { text: "Test all fixtures for leaks" },
+    ],
+    photos: [],
+  },
+  {
+    date: "2026-09-06", note: "Ceiling lights installed and tested.",
+    checklist: [
+      { text: "Mount light fixtures" },
+      { text: "Wire fixtures to switches" },
+      { text: "Test all fixtures for proper operation" },
+    ],
+    photos: ["img8", "img7"],
+  },
+  {
+    date: "2026-09-06", note: "Final walkthrough completed with the client — no issues noted.",
+    checklist: [
+      { text: "Review completed work with client" },
+      { text: "Confirm no outstanding punch list items" },
+      { text: "Collect client sign-off" },
+    ],
+    photos: [],
+  },
+  {
+    date: "2026-09-05", note: "Bathroom tile installation completed on the second floor.",
+    checklist: [
+      { text: "Prep subfloor for tile" },
+      { text: "Lay tile in shower and floor areas" },
+      { text: "Grout and seal tile" },
+    ],
+    photos: [],
+  },
+  {
+    date: "2026-09-04", note: "Kitchen cabinet hardware installed.",
+    checklist: [
+      { text: "Install cabinet hinges" },
+      { text: "Attach handles and knobs" },
+      { text: "Adjust cabinet doors for alignment" },
+    ],
+    photos: ["img6", "img1", "img9", "img2", "img3", "img4", "img8"],
+  },
+  {
+    date: "2026-09-03", note: "Interior door hardware fitted — knobs and locks in place.",
+    checklist: [
+      { text: "Install door knobs" },
+      { text: "Install deadbolts and locks" },
+      { text: "Test door operation" },
+    ],
+    photos: ["img6", "img7"],
+  },
+  {
+    date: "2026-09-02", note: "Drywall patching completed in the hallway.",
+    checklist: [
+      { text: "Cut out damaged drywall sections" },
+      { text: "Install patch and tape seams" },
+      { text: "Sand and prime patched area" },
+    ],
+    photos: ["img4"],
+  },
+  {
+    date: "2026-09-01", note: "Exterior paint touch-ups finished on the west elevation.",
+    checklist: [
+      { text: "Pressure wash exterior surface" },
+      { text: "Apply primer to touch-up areas" },
+      { text: "Apply finish coat" },
+    ],
+    photos: ["img2", "img5", "img7", "img1"],
+  },
+  {
+    date: "2026-08-31", note: "HVAC ductwork inspection passed.",
+    checklist: [
+      { text: "Inspect duct connections for leaks" },
+      { text: "Verify airflow at each vent" },
+      { text: "Confirm inspection sign-off" },
+    ],
+    photos: ["img8", "img9"],
+  },
+  {
+    date: "2026-08-28", note: "Cracked wall sections patched and primed.",
+    checklist: [
+      { text: "Clean and widen cracks for patching" },
+      { text: "Apply patching compound" },
+      { text: "Prime patched sections" },
+    ],
+    photos: ["img1", "img3", "img4"],
+  },
+  {
+    date: "2026-08-25", note: "Garage door opener installed and tested.",
+    checklist: [
+      { text: "Mount opener unit" },
+      { text: "Program remote controls" },
+      { text: "Test safety reverse sensors" },
+    ],
+    photos: ["img6"],
+  },
+  {
+    date: "2026-08-21", note: "Brickwork reinforcement completed on the north facade.",
+    checklist: [
+      { text: "Remove loose or damaged brick" },
+      { text: "Install reinforcement ties" },
+      { text: "Repoint mortar joints" },
+    ],
+    photos: ["img2", "img1"],
+  },
+  {
+    date: "2026-08-18", note: "Landscaping grading completed around the foundation.",
+    checklist: [
+      { text: "Grade soil away from foundation" },
+      { text: "Install drainage swales" },
+      { text: "Seed and mulch disturbed areas" },
+    ],
+    photos: ["img2", "img3"],
+  },
+  {
+    date: "2026-08-14", note: "Peeling paint removed and surface prepared for recoat.",
+    checklist: [
+      { text: "Scrape peeling paint" },
+      { text: "Sand rough surfaces" },
+      { text: "Apply primer coat" },
+    ],
+    photos: ["img5", "img4", "img3"],
+  },
+  {
+    date: "2026-08-11", note: "Window trim installed on the front facade.",
+    checklist: [
+      { text: "Measure and cut trim boards" },
+      { text: "Install trim around window frames" },
+      { text: "Caulk and paint trim" },
+    ],
+    photos: ["img5", "img1", "img4"],
+  },
+  {
+    date: "2026-08-07", note: "Door frame replaced in the storage room.",
+    checklist: [
+      { text: "Remove old door frame" },
+      { text: "Install new frame and shim level" },
+      { text: "Rehang door and test swing" },
+    ],
+    photos: ["img7", "img6"],
+  },
+  {
+    date: "2026-08-04", note: "Insulation installed in the attic space.",
+    checklist: [
+      { text: "Air-seal attic penetrations" },
+      { text: "Install batt insulation between joists" },
+      { text: "Verify coverage meets R-value target" },
+    ],
+    photos: ["img7", "img8"],
+  },
+  {
+    date: "2026-07-31", note: "Structural assessment completed — no major issues found.",
+    checklist: [
+      { text: "Inspect load-bearing walls and beams" },
+      { text: "Check foundation for cracking or settling" },
+      { text: "Document findings in report" },
+    ],
+    photos: ["img2"],
+  },
+  {
+    date: "2026-07-28", note: "Roof shingles replaced on the north slope.",
+    checklist: [
+      { text: "Remove damaged shingles" },
+      { text: "Install underlayment" },
+      { text: "Install new shingles and flashing" },
+    ],
+    photos: ["img9", "img2", "img6", "img3"],
+  },
+  {
+    date: "2026-07-24", note: "Scaffolding erected on the west side.",
+    checklist: [
+      { text: "Assemble scaffold base and frames" },
+      { text: "Secure guardrails and platforms" },
+      { text: "Inspect scaffold for safety compliance" },
+    ],
+    photos: ["img9", "img1"],
+  },
+  {
+    date: "2026-07-21", note: "Electrical panel upgrade completed.",
+    checklist: [
+      { text: "Disconnect and remove old panel" },
+      { text: "Install new panel and breakers" },
+      { text: "Schedule utility inspection" },
+    ],
+    photos: ["img1"],
+  },
+  {
+    date: "2026-07-17", note: "Waterproofing membrane applied to basement walls.",
+    checklist: [
+      { text: "Clean and prep basement wall surface" },
+      { text: "Apply waterproof membrane" },
+      { text: "Install drainage board" },
+    ],
+    photos: ["img3", "img5"],
+  },
+  {
+    date: "2026-07-14", note: "Foundation waterproofing sealant applied.",
+    checklist: [
+      { text: "Clean foundation exterior surface" },
+      { text: "Apply sealant coating" },
+      { text: "Backfill against foundation wall" },
+    ],
+    photos: ["img4", "img5"],
+  },
+  {
+    date: "2026-07-10", note: "Project kickoff — site survey and initial documentation.",
+    checklist: [
+      { text: "Conduct site survey" },
+      { text: "Document existing conditions" },
+      { text: "Confirm project scope with client" },
+    ],
+    photos: ["img2", "img9", "img6"],
+  },
+  {
+    date: "2026-06-30", note: "Framing inspection passed for the second-floor addition.",
+    checklist: [
+      { text: "Verify framing meets plan specifications" },
+      { text: "Check header and joist spacing" },
+      { text: "Pass inspector walkthrough" },
+    ],
+    photos: ["img3", "img7", "img9"],
+  },
+  {
+    date: "2026-06-23", note: "Site utilities connected — water and sewer lines.",
+    checklist: [
+      { text: "Trench for utility lines" },
+      { text: "Connect water service line" },
+      { text: "Connect sewer line and test flow" },
+    ],
+    photos: ["img2"],
+  },
+  {
+    date: "2026-06-16", note: "Excavation completed for the new foundation footprint.",
+    checklist: [
+      { text: "Mark foundation layout" },
+      { text: "Excavate to required depth" },
+      { text: "Verify grade and dimensions" },
+    ],
+    photos: ["img8", "img6", "img5", "img1", "img9"],
+  },
 ];
 
 // TODO(BE): replace with the crew member who actually logged each entry,
@@ -2376,7 +2617,8 @@ const buildReportHTML = (report) => {
       ? h("div", { style: "margin-top:16px;" },
           h("p", { style: "font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;margin:0 0 8px;" }, "Completed this update"),
           h("div", { style: "display:flex;flex-direction:column;gap:6px;" },
-            ...e.checklist.map(item =>
+            // Only the last 5 — same cap the live view applies.
+            ...e.checklist.slice(-5).map(item =>
               h("div", { style: "display:flex;align-items:center;gap:8px;" },
                 h("span", { style: "flex-shrink:0;color:#16a97d;font-size:13px;font-weight:700;" }, "✓"),
                 h("span", { style: "font-size:13px;color:#828282;" }, item.text)
@@ -3079,7 +3321,10 @@ function ReportsTab({ demoCase }) {
               Completed this update
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {e.checklist.map((item, idx) => (
+              {/* Only the last 5 — earlier items still exist in the data,
+                  just not shown, so the section stays a short recap
+                  instead of growing unbounded over a long task. */}
+              {e.checklist.slice(-5).map((item, idx) => (
                 <div key={idx} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <Check size={14} strokeWidth={SW} color="var(--tt-secondary)" style={{ flexShrink: 0 }} />
                   <span style={{ fontSize: 13, color: "var(--tt-grey05)" }}>
