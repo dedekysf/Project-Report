@@ -2330,18 +2330,20 @@ const buildReportHTML = (report) => {
   // what gets packed onto A4 pages below. A manual note is spliced into
   // g.entries right after the entry it's attached to (isNote:true
   // pseudo-entry) — it's consumed here into that entry's own block
-  // instead of becoming its own block in the list.
+  // instead of becoming its own block in the list. `isLabel` lets the
+  // pagination pass below keep a label glued to its first entry instead
+  // of stranding it alone at the bottom of a page.
   const blocks = groups.length === 0
-    ? [h("p", { style: "font-size:13px;color:#828282;text-align:center;padding:32px 0;" }, "No activity entries for this period.")]
+    ? [{ html: h("p", { style: "font-size:13px;color:#828282;text-align:center;padding:32px 0;" }, "No activity entries for this period."), isLabel: false }]
     : groups.flatMap(g => {
         const groupBlocks = [];
         if (grouping !== "day") {
-          groupBlocks.push(h("p", { style: "font-size:16px;font-weight:600;color:#828282;text-transform:uppercase;padding:8px 0;margin:0;" }, groupLabel(g).toUpperCase()));
+          groupBlocks.push({ html: h("p", { style: "font-size:16px;font-weight:600;color:#828282;text-transform:uppercase;padding:8px 0;margin:0;" }, groupLabel(g).toUpperCase()), isLabel: true });
         }
         g.entries.forEach((e, i) => {
           if (e.isNote) return;
           const next = g.entries[i + 1];
-          groupBlocks.push(entryHTML(e, next && next.isNote ? noteHTML(next) : ""));
+          groupBlocks.push({ html: entryHTML(e, next && next.isNote ? noteHTML(next) : ""), isLabel: false });
         });
         return groupBlocks;
       });
@@ -2481,7 +2483,7 @@ const buildReportHTML = (report) => {
   const headerEl = appendMeasureEl(fullHeaderHTML);
   const runningHeaderEl = appendMeasureEl(runningHeaderHTML);
   const footerEl = appendMeasureEl(footerHTML);
-  const blockEls = blocks.map(b => appendMeasureEl(b, PAGE_W - PAGE_PAD * 2));
+  const blockEls = blocks.map(b => appendMeasureEl(b.html, PAGE_W - PAGE_PAD * 2));
 
   const headerH = headerEl.offsetHeight;
   const runningHeaderH = runningHeaderEl.offsetHeight;
@@ -2496,13 +2498,18 @@ const buildReportHTML = (report) => {
   blocks.forEach((block, i) => {
     const blockH = blockHeights[i];
     const available = PAGE_H - PAGE_PAD * 2 - (isFirstPage ? headerH : runningHeaderH) - footerH;
-    if (current.length > 0 && used + blockH > available) {
+    // A section label must never be stranded alone at the bottom of a
+    // page with its task list starting on the next — check it together
+    // with its very next block (that group's first entry) against the
+    // remaining space, not just the label alone.
+    const fitsCheckH = block.isLabel && i + 1 < blocks.length ? blockH + blockHeights[i + 1] : blockH;
+    if (current.length > 0 && used + fitsCheckH > available) {
       pages.push(current);
       current = [];
       used = 0;
       isFirstPage = false;
     }
-    current.push(block);
+    current.push(block.html);
     used += blockH;
   });
   if (current.length > 0 || pages.length === 0) pages.push(current);
@@ -3234,10 +3241,18 @@ function ReportsTab({ demoCase }) {
     let current = [];
     let used = 0;
     let isFirstPage = true;
-    flatBlocks.forEach(block => {
+    flatBlocks.forEach((block, i) => {
       const h = blockMeasureRefs.current[block.key]?.offsetHeight || 0;
       const available = PAGE_H - PAGE_PAD * 2 - (isFirstPage ? headerH : runningHeaderH) - footerH;
-      if (current.length > 0 && used + h > available) {
+      // A section label must never be stranded alone at the bottom of a
+      // page with its task list starting on the next — check it together
+      // with its very next block (that group's first entry) against the
+      // remaining space, not just the label alone.
+      const next = flatBlocks[i + 1];
+      const fitsCheckH = block.type === "label" && next
+        ? h + (blockMeasureRefs.current[next.key]?.offsetHeight || 0)
+        : h;
+      if (current.length > 0 && used + fitsCheckH > available) {
         pages.push(current);
         current = [];
         used = 0;
