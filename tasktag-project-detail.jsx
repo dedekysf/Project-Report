@@ -1212,7 +1212,7 @@ function PhotoThumb({ src, onClick }) {
   );
 }
 
-// Photo grid capped to 2 rows of 3 — beyond that, the last visible cell
+// Photo grid capped to 1 row of 3 — beyond that, the last visible cell
 // becomes a "+N more" overlay that expands the grid in place to show every
 // photo (no cap), rather than jumping into the lightbox. Each visible photo
 // also carries a select checkbox in its top-right corner; checking one or
@@ -1230,8 +1230,8 @@ function PhotoThumb({ src, onClick }) {
 // one popover is open at a time across the grid.
 function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, onToggleSelect, captions, onCaptionChange }) {
   const COLS = 3;
-  const ROWS = 2;
-  const CAP = COLS * ROWS; // 2 rows of 3 before the last visible cell becomes "+N more"
+  const ROWS = 1;
+  const CAP = COLS * ROWS; // 1 row of 3 before the last visible cell becomes "+N more"
   const [expanded, setExpanded] = useState(false);
   const [openCaptionIdx, setOpenCaptionIdx] = useState(null); // original photo index, or null
   const [captionPos, setCaptionPos] = useState({ top: 0, left: 0 });
@@ -2334,7 +2334,7 @@ const buildReportHTML = (report) => {
     : groups.flatMap(g => {
         const groupBlocks = [];
         if (grouping !== "day") {
-          groupBlocks.push(h("p", { style: "font-size:18px;font-weight:600;color:#828282;text-transform:uppercase;padding:8px 0;margin:0;" }, groupLabel(g).toUpperCase()));
+          groupBlocks.push(h("p", { style: "font-size:16px;font-weight:600;color:#828282;text-transform:uppercase;padding:8px 0;margin:0;" }, groupLabel(g).toUpperCase()));
         }
         g.entries.forEach((e, i) => {
           if (e.isNote) return;
@@ -2878,7 +2878,7 @@ function ReportsTab({ demoCase }) {
     const isPeriodSection = grouping === "week" || grouping === "month";
     return (
       <p style={isPeriodSection
-        ? { fontSize: 18, fontWeight: 600, color: "var(--tt-grey05)", textTransform: "uppercase", padding: "8px 0", margin: 0 }
+        ? { fontSize: 16, fontWeight: 600, color: "var(--tt-grey05)", textTransform: "uppercase", padding: "8px 0", margin: 0 }
         : { fontSize: 11, fontWeight: 600, color: "var(--tt-grey05)", letterSpacing: "0.06em", textTransform: "uppercase", padding: "8px 0", margin: 0 }
       }>
         {formatGroupLabel(g, grouping).toUpperCase()}
@@ -3821,7 +3821,7 @@ function ReportsTab({ demoCase }) {
                           <div className="tt-skeleton" style={{ width: "60%", height: 18, marginBottom: 8 }} />
                           <div className="tt-skeleton" style={{ width: 160, height: 11, marginBottom: 10 }} />
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
-                            {[0, 1, 2, 3, 4, 5].map(pi => (
+                            {[0, 1, 2].map(pi => (
                               <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "16/9", borderRadius: 4 }} />
                             ))}
                           </div>
