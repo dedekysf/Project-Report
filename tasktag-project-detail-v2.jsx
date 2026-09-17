@@ -2546,13 +2546,28 @@ function buildReportData(dateRange, periodStr, customRange, includeNoPhotoTasks 
 // `${entryKey}_${photoIndex}` — against the *original*, unspliced entries,
 // so it has to run before applyExtraNotesToGroups shifts entry positions.
 function applyPhotoExclusions(groups, excludedPhotos) {
-  if (!excludedPhotos || Object.keys(excludedPhotos).length === 0) return groups;
+  // Always maps (even with nothing excluded) so every entry carries its
+  // own entryKey forward — applyTitleOverrides/applyExtraNotesToGroups
+  // run after this and reindex/splice g.entries, so a position-based
+  // `${g.key}_${i}` recomputed later (e.g. in buildReportHTML) would
+  // drift for any entry after a spliced manual note. Reading e.entryKey
+  // instead keeps every caption/exclusion lookup pinned to the same key
+  // the live view stored it under, against this original, pre-splice
+  // ordering.
   return groups.map(g => ({
     ...g,
     entries: g.entries.map((e, i) => {
       const entryKey = `${g.key}_${i}`;
-      const filtered = e.photos.filter((_, pi) => !excludedPhotos[`${entryKey}_${pi}`]);
-      return filtered.length === e.photos.length ? e : { ...e, photos: filtered };
+      if (!excludedPhotos || Object.keys(excludedPhotos).length === 0) return { ...e, entryKey };
+      // Captions are keyed by the photo's ORIGINAL index (before any
+      // exclusion), so once photos are actually filtered out here, the
+      // survivors' positions in the new array no longer line up with
+      // those keys — photoOriginalIndices is the parallel map back,
+      // consumed by buildReportHTML's caption lookup.
+      const kept = e.photos.map((k, pi) => ({ k, pi })).filter(({ pi }) => !excludedPhotos[`${entryKey}_${pi}`]);
+      return kept.length === e.photos.length
+        ? { ...e, entryKey }
+        : { ...e, entryKey, photos: kept.map(x => x.k), photoOriginalIndices: kept.map(x => x.pi) };
     }),
   }));
 }
@@ -2668,15 +2683,29 @@ const buildReportHTML = (report) => {
   };
 
   const STATUS_HEX = { completed: "#16a97d", in_progress: "#138eff", past_due: "#e5484d" };
+  // Editorial serif for headline/body content (title, address, summary,
+  // task headings, descriptions, captions); small uppercase UI labels
+  // (status pills, meta lines, section/footer chrome) stay on the sans
+  // stack and re-declare it explicitly, since the body default below is
+  // what's switching to serif.
+  const SANS = "-apple-system,BlinkMacSystemFont,'Inter',sans-serif";
+  const SERIF = "'Lora',Georgia,serif";
 
   // Fixed 4-column grid, same sizing as the live PhotoGrid — every photo
   // shows here (no "+N more" cap; there's nothing left to expand into).
-  const renderPhotos = (photos) => {
-    const cells = (photos || []).map(k => {
+  // originalIndices maps each surviving photo's position back to its
+  // pre-exclusion index (see applyPhotoExclusions) — the same key
+  // captions are stored under everywhere else.
+  const renderPhotos = (photos, entryKey, captions, originalIndices) => {
+    const cells = (photos || []).map((k, i) => {
       const src = IMG_MAP[k];
-      return src
-        ? selfClose("img", { src: toAbsoluteUrl(src), style: "width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:4px;display:block;" })
-        : "";
+      if (!src) return "";
+      const origIdx = originalIndices ? originalIndices[i] : i;
+      const caption = captions && captions[`${entryKey}_${origIdx}`];
+      return h("div", {},
+        selfClose("img", { src: toAbsoluteUrl(src), style: "width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:4px;display:block;" }),
+        caption ? h("p", { style: `font-size:12px;font-style:italic;color:#828282;font-family:${SERIF};margin:6px 0 0;` }, caption) : ""
+      );
     }).filter(Boolean);
     if (cells.length === 0) return "";
     return h("div", { style: "display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px;" }, ...cells);
@@ -2696,53 +2725,55 @@ const buildReportHTML = (report) => {
   // avoids that collapse entirely and gives each gap its exact value.
   const noteHTML = (note) =>
     h("div", { style: "margin-top:8px;" },
-      h("p", { style: "font-size:12px;color:#303742;line-height:1.5;margin:0;" }, note.note)
+      h("p", { style: `font-family:${SERIF};font-size:12px;color:#303742;line-height:1.5;margin:0;` }, note.note)
     );
 
-  const entryHTML = (e, attachedNoteHTML) => {
+  const entryHTML = (e, attachedNoteHTML, entryKey, captions) => {
     const { kind, daysAgo } = statusForEntry(e);
     const statusMeta = STATUS_META[kind];
     const statusColor = STATUS_HEX[kind];
     const visiblePhotoCount = (e.photos || []).length;
-    const dot = "<span style=\"display:inline-block;width:3px;height:3px;border-radius:50%;background:#bdbdbd;vertical-align:middle;margin:0 6px;\"></span>";
+    const dot = `<span style="display:inline-block;width:3px;height:3px;border-radius:50%;background:#bdbdbd;vertical-align:middle;margin:0 6px;"></span>`;
     // Matches the live view exactly: the per-entry date always shows
     // inline (the live meta line has no grouping-based condition on it),
     // and the section label above only appears for week/month grouping —
     // see entriesHTML below, which skips it for "day" the same way the
     // live view's flatBlocks pagination does.
-    const dueHTML = `<span style="font-size:11px;font-weight:500;color:#828282;">${fmtDate(parseDate(e.date))}</span>` + dot;
+    // Meta-line chrome (status/date/owner/photo-count) stays on the sans
+    // stack, same reasoning as SANS's own comment above.
+    const dueHTML = `<span style="font-family:${SANS};font-size:11px;font-weight:500;color:#828282;">${fmtDate(parseDate(e.date))}</span>` + dot;
     const metaLine =
       `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${statusColor};vertical-align:middle;margin-right:6px;"></span>` +
-      `<span style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:${statusColor};">${statusMeta.label}${kind === "past_due" && daysAgo > 0 ? ` ${daysAgo} days` : ""}</span>` +
+      `<span style="font-family:${SANS};font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:${statusColor};">${statusMeta.label}${kind === "past_due" && daysAgo > 0 ? ` ${daysAgo} days` : ""}</span>` +
       dot +
       dueHTML +
-      `<span style="font-size:11px;font-weight:500;color:#828282;">${ownerForEntry(e.date)}</span>` +
+      `<span style="font-family:${SANS};font-size:11px;font-weight:500;color:#828282;">${ownerForEntry(e.date)}</span>` +
       (!e.noPhotos && visiblePhotoCount > 0
-        ? dot + `<span style="font-size:11px;font-weight:500;color:#828282;">${visiblePhotoCount} photo${visiblePhotoCount === 1 ? "" : "s"}</span>`
+        ? dot + `<span style="font-family:${SANS};font-size:11px;font-weight:500;color:#828282;">${visiblePhotoCount} photo${visiblePhotoCount === 1 ? "" : "s"}</span>`
         : "");
     // Same divider the live view always shows now (see renderEntryBlock) —
     // the checklist (if any) and/or the attached note both sit below it.
     const dividerHTML = h("div", { style: "height:1px;background:#e8e8e6;margin-top:16px;" }, "");
     const checklistHTML = (e.checklist && e.checklist.length > 0)
       ? h("div", { style: "margin-top:16px;" },
-          h("p", { style: "font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;margin:0 0 8px;" }, "Completed this update"),
+          h("p", { style: `font-family:${SANS};font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;margin:0 0 8px;` }, "Completed this update"),
           h("div", { style: "display:flex;flex-direction:column;gap:6px;" },
             // Only the last 5 — same cap the live view applies.
             ...e.checklist.slice(-5).map(item =>
               h("div", { style: "display:flex;align-items:center;gap:8px;" },
                 h("span", { style: "flex-shrink:0;color:#16a97d;font-size:13px;font-weight:700;" }, "✓"),
-                h("span", { style: "font-size:13px;color:#303742;" }, item.text)
+                h("span", { style: `font-family:${SERIF};font-size:13px;color:#303742;` }, item.text)
               )
             )
           )
         )
       : "";
     return h("div", { style: "margin-bottom:40px;" },
-      h("p", { style: "font-size:18px;font-weight:600;color:#0a1629;line-height:1.35;margin:0;" }, e.note),
-      h("div", { style: "margin-top:4px;" }, metaLine),
+      h("p", { style: `font-family:${SERIF};font-size:20px;font-weight:700;color:#0a1629;line-height:1.35;margin:0;` }, e.note),
+      h("div", { style: "margin-top:6px;" }, metaLine),
       dividerHTML,
       checklistHTML,
-      e.noPhotos ? "" : renderPhotos(e.photos),
+      e.noPhotos ? "" : renderPhotos(e.photos, entryKey, captions, e.photoOriginalIndices),
       attachedNoteHTML || ""
     );
   };
@@ -2757,16 +2788,20 @@ const buildReportHTML = (report) => {
   // pagination pass below keep a label glued to its first entry instead
   // of stranding it alone at the bottom of a page.
   const blocks = groups.length === 0
-    ? [{ html: h("p", { style: "font-size:13px;color:#828282;text-align:center;padding:32px 0;" }, "No activity entries for this period."), isLabel: false }]
+    ? [{ html: h("p", { style: `font-family:${SANS};font-size:13px;color:#828282;text-align:center;padding:32px 0;` }, "No activity entries for this period."), isLabel: false }]
     : groups.flatMap(g => {
         const groupBlocks = [];
         if (grouping !== "day") {
-          groupBlocks.push({ html: h("p", { style: "font-size:16px;font-weight:600;color:#828282;text-transform:uppercase;padding:8px 0;margin:0;" }, groupLabel(g).toUpperCase()), isLabel: true });
+          groupBlocks.push({ html: h("p", { style: `font-family:${SANS};font-size:16px;font-weight:600;color:#828282;text-transform:uppercase;padding:8px 0;margin:0;` }, groupLabel(g).toUpperCase()), isLabel: true });
         }
+        // e.entryKey (embedded by applyPhotoExclusions) instead of
+        // recomputing `${g.key}_${i}` here — this loop runs on the final,
+        // post-note-splice g.entries, where a real entry's position can
+        // have shifted from where it was when captions were first keyed.
         g.entries.forEach((e, i) => {
           if (e.isNote) return;
           const next = g.entries[i + 1];
-          groupBlocks.push({ html: entryHTML(e, next && next.isNote ? noteHTML(next) : ""), isLabel: false });
+          groupBlocks.push({ html: entryHTML(e, next && next.isNote ? noteHTML(next) : "", e.entryKey, report.photoCaptions), isLabel: false });
         });
         return groupBlocks;
       });
@@ -2774,12 +2809,12 @@ const buildReportHTML = (report) => {
   const progressHTML = report.includeSummary
     ? h("div", { style: "display:flex;align-items:center;gap:16px;margin-bottom:56px;" },
         h("div", { style: "flex:1;min-width:0;" },
-          h("p", { style: "font-size:13px;font-weight:600;color:#0a1629;margin:0 0 8px;" }, `${completed} of ${total} tasks complete`),
+          h("p", { style: `font-family:${SERIF};font-size:13px;font-weight:600;color:#0a1629;margin:0 0 8px;` }, `${completed} of ${total} tasks complete`),
           h("div", { style: "height:6px;background:#e8e8e6;border-radius:99px;overflow:hidden;" },
             h("div", { style: `width:${pct}%;height:100%;background:#16a97d;border-radius:99px;` }, "")
           )
         ),
-        h("span", { style: "font-size:28px;font-weight:700;font-style:italic;color:#0a1629;flex-shrink:0;line-height:1;" }, `${pct}%`)
+        h("span", { style: `font-family:${SERIF};font-size:28px;font-weight:700;font-style:italic;color:#0a1629;flex-shrink:0;line-height:1;` }, `${pct}%`)
       )
     : "";
 
@@ -2790,12 +2825,12 @@ const buildReportHTML = (report) => {
   const targetRowHTML =
     h("div", { style: "display:flex;flex-wrap:nowrap;gap:24px;margin-top:16px;align-items:center;margin-bottom:24px;" },
       h("div", { style: "display:flex;align-items:center;gap:8px;" },
-        h("span", { style: "font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;" }, "Target Opening"),
-        report.targetOpening ? h("span", { style: "font-size:12px;font-weight:600;text-transform:uppercase;color:#0a1629;" }, report.targetOpening) : ""
+        h("span", { style: `font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;` }, "Target Opening"),
+        report.targetOpening ? h("span", { style: `font-family:${SANS};font-size:12px;font-weight:600;text-transform:uppercase;color:#0a1629;` }, report.targetOpening) : ""
       ),
       h("div", { style: "display:flex;align-items:center;gap:8px;" },
-        h("span", { style: "font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;" }, "Prepared For"),
-        report.clientName ? h("span", { style: "font-size:12px;font-weight:600;text-transform:uppercase;color:#0a1629;" }, report.clientName) : ""
+        h("span", { style: `font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;` }, "Prepared For"),
+        report.clientName ? h("span", { style: `font-family:${SANS};font-size:12px;font-weight:600;text-transform:uppercase;color:#0a1629;` }, report.clientName) : ""
       )
     ) +
     h("div", { style: "height:1px;background:#e8e8e6;margin:0 0 24px;" }, "");
@@ -2803,17 +2838,17 @@ const buildReportHTML = (report) => {
   const projectName = report.projectName || PROJECT_NAME;
   const address = report.address || PROJECT_ADDRESS;
   const summaryHTML = h("div", { style: "background:#f7f8fa;border-radius:8px;padding:16px;" },
-    report.summary ? h("p", { style: "font-size:14px;color:#303742;line-height:1.6;margin:0;" }, report.summary) : ""
+    report.summary ? h("p", { style: `font-family:${SERIF};font-size:14px;color:#303742;line-height:1.6;margin:0;` }, report.summary) : ""
   );
 
   const logoHTML = report.logo
     ? selfClose("img", { src: report.logo, alt: "Company logo", style: "display:block;max-width:100px;height:auto;" })
     : "";
   const companyNameHTML = report.companyName
-    ? h("p", { style: "font-size:14px;font-weight:700;color:#0a1629;margin:0 0 2px;" }, report.companyName)
+    ? h("p", { style: `font-family:${SANS};font-size:14px;font-weight:700;color:#0a1629;margin:0 0 2px;` }, report.companyName)
     : "";
   const companyAddressHTML = report.companyAddress
-    ? h("p", { style: "font-size:11px;font-weight:400;color:#828282;margin:0;" }, report.companyAddress)
+    ? h("p", { style: `font-family:${SANS};font-size:11px;font-weight:400;color:#828282;margin:0;` }, report.companyAddress)
     : "";
   const identityLeft = (logoHTML || companyNameHTML || companyAddressHTML)
     ? h("div", { style: "display:flex;align-items:center;gap:12px;" },
@@ -2824,10 +2859,10 @@ const buildReportHTML = (report) => {
   const identityRowHTML = h("div", { style: "display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;" },
     identityLeft,
     h("div", { style: "white-space:nowrap;margin-top:10px;" },
-      h("span", { style: "font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;line-height:1;" }, "VIA TASKTAG")
+      h("span", { style: `font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;line-height:1;` }, "VIA TASKTAG")
     )
   );
-  const updateLineHTML = h("p", { style: "font-size:12px;font-weight:600;text-transform:uppercase;color:#828282;margin:0 0 12px;" }, `Update No. ${report.version} \xB7 ${report.period}`);
+  const updateLineHTML = h("p", { style: `font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#6d5fd3;margin:0 0 12px;` }, `Update No. ${report.version} \xB7 ${report.period}`);
 
   // Full (page 1) vs. running (page 2+) header — mirrors renderFullHeader/
   // renderRunningHeader/renderCompanyIdentityRow exactly, each self-padded
@@ -2840,9 +2875,9 @@ const buildReportHTML = (report) => {
     h("div", { style: "height:1px;background:#e8e8e6;margin-bottom:20px;" }, "") +
     h("div", { style: "margin-bottom:24px;" },
       updateLineHTML,
-      h("div", { style: "display:flex;flex-direction:column;gap:4px;" },
-        h("h2", { style: "font-size:28px;font-weight:700;color:#0a1629;line-height:1;margin:0;" }, projectName),
-        h("p", { style: "font-size:13px;font-weight:400;color:#828282;line-height:1;margin:0;" }, address)
+      h("div", { style: "display:flex;flex-direction:column;gap:6px;" },
+        h("h2", { style: `font-family:${SERIF};font-size:32px;font-weight:700;color:#0a1629;line-height:1.1;margin:0;` }, projectName),
+        h("p", { style: `font-family:${SERIF};font-size:14px;font-weight:400;font-style:italic;color:#828282;line-height:1.2;margin:0;` }, address)
       )
     ) +
     summaryHTML +
@@ -2859,16 +2894,16 @@ const buildReportHTML = (report) => {
     h("div", { style: "display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;" },
       h("div", { style: "display:flex;align-items:center;gap:10px;" },
         h("div", { style: "width:36px;height:36px;border-radius:50%;background:#a85796;display:flex;align-items:center;justify-content:center;flex-shrink:0;" },
-          h("span", { style: "font-size:13px;font-weight:700;color:white;" }, initialsOf(POINT_OF_CONTACT_NAME))
+          h("span", { style: `font-family:${SANS};font-size:13px;font-weight:700;color:white;` }, initialsOf(POINT_OF_CONTACT_NAME))
         ),
         h("div", {},
-          h("p", { style: "font-size:11px;font-weight:600;color:#0a1629;line-height:1;margin:0 0 6px;" }, POINT_OF_CONTACT_NAME),
-          h("p", { style: "font-size:11px;font-weight:400;color:#828282;line-height:1;margin:0;" }, contactRoleLine)
+          h("p", { style: `font-family:${SANS};font-size:11px;font-weight:600;color:#0a1629;line-height:1;margin:0 0 6px;` }, POINT_OF_CONTACT_NAME),
+          h("p", { style: `font-family:${SANS};font-size:11px;font-weight:400;color:#828282;line-height:1;margin:0;` }, contactRoleLine)
         )
       ),
       h("div", { style: "text-align:right;" },
-        h("p", { style: "font-size:11px;color:#828282;line-height:1;margin:0 0 6px;" }, "Generated via TaskTag"),
-        h("p", { style: "font-size:11px;color:#828282;line-height:1;margin:0;" }, `Report ID: ${REPORT_ID}`)
+        h("p", { style: `font-family:${SANS};font-size:11px;color:#828282;line-height:1;margin:0 0 6px;` }, "Generated via TaskTag"),
+        h("p", { style: `font-family:${SANS};font-size:11px;color:#828282;line-height:1;margin:0;` }, `Report ID: ${REPORT_ID}`)
       )
     )
   );
@@ -2948,7 +2983,7 @@ const buildReportHTML = (report) => {
   // doesn't fill the full min-height just leaves the footer sitting right
   // after the last block, with the page's remaining empty space stranded
   // below the footer instead of above it.
-  const css = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;background:#f7f8fa;min-height:100vh;padding:32px 24px}.card{background:white;border:1px solid #e8e8e6;border-radius:12px;overflow:hidden;width:${PAGE_W}px;min-height:${PAGE_H}px;margin:0 auto;display:flex;flex-direction:column}.card+.card{margin-top:24px}.card__body{padding:0 ${PAGE_PAD}px;flex:1}`;
+  const css = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:${SERIF};background:#f7f8fa;min-height:100vh;padding:32px 24px}.card{background:white;border:1px solid #e8e8e6;border-radius:12px;overflow:hidden;width:${PAGE_W}px;min-height:${PAGE_H}px;margin:0 auto;display:flex;flex-direction:column}.card+.card{margin-top:24px}.card__body{padding:0 ${PAGE_PAD}px;flex:1}`;
 
   const cardsHTML = pages.map((pageBlocks, pi) =>
     h("div", { class: "card", style: "box-shadow:0 1px 3px rgba(10,22,41,0.08);" },
@@ -2964,6 +2999,9 @@ const buildReportHTML = (report) => {
       h("head", {},
         selfClose("meta", { charset: "UTF-8" }),
         h("title", {}, `${title} – ${report.period}`),
+        selfClose("link", { rel: "preconnect", href: "https://fonts.googleapis.com" }),
+        selfClose("link", { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "" }),
+        selfClose("link", { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400;1,600;1,700&display=swap" }),
         h("style", {}, css)
       ),
       h("body", {}, cardsHTML)
@@ -3912,12 +3950,12 @@ function ReportsTab({ demoCase }) {
 
   const handlePreviewDownload = () => {
     if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to export"); return; }
-    handleDownload({ includeSummary: preview.includeSummary, period: preview.period, version: preview.version, data: { ...previewData, groups: previewFinalGroups } });
+    handleDownload({ includeSummary: preview.includeSummary, period: preview.period, version: preview.version, data: { ...previewData, groups: previewFinalGroups }, photoCaptions: preview.photoCaptions });
   };
 
   const handlePreviewCopy = async () => {
     if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to export"); return; }
-    await handleCopy({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, version: preview.version, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides });
+    await handleCopy({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, version: preview.version, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides, photoCaptions: preview.photoCaptions });
     setPreviewCopied(true);
     setTimeout(() => setPreviewCopied(false), 2000);
   };
@@ -3941,7 +3979,7 @@ function ReportsTab({ demoCase }) {
         showToast("error", "Save failed. Try again.");
         return;
       }
-      pushReport({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, version: preview.version, data: { ...previewData, groups: finalGroups }, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides, projectName: preview.projectName, address: preview.address, logo: preview.logo, companyName: preview.companyName, companyAddress: preview.companyAddress, summary: preview.summary, targetOpening: preview.targetOpening, clientName: preview.clientName });
+      pushReport({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, version: preview.version, data: { ...previewData, groups: finalGroups }, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides, photoCaptions: preview.photoCaptions, projectName: preview.projectName, address: preview.address, logo: preview.logo, companyName: preview.companyName, companyAddress: preview.companyAddress, summary: preview.summary, targetOpening: preview.targetOpening, clientName: preview.clientName });
       setDateRange("since_last");
       setSaving(false);
       showToast("success", "Report saved");
@@ -4006,6 +4044,13 @@ function ReportsTab({ demoCase }) {
     // too or the shared link would silently revert to the original name.
     if (report.titleOverrides && Object.keys(report.titleOverrides).some(k => report.titleOverrides[k]?.trim())) {
       params.set("titles", JSON.stringify(report.titleOverrides));
+    }
+    // Same reasoning again — photo captions live only in this report's
+    // draft/saved state, not in DUMMY_ENTRIES, so without this the shared
+    // link would render every photo caption-less even where the
+    // downloaded HTML shows them.
+    if (report.photoCaptions && Object.keys(report.photoCaptions).some(k => report.photoCaptions[k]?.trim())) {
+      params.set("captions", JSON.stringify(report.photoCaptions));
     }
     // Header identity/summary fields — plain short strings, safe to carry
     // in the URL so the shared link renders the same document as the
@@ -4714,16 +4759,19 @@ function ReportPaywall() {
 // period, included sections, excluded photos, and any manually-added
 // notes) — rebuilt on the fly rather than fetched from storage, so a
 // shared link works on any device/browser and can never 404.
-function ReportPage({ dateRange, period, version, includeSummary, includeNoPhotoTasks, notesParam, excludedParam, titlesParam, projectName, address, logo, companyName, companyAddress, summaryText, targetOpening, clientName }) {
+function ReportPage({ dateRange, period, version, includeSummary, includeNoPhotoTasks, notesParam, excludedParam, titlesParam, captionsParam, projectName, address, logo, companyName, companyAddress, summaryText, targetOpening, clientName }) {
   let data = buildReportData(dateRange, period, null, includeNoPhotoTasks);
   let groups = data.groups;
+  // Always runs (even with nothing excluded) — this is what embeds each
+  // entry's entryKey, which the caption lookup below (and this same call
+  // everywhere else it's made) reads instead of a position recomputed
+  // after titles/notes have reshuffled g.entries.
+  const excludedPhotos = {};
   if (excludedParam) {
-    try {
-      const excludedPhotos = {};
-      JSON.parse(excludedParam).forEach(k => { excludedPhotos[k] = true; });
-      groups = applyPhotoExclusions(groups, excludedPhotos);
-    } catch { /* malformed/tampered param — ignore */ }
+    try { JSON.parse(excludedParam).forEach(k => { excludedPhotos[k] = true; }); }
+    catch { /* malformed/tampered param — ignore */ }
   }
+  groups = applyPhotoExclusions(groups, excludedPhotos);
   if (titlesParam) {
     try {
       const titleOverrides = JSON.parse(titlesParam);
@@ -4736,8 +4784,13 @@ function ReportPage({ dateRange, period, version, includeSummary, includeNoPhoto
       groups = applyExtraNotesToGroups(groups, extraNotes);
     } catch { /* malformed/tampered param — ignore */ }
   }
+  let photoCaptions;
+  if (captionsParam) {
+    try { photoCaptions = JSON.parse(captionsParam); }
+    catch { /* malformed/tampered param — ignore */ }
+  }
   data = { ...data, groups };
-  const html = buildReportHTML({ includeSummary, period, version, data, projectName, address, logo, companyName, companyAddress, summary: summaryText, targetOpening, clientName });
+  const html = buildReportHTML({ includeSummary, period, version, data, projectName, address, logo, companyName, companyAddress, summary: summaryText, targetOpening, clientName, photoCaptions });
 
   return (
     <iframe
@@ -4763,6 +4816,7 @@ export default function ProjectDetail() {
       notesParam={params.get("notes")}
       excludedParam={params.get("excluded")}
       titlesParam={params.get("titles")}
+      captionsParam={params.get("captions")}
       projectName={params.get("projectName")}
       address={params.get("address")}
       logo={params.get("logo")}
