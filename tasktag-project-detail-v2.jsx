@@ -3943,11 +3943,14 @@ function ReportsTab({ demoCase }) {
       }
       pushReport({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, version: preview.version, data: { ...previewData, groups: finalGroups }, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides, projectName: preview.projectName, address: preview.address, logo: preview.logo, companyName: preview.companyName, companyAddress: preview.companyAddress, summary: preview.summary, targetOpening: preview.targetOpening, clientName: preview.clientName });
       setDateRange("since_last");
-      setPreviewSaved(true);
-      setActiveEditField(null);
       setSaving(false);
-      setSelectedPhotos({});
       showToast("success", "Report saved");
+      // Straight back to the reports table — Download/Copy link for this
+      // report are already one click away from its row there, so there's
+      // no reason to detour through the locked read-only preview chrome
+      // first (closePreview resets previewSaved/activeEditField/
+      // selectedPhotos/etc. along with actually closing the modal).
+      closePreview();
     }, 900);
   };
 
