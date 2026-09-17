@@ -1415,7 +1415,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
                         if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); onCaptionChange(i, captionStartRef.current); setOpenCaptionIdx(null); }
                       }}
                       placeholder="Add a caption"
-                      style={{ fontSize: 12, height: 32, padding: "0 36px 0 10px" }}
+                      style={{ fontSize: 12, height: 32, padding: "0 36px 0 10px", textAlign: "center" }}
                     />
                     {/* Caption already auto-saves on every keystroke — this
                         button is just a "done" affordance (closes the
