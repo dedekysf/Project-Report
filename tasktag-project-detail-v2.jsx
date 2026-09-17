@@ -1417,7 +1417,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
                         if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); onCaptionChange(i, captionStartRef.current); setOpenCaptionIdx(null); }
                       }}
                       placeholder="Add a caption"
-                      style={{ fontSize: 12, height: 32, padding: "0 36px 0 10px", textAlign: "center" }}
+                      style={{ fontSize: 12, height: 32, padding: "0 36px 0 10px" }}
                     />
                     {/* Caption already auto-saves on every keystroke — this
                         button is just a "done" affordance (closes the
@@ -1446,7 +1446,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
             )}
           </div>
           {!isCapCell && caption && (
-            <p style={{ fontSize: 11, color: "var(--tt-grey06)", margin: "4px 0 4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            <p style={{ fontSize: 11, color: "var(--tt-grey06)", margin: "4px 0 4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "center" }}>
               {caption}
             </p>
           )}
@@ -1915,7 +1915,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
               }}
             >
               <StickyNote size={13} strokeWidth={2} style={{ flexShrink: 0 }} />
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{caption || "Add caption"}</span>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{caption || "Add caption"}</span>
             </button>
           )}
         </div>
