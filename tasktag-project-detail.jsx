@@ -1869,19 +1869,34 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
           padding: "20px 24px 18px", background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent)",
         }}>
           {captionEditing ? (
-            <Input
-              autoFocus
-              value={caption || ""}
-              onChange={ev => onCaptionChange && onCaptionChange(originalIdx, ev.target.value)}
-              onKeyDown={ev => {
-                if (ev.key === "Enter") { ev.preventDefault(); setCaptionEditing(false); }
-                if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); onCaptionChange && onCaptionChange(originalIdx, captionStartRef.current); setCaptionEditing(false); }
-              }}
-              onBlur={() => setCaptionEditing(false)}
-              placeholder="Add a caption"
-              className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus-visible:border-white/40"
-              style={{ width: "100%", maxWidth: 480, height: 34 }}
-            />
+            <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", maxWidth: 480 }}>
+              <Input
+                autoFocus
+                value={caption || ""}
+                onChange={ev => onCaptionChange && onCaptionChange(originalIdx, ev.target.value)}
+                onKeyDown={ev => {
+                  if (ev.key === "Enter") { ev.preventDefault(); setCaptionEditing(false); }
+                  if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); onCaptionChange && onCaptionChange(originalIdx, captionStartRef.current); setCaptionEditing(false); }
+                }}
+                placeholder="Add a caption"
+                className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus-visible:border-white/40"
+                style={{ flex: 1, height: 34 }}
+              />
+              <button
+                onMouseDown={ev => ev.preventDefault()}
+                onClick={() => setCaptionEditing(false)}
+                style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, border: "none", background: "var(--tt-secondary)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+              >
+                <Check size={14} strokeWidth={SW} />
+              </button>
+              <button
+                onMouseDown={ev => ev.preventDefault()}
+                onClick={() => { onCaptionChange && onCaptionChange(originalIdx, captionStartRef.current); setCaptionEditing(false); }}
+                style={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, border: "none", background: "rgba(255,255,255,0.15)", color: "white", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+              >
+                <X size={14} strokeWidth={SW} />
+              </button>
+            </div>
           ) : (
             <button
               onClick={() => { captionStartRef.current = caption || ""; setCaptionEditing(true); }}
