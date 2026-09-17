@@ -1382,7 +1382,15 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
                 +{remaining} more
               </button>
             )}
-            {openCaptionIdx === i && (
+            {openCaptionIdx === i && createPortal(
+              // Portaled straight to <body> — pages after the first have
+              // contentVisibility:auto (see visiblePages), which (like a
+              // transform) makes that page div a containing block for its
+              // position:fixed descendants. Left in place, this popover's
+              // computed top/left (real viewport coordinates from
+              // getBoundingClientRect) would land relative to that page's
+              // own box instead of the viewport, landing in the wrong
+              // spot on every page but the first.
               <div ref={captionPopoverRef} style={{ position: "fixed", top: captionPos.top, left: captionPos.left, zIndex: 300, width: 240 }}>
                 <div style={{ position: "absolute", top: -5, left: 12, width: 10, height: 10, background: "white", border: "1px solid var(--tt-grey03)", borderRight: "none", borderBottom: "none", transform: "rotate(45deg)" }} />
                 <div style={{ position: "relative", background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, padding: 8, boxShadow: "0 8px 24px rgba(10,22,41,0.16)" }}>
@@ -1424,7 +1432,8 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
                     </button>
                   </div>
                 </div>
-              </div>
+              </div>,
+              document.body
             )}
           </div>
           {!isCapCell && caption && (
@@ -2873,10 +2882,21 @@ function ReportsTab({ demoCase }) {
         if (!e.noPhotos) {
           const includedCount = (e.photos || []).filter((_, pi) => !(preview.excludedPhotos && preview.excludedPhotos[`${entryKey}_${pi}`])).length;
           const revealed = expandedPhotoGroups[entryKey] || 0;
+          // `revealed` only tracks how many times "+N more" was clicked —
+          // if photos were later unchecked via the manage-photos modal,
+          // includedCount can shrink enough that fewer chunks are actually
+          // needed than were revealed. Collect the chunks that still exist
+          // first, so `isTip` (which decides which one carries the
+          // trailing 40px gap) lands on the one that's really last, not
+          // whichever one happens to match the stale click count.
+          const chunkNums = [];
           for (let chunk = 1; chunk <= revealed; chunk++) {
             if (chunk * PHOTO_GRID_CAP >= includedCount) break;
-            flatBlocks.push({ type: "photoContinuation", key: `${entryKey}_cont${chunk}`, entryKey, e, chunk, isTip: chunk === revealed });
+            chunkNums.push(chunk);
           }
+          chunkNums.forEach((chunk, idx) => {
+            flatBlocks.push({ type: "photoContinuation", key: `${entryKey}_cont${chunk}`, entryKey, e, chunk, isTip: idx === chunkNums.length - 1 });
+          });
         }
       });
     });
@@ -2953,8 +2973,11 @@ function ReportsTab({ demoCase }) {
     // Once any photos have been revealed via "+N more", they exist as
     // their own continuation block(s) right after this one (see
     // flatBlocks) — so this block's own trailing gap moves to whichever
-    // one is currently last instead of doubling up here too.
-    const hasRevealedContinuation = (expandedPhotoGroups[entryKey] || 0) > 0;
+    // one is currently last instead of doubling up here too. Also checks
+    // there's actually enough left to form that first chunk — photos
+    // unchecked afterward via the manage-photos modal can leave a stale
+    // "revealed" count with nothing left for it to reveal.
+    const hasRevealedContinuation = (expandedPhotoGroups[entryKey] || 0) > 0 && visiblePhotoCount > PHOTO_GRID_CAP;
     return (
       <div style={{ marginBottom: hasRevealedContinuation ? 0 : 40 }}>
         {/* Renaming here only overrides the title for this report — the
