@@ -1934,7 +1934,6 @@ const DUMMY_ENTRIES = [
   // something to demo without needing a specific date range.
   {
     date: "2026-09-10", note: "Flooring installation started on the ground floor.",
-    updateSummary: "Old flooring fully removed and subfloor leveled. New hardwood planks are being laid in the living room and hallway.",
     checklist: [
       { text: "Remove old flooring throughout the ground floor" },
       { text: "Level and inspect subfloor for damage" },
@@ -2377,7 +2376,6 @@ const buildReportHTML = (report) => {
     const dividerHTML = h("div", { style: "height:1px;background:#e8e8e6;margin-top:16px;" }, "");
     const checklistHTML = (e.checklist && e.checklist.length > 0)
       ? h("div", { style: "margin-top:16px;" },
-          e.updateSummary ? h("p", { style: "font-size:13px;color:#303742;line-height:1.5;margin:0 0 12px;" }, e.updateSummary) : "",
           h("p", { style: "font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;margin:0 0 8px;" }, "Completed this update"),
           h("div", { style: "display:flex;flex-direction:column;gap:6px;" },
             ...e.checklist.map(item =>
@@ -3082,11 +3080,6 @@ function ReportsTab({ demoCase }) {
         <div style={{ height: 1, background: "var(--tt-grey03)", marginTop: 16 }} />
         {e.checklist && e.checklist.length > 0 && (
           <div style={{ marginTop: 16 }}>
-            {e.updateSummary && (
-              <p style={{ fontSize: 13, color: "var(--tt-text-2)", lineHeight: 1.5, margin: "0 0 12px" }}>
-                {e.updateSummary}
-              </p>
-            )}
             <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "0 0 8px" }}>
               Completed this update
             </p>
