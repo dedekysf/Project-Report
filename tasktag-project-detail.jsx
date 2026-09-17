@@ -2621,7 +2621,7 @@ const buildReportHTML = (report) => {
             ...e.checklist.slice(-5).map(item =>
               h("div", { style: "display:flex;align-items:center;gap:8px;" },
                 h("span", { style: "flex-shrink:0;color:#16a97d;font-size:13px;font-weight:700;" }, "✓"),
-                h("span", { style: "font-size:13px;color:#828282;" }, item.text)
+                h("span", { style: "font-size:13px;color:#303742;" }, item.text)
               )
             )
           )
@@ -3327,7 +3327,7 @@ function ReportsTab({ demoCase }) {
               {e.checklist.slice(-5).map((item, idx) => (
                 <div key={idx} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <Check size={14} strokeWidth={SW} color="var(--tt-secondary)" style={{ flexShrink: 0 }} />
-                  <span style={{ fontSize: 13, color: "var(--tt-grey05)" }}>
+                  <span style={{ fontSize: 13, color: "var(--tt-text-2)" }}>
                     {item.text}
                   </span>
                 </div>
