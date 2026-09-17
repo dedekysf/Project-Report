@@ -1610,7 +1610,7 @@ function LightboxIconBtn({ label, onClick, disabled, children }) {
   );
 }
 
-function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onClose, onDeleteSelected }) {
+function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalIndices, captions, onCaptionChange, onIndexChange, onClose, onDeleteSelected }) {
   const [rotation, setRotation] = useState(0);
   const [zoom, setZoom] = useState(100);
   const [showFileDetails, setShowFileDetails] = useState(false);
@@ -1666,6 +1666,12 @@ function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onCl
     : "";
   const fileName = entryDate ? `${entryDate.replace(/-/g, "")}-${String(index + 1).padStart(2, "0")}.jpg` : `photo-${index + 1}.jpg`;
   const fileSizeKb = 140 + (hash % 260);
+  // `index` is a position in this filmstrip's own (possibly filtered)
+  // photo list — originalIndices maps it back to the entry's real photo
+  // index, the same one captions/excludedPhotos are keyed by everywhere
+  // else (see PhotoGrid).
+  const originalIdx = originalIndices ? originalIndices[index] : index;
+  const caption = captions && captions[`${entryKey}_${originalIdx}`];
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 5000, background: "black", display: "flex", flexDirection: "column" }}>
@@ -1809,6 +1815,19 @@ function PhotoLightbox({ photos, index, entryDate, taskName, onIndexChange, onCl
             </button>
           </div>
         )}
+      </div>
+
+      {/* Caption — sits directly above the filmstrip, editing the currently
+          viewed photo's caption. Auto-saves on every keystroke, same as
+          the grid's own caption popover (no separate draft/confirm step);
+          this is just a permanently-open version of that same input. */}
+      <div style={{ padding: "12px 20px", flexShrink: 0, background: "var(--tt-grey06)", borderTop: "1px solid rgba(255,255,255,0.12)" }}>
+        <Input
+          value={caption || ""}
+          onChange={ev => onCaptionChange && onCaptionChange(originalIdx, ev.target.value)}
+          placeholder="Add a caption"
+          style={{ maxWidth: 480, margin: "0 auto", display: "block" }}
+        />
       </div>
 
       {/* Filmstrip — shown even for a single photo, not just when there's
@@ -4482,6 +4501,10 @@ function ReportsTab({ demoCase }) {
           index={lightbox.index}
           entryDate={lightbox.entryDate}
           taskName={lightbox.taskName}
+          entryKey={lightbox.entryKey}
+          originalIndices={lightbox.originalIndices}
+          captions={preview.photoCaptions}
+          onCaptionChange={previewSaved ? undefined : (idx, text) => setPhotoCaption(lightbox.entryKey, idx, text)}
           onIndexChange={i => setLightbox(lb => ({ ...lb, index: i }))}
           onClose={() => setLightbox(null)}
           onDeleteSelected={(indices) => {
