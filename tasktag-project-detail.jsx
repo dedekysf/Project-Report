@@ -2706,7 +2706,7 @@ const buildReportHTML = (report) => {
       );
     }).filter(Boolean);
     if (cells.length === 0) return "";
-    return h("div", { style: "display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px;" }, ...cells);
+    return h("div", { style: "display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:16px;" }, ...cells);
   };
 
   const groupLabel = (g) => formatGroupLabel(g, grouping);
@@ -2722,7 +2722,7 @@ const buildReportHTML = (report) => {
   // marginBottom:24 rendered as a 24px gap instead of 8px; nesting it
   // avoids that collapse entirely and gives each gap its exact value.
   const noteHTML = (note) =>
-    h("div", { style: "margin-top:8px;" },
+    h("div", { style: "margin-top:16px;" },
       h("p", { style: `font-family:${SERIF};font-size:12px;color:#303742;line-height:1.5;margin:0;` }, note.note)
     );
 
@@ -2751,9 +2751,9 @@ const buildReportHTML = (report) => {
         : "");
     // Same divider the live view always shows now (see renderEntryBlock) —
     // the checklist (if any) and/or the attached note both sit below it.
-    const dividerHTML = h("div", { style: "height:1px;background:#e8e8e6;margin-top:16px;" }, "");
+    const dividerHTML = h("div", { style: "height:1px;background:#e8e8e6;margin-top:20px;" }, "");
     const checklistHTML = (e.checklist && e.checklist.length > 0)
-      ? h("div", { style: "margin-top:16px;" },
+      ? h("div", { style: "margin-top:20px;" },
           h("p", { style: `font-family:${SANS};font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;margin:0 0 8px;` }, "Completed this update"),
           h("div", { style: "display:flex;flex-direction:column;gap:6px;" },
             // Only the last 5 — same cap the live view applies.
@@ -2766,13 +2766,13 @@ const buildReportHTML = (report) => {
           )
         )
       : "";
-    return h("div", { style: "margin-bottom:40px;" },
+    return h("div", { style: "margin-bottom:48px;" },
       h("p", { style: `font-family:${SERIF};font-size:20px;font-weight:700;color:#0a1629;line-height:1.35;margin:0;` }, e.note),
       h("div", { style: "margin-top:6px;" }, metaLine),
       dividerHTML,
       checklistHTML,
-      e.noPhotos ? "" : renderPhotos(e.photos, entryKey, captions, e.photoOriginalIndices),
-      attachedNoteHTML || ""
+      attachedNoteHTML || "",
+      e.noPhotos ? "" : renderPhotos(e.photos, entryKey, captions, e.photoOriginalIndices)
     );
   };
 
@@ -2807,7 +2807,7 @@ const buildReportHTML = (report) => {
   const progressHTML = report.includeSummary
     ? h("div", { style: "display:flex;align-items:center;gap:16px;margin-bottom:56px;" },
         h("div", { style: "flex:1;min-width:0;" },
-          h("p", { style: `font-family:${SERIF};font-size:13px;font-weight:600;color:#0a1629;margin:0 0 8px;` }, `${completed} of ${total} tasks complete`),
+          h("p", { style: `font-family:${SANS};font-size:13px;font-weight:600;color:#0a1629;margin:0 0 8px;` }, `${completed} of ${total} tasks complete`),
           h("div", { style: "height:6px;background:#e8e8e6;border-radius:99px;overflow:hidden;" },
             h("div", { style: `width:${pct}%;height:100%;background:#16a97d;border-radius:99px;` }, "")
           )
@@ -2860,7 +2860,7 @@ const buildReportHTML = (report) => {
       h("span", { style: `font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;line-height:1;` }, "VIA TASKTAG")
     )
   );
-  const updateLineHTML = h("p", { style: `font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#6d5fd3;margin:0 0 12px;` }, `Update No. ${report.version} \xB7 ${report.period}`);
+  const updateLineHTML = h("p", { style: `font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#303742;margin:0 0 12px;` }, `Update No. ${report.version} \xB7 ${report.period}`);
 
   // Full (page 1) vs. running (page 2+) header — mirrors renderFullHeader/
   // renderRunningHeader/renderCompanyIdentityRow exactly, each self-padded
@@ -2870,8 +2870,8 @@ const buildReportHTML = (report) => {
   // directly in that page's own card.
   const fullHeaderHTML = h("div", { style: `padding:${PAGE_PAD}px ${PAGE_PAD}px 0;` },
     identityRowHTML +
-    h("div", { style: "height:1px;background:#e8e8e6;margin-bottom:20px;" }, "") +
-    h("div", { style: "margin-bottom:24px;" },
+    h("div", { style: "height:1px;background:#e8e8e6;margin-bottom:24px;" }, "") +
+    h("div", { style: "margin-bottom:32px;" },
       updateLineHTML,
       h("div", { style: "display:flex;flex-direction:column;gap:6px;" },
         h("h2", { style: `font-family:${SERIF};font-size:32px;font-weight:700;color:#0a1629;line-height:1.1;margin:0;` }, projectName),
