@@ -1870,19 +1870,18 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
           position: "absolute", left: 0, right: 0, bottom: 0, display: "flex", justifyContent: "center",
           padding: "20px 24px 18px", background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent)",
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", maxWidth: 480 }}>
-            <StickyNote size={14} strokeWidth={2} color="rgba(255,255,255,0.55)" style={{ flexShrink: 0 }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <EditableField
-                key={originalIdx}
-                fieldId={`lightbox_caption_${entryKey}_${originalIdx}`}
-                value={caption || ""}
-                placeholder="Add caption"
-                alwaysEditing
-                onSave={v => onCaptionChange && onCaptionChange(originalIdx, v)}
-                inputStyle={{ fontSize: 12, height: 40 }}
-              />
-            </div>
+          <div style={{ position: "relative", width: "100%", maxWidth: 480 }}>
+            <StickyNote size={14} strokeWidth={2} color="rgba(255,255,255,0.6)" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", zIndex: 1 }} />
+            <EditableField
+              key={originalIdx}
+              fieldId={`lightbox_caption_${entryKey}_${originalIdx}`}
+              value={caption || ""}
+              placeholder="Add caption"
+              alwaysEditing
+              onSave={v => onCaptionChange && onCaptionChange(originalIdx, v)}
+              inputStyle={{ fontSize: 12, height: 40, paddingLeft: 30 }}
+              textStyle={{ display: "inline-block", width: "auto", color: "white", paddingLeft: 22, textShadow: "0 1px 3px rgba(0,0,0,0.6)" }}
+            />
           </div>
         </div>
       </div>
