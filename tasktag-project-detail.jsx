@@ -12,7 +12,7 @@ import {
   Activity, Users, BarChart2, SlidersHorizontal,
   ArrowUpDown, Calendar, AlignJustify, Clock,
   UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, Crown, AlertTriangle,
-  RotateCw, ZoomIn, ZoomOut, Folder, ArrowLeft, ArrowRight, Info, PencilLine,
+  RotateCw, ZoomIn, ZoomOut, Folder, ArrowLeft, ArrowRight, Info, StickyNote,
   ExternalLink, Forward,
 } from "lucide-react";
 
@@ -1364,7 +1364,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
                   zIndex: 2,
                 }}
               >
-                <PencilLine size={11} color="var(--tt-grey06)" strokeWidth={2.25} />
+                <StickyNote size={11} color="var(--tt-grey06)" strokeWidth={2.25} />
               </button>
             )}
             {canOpen && (
@@ -1906,7 +1906,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
                 fontSize: 13, fontWeight: 500, textShadow: "0 1px 3px rgba(0,0,0,0.6)",
               }}
             >
-              <PencilLine size={13} strokeWidth={2} style={{ flexShrink: 0 }} />
+              <StickyNote size={13} strokeWidth={2} style={{ flexShrink: 0 }} />
               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{caption || "Add caption"}</span>
             </button>
           )}
