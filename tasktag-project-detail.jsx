@@ -2015,14 +2015,11 @@ function formatGroupLabel(g, grouping) {
     const [y, m, d] = g.key.split("-").map(Number);
     const mon = new Date(y, m - 1, d);
     const fmt = dt => dt.toLocaleDateString("en-US", { month: "short", day: "numeric" }).toLowerCase();
-    const tp = g.entries.reduce((s, e) => s + e.photos.length, 0);
-    return `week of ${fmt(mon)} \xB7 ${tp} photo${tp !== 1 ? "s" : ""}`;
+    return `week of ${fmt(mon)}`;
   }
   if (grouping === "month") {
     const [y, m] = g.key.split("-").map(Number);
-    const label = new Date(y, m - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" }).toLowerCase();
-    const tp = g.entries.reduce((s, e) => s + e.photos.length, 0);
-    return `${label} \xB7 ${tp} photo${tp !== 1 ? "s" : ""}`;
+    return new Date(y, m - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" }).toLowerCase();
   }
   const [y, m, d] = g.key.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString("en-US", { day: "numeric", month: "short" }).toUpperCase();
@@ -2337,7 +2334,7 @@ const buildReportHTML = (report) => {
     : groups.flatMap(g => {
         const groupBlocks = [];
         if (grouping !== "day") {
-          groupBlocks.push(h("p", { style: "font-size:11px;font-weight:600;color:#828282;letter-spacing:.06em;text-transform:uppercase;padding:8px 0;margin:0;" }, groupLabel(g).toUpperCase()));
+          groupBlocks.push(h("p", { style: "font-size:18px;font-weight:600;color:#828282;text-transform:uppercase;padding:8px 0;margin:0;" }, groupLabel(g).toUpperCase()));
         }
         g.entries.forEach((e, i) => {
           if (e.isNote) return;
@@ -2873,11 +2870,21 @@ function ReportsTab({ demoCase }) {
     );
   };
 
-  const renderGroupLabelBlock = (g) => (
-    <p style={{ fontSize: 11, fontWeight: 600, color: "var(--tt-grey05)", letterSpacing: "0.06em", textTransform: "uppercase", padding: "8px 0", margin: 0 }}>
-      {formatGroupLabel(g, previewData.grouping).toUpperCase()}
-    </p>
-  );
+  // Week/month sections read as proper section titles (18px); day sections
+  // stay a small uppercase date badge — formatGroupLabel already drops the
+  // photo count for week/month, this just covers the type scale.
+  const renderGroupLabelBlock = (g) => {
+    const grouping = previewData.grouping;
+    const isPeriodSection = grouping === "week" || grouping === "month";
+    return (
+      <p style={isPeriodSection
+        ? { fontSize: 18, fontWeight: 600, color: "var(--tt-grey05)", textTransform: "uppercase", padding: "8px 0", margin: 0 }
+        : { fontSize: 11, fontWeight: 600, color: "var(--tt-grey05)", letterSpacing: "0.06em", textTransform: "uppercase", padding: "8px 0", margin: 0 }
+      }>
+        {formatGroupLabel(g, grouping).toUpperCase()}
+      </p>
+    );
+  };
 
   const renderEntryBlock = ({ entryKey, e }) => {
     const displayTitle = titleOverrides[entryKey] ?? e.note;
