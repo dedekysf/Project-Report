@@ -2768,8 +2768,8 @@ const buildReportHTML = (report) => {
     const dividerHTML = h("div", { style: "height:1px;background:#e8e8e6;margin-top:20px;" }, "");
     const checklistHTML = (e.checklist && e.checklist.length > 0)
       ? h("div", { style: "margin-top:20px;" },
-          h("p", { style: `font-family:${SANS};font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;margin:0 0 8px;` }, "Completed this update"),
-          h("div", { style: "display:flex;flex-direction:column;gap:8px;" },
+          h("p", { style: `font-family:${SANS};font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;margin:0 0 12px;` }, "Completed this update"),
+          h("div", { style: "display:flex;flex-direction:column;gap:12px;" },
             // Only the last 5 — same cap the live view applies.
             ...e.checklist.slice(-5).map(item =>
               h("div", { style: "display:flex;align-items:center;gap:8px;" },
