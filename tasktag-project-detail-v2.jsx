@@ -1882,7 +1882,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
                   if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); onCaptionChange && onCaptionChange(originalIdx, captionStartRef.current); setCaptionEditing(false); }
                 }}
                 placeholder="Add a caption"
-                style={{ fontSize: 12, height: 40, padding: "0 76px 0 12px" }}
+                style={{ fontSize: 12, height: 40, padding: "0 76px 0 12px", textAlign: "center" }}
               />
               <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>
                 <button
