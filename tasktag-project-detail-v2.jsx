@@ -1214,6 +1214,11 @@ function PhotoThumb({ src, onClick }) {
   );
 }
 
+// Shared with ReportsTab's flatBlocks construction, which needs the same
+// chunk size to build continuation blocks for a "+N more" reveal.
+const PHOTO_GRID_COLS = 3;
+const PHOTO_GRID_CAP = PHOTO_GRID_COLS; // 1 row before "+N more"
+
 // Photo grid capped to 1 row of 3 — beyond that, the last visible cell
 // becomes a "+N more" overlay that expands the grid in place to show every
 // photo (no cap), rather than jumping into the lightbox. Each visible photo
@@ -1224,13 +1229,20 @@ function PhotoThumb({ src, onClick }) {
 // even after some are removed. An entry with zero visible photos renders
 // nothing.
 //
-// `expanded`/`onExpand` are lifted to the caller (ReportsTab) rather than
-// local state here — pagination repacks pages from a layoutDepsKey that
-// only reacts to shared/lifted state, and the hidden measuring scaffold
-// renders this same component from that same state. Local state would let
-// the visible page grow past the A4 boundary on "+N more" (the block's
-// real height changes, but pagination never finds out) while the
-// scaffold kept measuring the collapsed height.
+// `windowStart`/`windowEnd` (rather than a simple "expanded" boolean) are
+// what let "+N more" add a fresh, independent block instead of growing
+// this one — see renderPhotoContinuationBlock. A block with an open
+// windowEnd (undefined) shows up to PHOTO_GRID_CAP items starting at
+// windowStart and, if more remain beyond that, a "+N more" cell — same
+// cap logic the very first (unwindowed) block already used. A block with
+// a closed windowEnd just shows exactly that slice, with no cap cell,
+// because whatever comes after it already exists as the next block.
+// `onExpand` is called only from an open-ended block's cap cell, and is
+// owned by the caller (ReportsTab) rather than local state — pagination
+// repacks pages from a layoutDepsKey that only reacts to shared/lifted
+// state, and the hidden measuring scaffold renders this same component
+// from that same state, so a purely local "expanded" flag would grow the
+// visible page past the A4 boundary without pagination ever finding out.
 //
 // A second circle in the bottom-left corner (icon centered inside it, both
 // axes) is the caption trigger — hover-only, always, even once a caption
@@ -1238,10 +1250,7 @@ function PhotoThumb({ src, onClick }) {
 // off the trigger's own bounding rect (so it isn't clipped by the
 // grid/scroll container), with a single input for the caption text. Only
 // one popover is open at a time across the grid.
-function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, onToggleSelect, captions, onCaptionChange, expanded, onExpand }) {
-  const COLS = 3;
-  const ROWS = 1;
-  const CAP = COLS * ROWS; // 1 row of 3 before the last visible cell becomes "+N more"
+function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, onToggleSelect, captions, onCaptionChange, windowStart, windowEnd, onExpand }) {
   const [openCaptionIdx, setOpenCaptionIdx] = useState(null); // original photo index, or null
   const [captionPos, setCaptionPos] = useState({ top: 0, left: 0 });
   const captionTriggerRef = useRef(null); // the specific trigger button last clicked, for scroll repositioning
@@ -1283,8 +1292,20 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
 
   if (items.length === 0) return null;
 
-  const remaining = items.length - CAP;
-  const visibleItems = (expanded || remaining <= 0) ? items : items.slice(0, CAP);
+  // This block's slice of the full (post-exclusion) items — [0, all) for
+  // the plain/first block, [windowStart, windowEnd) for a bounded earlier
+  // continuation chunk, or [windowStart, all) for the current open-ended
+  // tip of the reveal chain (see the doc comment above).
+  const windowItems = windowEnd != null
+    ? items.slice(windowStart || 0, windowEnd)
+    : items.slice(windowStart || 0);
+  if (windowItems.length === 0) return null;
+
+  const remaining = windowItems.length - PHOTO_GRID_CAP;
+  const visibleItems = remaining <= 0 ? windowItems : windowItems.slice(0, PHOTO_GRID_CAP);
+  // Full entry's photos (not just this block's window) — the lightbox
+  // filmstrip should always offer every photo, regardless of which chunk
+  // was clicked into it.
   const visiblePhotoKeys = items.map(it => it.k);
   // Original (pre-filter) indices for each visible photo, in the same
   // order as visiblePhotoKeys — lets the lightbox map a filmstrip
@@ -1292,10 +1313,13 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
   const visibleOriginalIndices = items.map(it => it.i);
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: `repeat(${COLS},1fr)`, gap: 8, marginTop: 10 }}>
-      {visibleItems.map(({ k, i }, viewIdx) => {
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${PHOTO_GRID_COLS},1fr)`, gap: 8, marginTop: 10 }}>
+      {visibleItems.map(({ k, i }, viewIdxInWindow) => {
+        // Position within the FULL (unwindowed) items/visiblePhotoKeys
+        // array — what the lightbox filmstrip actually indexes by.
+        const viewIdx = (windowStart || 0) + viewIdxInWindow;
         const selected = !!(selectedPhotos && selectedPhotos[`${entryKey}_${i}`]);
-        const isCapCell = !expanded && remaining > 0 && viewIdx === visibleItems.length - 1;
+        const isCapCell = remaining > 0 && viewIdxInWindow === visibleItems.length - 1;
         const canOpen = !!(IMG_MAP[k] && onOpen) && !isCapCell;
         const caption = captions && captions[`${entryKey}_${i}`];
         return (
@@ -2576,7 +2600,7 @@ function ReportsTab({ demoCase }) {
   const [lightbox, setLightbox] = useState(null); // { photos, index, caption } | null — full-screen photo viewer
   const [selectedPhotos, setSelectedPhotos] = useState({}); // { [entryKey_photoIndex]: photoKey } — in-progress checkbox selection, not yet deleted
   const [photoManager, setPhotoManager] = useState(null); // { entryKey, photos, taskName } | null — full photo list modal for an over-the-cap task item
-  const [expandedPhotoGroups, setExpandedPhotoGroups] = useState({}); // { [entryKey]: true } — which PhotoGrids have had "+N more" clicked; lifted (not local to PhotoGrid) so pagination repacks when one expands
+  const [expandedPhotoGroups, setExpandedPhotoGroups] = useState({}); // { [entryKey]: revealedChunkCount } — how many extra "+N more" chunks are showing per entry; lifted (not local to PhotoGrid) so pagination repacks as each one is revealed
   const periodRef     = useRef(null);
   const chipRef       = useRef(null);
   // Fixed positioning so this dropdown isn't clipped by an ancestor's
@@ -2846,6 +2870,19 @@ function ReportsTab({ demoCase }) {
       g.entries.forEach((e, i) => {
         const entryKey = `${g.key}_${i}`;
         flatBlocks.push({ type: "entry", key: entryKey, entryKey, e });
+        // "+N more" reveals one row of photos at a time as its own,
+        // independent block (see renderPhotoContinuationBlock) rather than
+        // growing this entry's own block — that's what lets the extra rows
+        // flow onto a fresh page instead of dragging the whole entry down
+        // with them (see layoutDepsKey/expandedPhotoGroups below).
+        if (!e.noPhotos) {
+          const includedCount = (e.photos || []).filter((_, pi) => !(preview.excludedPhotos && preview.excludedPhotos[`${entryKey}_${pi}`])).length;
+          const revealed = expandedPhotoGroups[entryKey] || 0;
+          for (let chunk = 1; chunk <= revealed; chunk++) {
+            if (chunk * PHOTO_GRID_CAP >= includedCount) break;
+            flatBlocks.push({ type: "photoContinuation", key: `${entryKey}_cont${chunk}`, entryKey, e, chunk, isTip: chunk === revealed });
+          }
+        }
       });
     });
   }
@@ -2918,8 +2955,13 @@ function ReportsTab({ demoCase }) {
     const visiblePhotoCount = (e.photos || []).filter(
       (_, i) => !(preview.excludedPhotos && preview.excludedPhotos[`${entryKey}_${i}`])
     ).length;
+    // Once any photos have been revealed via "+N more", they exist as
+    // their own continuation block(s) right after this one (see
+    // flatBlocks) — so this block's own trailing gap moves to whichever
+    // one is currently last instead of doubling up here too.
+    const hasRevealedContinuation = (expandedPhotoGroups[entryKey] || 0) > 0;
     return (
-      <div style={{ marginBottom: 40 }}>
+      <div style={{ marginBottom: hasRevealedContinuation ? 0 : 40 }}>
         {/* Renaming here only overrides the title for this report — the
             original task/entry text is never modified. No pencil icon —
             hover shows the grey02 affordance, click edits. */}
@@ -2990,15 +3032,42 @@ function ReportsTab({ demoCase }) {
             onToggleSelect={previewSaved ? undefined : (idx, photoKey) => togglePhotoSelected(entryKey, idx, photoKey)}
             captions={preview.photoCaptions}
             onCaptionChange={previewSaved ? undefined : (idx, text) => setPhotoCaption(entryKey, idx, text)}
-            expanded={!!expandedPhotoGroups[entryKey]}
-            onExpand={() => setExpandedPhotoGroups(p => ({ ...p, [entryKey]: true }))}
+            windowEnd={hasRevealedContinuation ? PHOTO_GRID_CAP : undefined}
+            onExpand={() => setExpandedPhotoGroups(p => ({ ...p, [entryKey]: (p[entryKey] || 0) + 1 }))}
           />
         )}
       </div>
     );
   };
 
-  const renderBlock = (block) => block.type === "label" ? renderGroupLabelBlock(block.g) : renderEntryBlock(block);
+  // Renders one revealed "+N more" chunk as its own standalone block — see
+  // flatBlocks (which decides how many of these exist per entry) and
+  // PhotoGrid's own doc comment (which explains bounded vs. open-ended
+  // windows). No title/meta/note here; those only ever live on the
+  // entry's own (first) block.
+  const renderPhotoContinuationBlock = ({ entryKey, e, chunk, isTip }) => (
+    <div style={{ marginBottom: isTip ? 40 : 0 }}>
+      <PhotoGrid
+        photos={e.photos}
+        onOpen={(photos, idx, originalIndices) => setLightbox({ photos, index: idx, entryDate: e.date, taskName: titleOverrides[entryKey] ?? e.note, entryKey, originalIndices })}
+        excludedPhotos={preview.excludedPhotos}
+        entryKey={entryKey}
+        selectedPhotos={selectedPhotos}
+        onToggleSelect={previewSaved ? undefined : (idx, photoKey) => togglePhotoSelected(entryKey, idx, photoKey)}
+        captions={preview.photoCaptions}
+        onCaptionChange={previewSaved ? undefined : (idx, text) => setPhotoCaption(entryKey, idx, text)}
+        windowStart={chunk * PHOTO_GRID_CAP}
+        windowEnd={isTip ? undefined : (chunk + 1) * PHOTO_GRID_CAP}
+        onExpand={() => setExpandedPhotoGroups(p => ({ ...p, [entryKey]: (p[entryKey] || 0) + 1 }))}
+      />
+    </div>
+  );
+
+  const renderBlock = (block) => {
+    if (block.type === "label") return renderGroupLabelBlock(block.g);
+    if (block.type === "photoContinuation") return renderPhotoContinuationBlock(block);
+    return renderEntryBlock(block);
+  };
 
   // identity, summary + progress, and Target Opening/Prepared For.
   //
