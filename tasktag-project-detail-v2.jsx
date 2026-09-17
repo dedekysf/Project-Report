@@ -1822,14 +1822,20 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
       {/* Caption — sits directly above the filmstrip, editing the currently
           viewed photo's caption. Auto-saves on every keystroke, same as
           the grid's own caption popover (no separate draft/confirm step);
-          this is just a permanently-open version of that same input. */}
+          this is just a permanently-open version of that same input. Dark
+          themed (Input's own bg-white default reads jarring against the
+          rest of this chrome) to match the lightbox's own dark UI. */}
       <div style={{ padding: "12px 20px", flexShrink: 0, background: "var(--tt-grey06)", borderTop: "1px solid rgba(255,255,255,0.12)" }}>
-        <Input
-          value={caption || ""}
-          onChange={ev => onCaptionChange && onCaptionChange(originalIdx, ev.target.value)}
-          placeholder="Add a caption"
-          style={{ maxWidth: 480, margin: "0 auto", display: "block" }}
-        />
+        <div style={{ position: "relative", maxWidth: 480, margin: "0 auto" }}>
+          <MessageSquare size={14} strokeWidth={2} color="rgba(255,255,255,0.45)" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+          <Input
+            value={caption || ""}
+            onChange={ev => onCaptionChange && onCaptionChange(originalIdx, ev.target.value)}
+            placeholder="Add a caption"
+            className="bg-white/10 border-white/15 text-white placeholder:text-white/40 focus-visible:border-white/40"
+            style={{ paddingLeft: 34 }}
+          />
+        </div>
       </div>
 
       {/* Filmstrip — shown even for a single photo, not just when there's
