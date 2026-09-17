@@ -1620,8 +1620,10 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
   const [selectedFilmstrip, setSelectedFilmstrip] = useState({}); // { [photoIndex]: photoKey } — filmstrip checkbox selection
   const [showMoreMenu, setShowMoreMenu] = useState(false); // "..." dropdown (Information/Delete)
   const moreMenuRef = useRef(null);
+  const [captionEditing, setCaptionEditing] = useState(false); // caption input overlaid on the image
+  const captionStartRef = useRef(""); // caption text when editing was opened, for the "Escape reverts" behavior
 
-  useEffect(() => { setRotation(0); setZoom(100); setShowFileDetails(false); setImgDims(null); setShowMoreMenu(false); }, [index]);
+  useEffect(() => { setRotation(0); setZoom(100); setShowFileDetails(false); setImgDims(null); setShowMoreMenu(false); setCaptionEditing(false); }, [index]);
 
   useEffect(() => {
     if (!showMoreMenu) return;
@@ -1716,6 +1718,9 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0, justifySelf: "end" }}>
+          <LightboxIconBtn label="Add caption" onClick={() => { captionStartRef.current = caption || ""; setCaptionEditing(o => !o); }}>
+            <PencilLine size={16} strokeWidth={SW} />
+          </LightboxIconBtn>
           <LightboxIconBtn label="Download">
             <Download size={16} strokeWidth={SW} />
           </LightboxIconBtn>
@@ -1859,27 +1864,39 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
             </button>
           </div>
         )}
-      </div>
 
-      {/* Caption — sits directly above the filmstrip, editing the currently
-          viewed photo's caption. Auto-saves on every keystroke, same as
-          the grid's own caption popover (no separate draft/confirm step);
-          this is just a permanently-open version of that same input.
-          Blended into the same black as the image area (no separate
-          chrome-colored bar, no border) and dimmed down so it reads as a
-          quiet caption strip under the photo instead of another toolbar
-          competing for attention between the image and the filmstrip. */}
-      <div style={{ padding: "8px 20px", flexShrink: 0, background: "black" }}>
-        <div style={{ position: "relative", maxWidth: 480, margin: "0 auto" }}>
-          <PencilLine size={13} strokeWidth={2} color="rgba(255,255,255,0.3)" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-          <Input
-            value={caption || ""}
-            onChange={ev => onCaptionChange && onCaptionChange(originalIdx, ev.target.value)}
-            placeholder="Add a caption"
-            className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus-visible:border-white/25"
-            style={{ paddingLeft: 32, height: 32 }}
-          />
-        </div>
+        {/* Caption — overlaid directly on the image instead of a persistent
+            bar, so it only takes up space when there's something to show
+            (an existing caption) or the user is actively editing (opened
+            from the pencil-line button in the top bar). Auto-saves on
+            every keystroke, same as the grid's own caption popover. */}
+        {(caption || captionEditing) && (
+          <div style={{
+            position: "absolute", left: 0, right: 0, bottom: 0, display: "flex", justifyContent: "center",
+            padding: "20px 24px 18px", background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent)",
+            pointerEvents: captionEditing ? "auto" : "none",
+          }}>
+            {captionEditing ? (
+              <Input
+                autoFocus
+                value={caption || ""}
+                onChange={ev => onCaptionChange && onCaptionChange(originalIdx, ev.target.value)}
+                onKeyDown={ev => {
+                  if (ev.key === "Enter") { ev.preventDefault(); setCaptionEditing(false); }
+                  if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); onCaptionChange && onCaptionChange(originalIdx, captionStartRef.current); setCaptionEditing(false); }
+                }}
+                onBlur={() => setCaptionEditing(false)}
+                placeholder="Add a caption"
+                className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus-visible:border-white/40"
+                style={{ width: "100%", maxWidth: 480, height: 34 }}
+              />
+            ) : (
+              <p style={{ margin: 0, maxWidth: 480, color: "white", fontSize: 13, fontWeight: 500, textAlign: "center", textShadow: "0 1px 3px rgba(0,0,0,0.6)" }}>
+                {caption}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Filmstrip — shown even for a single photo, not just when there's
