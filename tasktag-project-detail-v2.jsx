@@ -12,7 +12,7 @@ import {
   Activity, Users, BarChart2, SlidersHorizontal,
   ArrowUpDown, Calendar, AlignJustify, Clock,
   UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, Crown, AlertTriangle,
-  RotateCw, ZoomIn, ZoomOut, Folder, ArrowLeft, ArrowRight, Info, MessageSquare,
+  RotateCw, ZoomIn, ZoomOut, Folder, ArrowLeft, ArrowRight, Info, PencilLine,
   ExternalLink, Forward,
 } from "lucide-react";
 
@@ -1366,7 +1366,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
                   zIndex: 2,
                 }}
               >
-                <MessageSquare size={11} color="var(--tt-grey06)" strokeWidth={2.25} />
+                <PencilLine size={11} color="var(--tt-grey06)" strokeWidth={2.25} />
               </button>
             )}
             {canOpen && (
@@ -1871,7 +1871,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
           competing for attention between the image and the filmstrip. */}
       <div style={{ padding: "8px 20px", flexShrink: 0, background: "black" }}>
         <div style={{ position: "relative", maxWidth: 480, margin: "0 auto" }}>
-          <MessageSquare size={13} strokeWidth={2} color="rgba(255,255,255,0.3)" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+          <PencilLine size={13} strokeWidth={2} color="rgba(255,255,255,0.3)" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
           <Input
             value={caption || ""}
             onChange={ev => onCaptionChange && onCaptionChange(originalIdx, ev.target.value)}
