@@ -1880,8 +1880,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
                 placeholder="Add caption"
                 alwaysEditing
                 onSave={v => onCaptionChange && onCaptionChange(originalIdx, v)}
-                textStyle={{ color: "white", fontSize: 13, fontWeight: 500, textShadow: "0 1px 3px rgba(0,0,0,0.6)" }}
-                inputStyle={{ background: "rgba(255,255,255,0.1)", borderColor: "rgba(255,255,255,0.25)", color: "white", height: 34 }}
+                inputStyle={{ fontSize: 12, height: 40 }}
               />
             </div>
           </div>
