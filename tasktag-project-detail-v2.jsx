@@ -1224,17 +1224,24 @@ function PhotoThumb({ src, onClick }) {
 // even after some are removed. An entry with zero visible photos renders
 // nothing.
 //
+// `expanded`/`onExpand` are lifted to the caller (ReportsTab) rather than
+// local state here — pagination repacks pages from a layoutDepsKey that
+// only reacts to shared/lifted state, and the hidden measuring scaffold
+// renders this same component from that same state. Local state would let
+// the visible page grow past the A4 boundary on "+N more" (the block's
+// real height changes, but pagination never finds out) while the
+// scaffold kept measuring the collapsed height.
+//
 // A second circle in the bottom-left corner (icon centered inside it, both
 // axes) is the caption trigger — hover-only, always, even once a caption
 // is already set. Clicking it opens a small caret popover, fixed-positioned
 // off the trigger's own bounding rect (so it isn't clipped by the
 // grid/scroll container), with a single input for the caption text. Only
 // one popover is open at a time across the grid.
-function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, onToggleSelect, captions, onCaptionChange }) {
+function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, onToggleSelect, captions, onCaptionChange, expanded, onExpand }) {
   const COLS = 3;
   const ROWS = 1;
   const CAP = COLS * ROWS; // 1 row of 3 before the last visible cell becomes "+N more"
-  const [expanded, setExpanded] = useState(false);
   const [openCaptionIdx, setOpenCaptionIdx] = useState(null); // original photo index, or null
   const [captionPos, setCaptionPos] = useState({ top: 0, left: 0 });
   const captionTriggerRef = useRef(null); // the specific trigger button last clicked, for scroll repositioning
@@ -1343,7 +1350,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
             )}
             {isCapCell && (
               <button
-                onClick={() => setExpanded(true)}
+                onClick={onExpand}
                 style={{
                   position: "absolute", inset: 0, background: "rgba(10,22,41,0.55)",
                   border: "none", borderRadius: 4, color: "white",
@@ -2569,6 +2576,7 @@ function ReportsTab({ demoCase }) {
   const [lightbox, setLightbox] = useState(null); // { photos, index, caption } | null — full-screen photo viewer
   const [selectedPhotos, setSelectedPhotos] = useState({}); // { [entryKey_photoIndex]: photoKey } — in-progress checkbox selection, not yet deleted
   const [photoManager, setPhotoManager] = useState(null); // { entryKey, photos, taskName } | null — full photo list modal for an over-the-cap task item
+  const [expandedPhotoGroups, setExpandedPhotoGroups] = useState({}); // { [entryKey]: true } — which PhotoGrids have had "+N more" clicked; lifted (not local to PhotoGrid) so pagination repacks when one expands
   const periodRef     = useRef(null);
   const chipRef       = useRef(null);
   // Fixed positioning so this dropdown isn't clipped by an ancestor's
@@ -2743,6 +2751,7 @@ function ReportsTab({ demoCase }) {
     setLoadingMore(false);
     setSelectedPhotos({});
     setPhotoManager(null);
+    setExpandedPhotoGroups({});
   };
 
   useEffect(() => {
@@ -2981,6 +2990,8 @@ function ReportsTab({ demoCase }) {
             onToggleSelect={previewSaved ? undefined : (idx, photoKey) => togglePhotoSelected(entryKey, idx, photoKey)}
             captions={preview.photoCaptions}
             onCaptionChange={previewSaved ? undefined : (idx, text) => setPhotoCaption(entryKey, idx, text)}
+            expanded={!!expandedPhotoGroups[entryKey]}
+            onExpand={() => setExpandedPhotoGroups(p => ({ ...p, [entryKey]: true }))}
           />
         )}
       </div>
@@ -3224,6 +3235,7 @@ function ReportsTab({ demoCase }) {
     ? JSON.stringify({ ...preview, logo: preview.logo ? preview.logo.length : 0 })
       + "|" + JSON.stringify(titleOverrides)
       + "|" + JSON.stringify(selectedPhotos)
+      + "|" + JSON.stringify(expandedPhotoGroups)
       + "|" + previewSaved
       + "|" + flatBlocks.map(b => b.key).join(",")
     : "";
