@@ -1716,9 +1716,6 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0, justifySelf: "end" }}>
-          <LightboxIconBtn label="Add caption" onClick={() => { captionStartRef.current = caption || ""; setCaptionEditing(o => !o); }}>
-            <PencilLine size={16} strokeWidth={SW} />
-          </LightboxIconBtn>
           <LightboxIconBtn label="Download">
             <Download size={16} strokeWidth={SW} />
           </LightboxIconBtn>
@@ -1863,38 +1860,42 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
           </div>
         )}
 
-        {/* Caption — overlaid directly on the image instead of a persistent
-            bar, so it only takes up space when there's something to show
-            (an existing caption) or the user is actively editing (opened
-            from the pencil-line button in the top bar). Auto-saves on
-            every keystroke, same as the grid's own caption popover. */}
-        {(caption || captionEditing) && (
-          <div style={{
-            position: "absolute", left: 0, right: 0, bottom: 0, display: "flex", justifyContent: "center",
-            padding: "20px 24px 18px", background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent)",
-            pointerEvents: captionEditing ? "auto" : "none",
-          }}>
-            {captionEditing ? (
-              <Input
-                autoFocus
-                value={caption || ""}
-                onChange={ev => onCaptionChange && onCaptionChange(originalIdx, ev.target.value)}
-                onKeyDown={ev => {
-                  if (ev.key === "Enter") { ev.preventDefault(); setCaptionEditing(false); }
-                  if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); onCaptionChange && onCaptionChange(originalIdx, captionStartRef.current); setCaptionEditing(false); }
-                }}
-                onBlur={() => setCaptionEditing(false)}
-                placeholder="Add a caption"
-                className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus-visible:border-white/40"
-                style={{ width: "100%", maxWidth: 480, height: 34 }}
-              />
-            ) : (
-              <p style={{ margin: 0, maxWidth: 480, color: "white", fontSize: 13, fontWeight: 500, textAlign: "center", textShadow: "0 1px 3px rgba(0,0,0,0.6)" }}>
-                {caption}
-              </p>
-            )}
-          </div>
-        )}
+        {/* Caption — overlaid directly on the image. Shows the caption text
+            when one exists, an "Add caption" prompt when it doesn't, and
+            either one is itself the trigger that opens editing — no
+            separate button in the top bar. */}
+        <div style={{
+          position: "absolute", left: 0, right: 0, bottom: 0, display: "flex", justifyContent: "center",
+          padding: "20px 24px 18px", background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent)",
+        }}>
+          {captionEditing ? (
+            <Input
+              autoFocus
+              value={caption || ""}
+              onChange={ev => onCaptionChange && onCaptionChange(originalIdx, ev.target.value)}
+              onKeyDown={ev => {
+                if (ev.key === "Enter") { ev.preventDefault(); setCaptionEditing(false); }
+                if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); onCaptionChange && onCaptionChange(originalIdx, captionStartRef.current); setCaptionEditing(false); }
+              }}
+              onBlur={() => setCaptionEditing(false)}
+              placeholder="Add a caption"
+              className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus-visible:border-white/40"
+              style={{ width: "100%", maxWidth: 480, height: 34 }}
+            />
+          ) : (
+            <button
+              onClick={() => { captionStartRef.current = caption || ""; setCaptionEditing(true); }}
+              style={{
+                display: "flex", alignItems: "center", gap: 6, maxWidth: 480, background: "none", border: "none",
+                padding: 0, cursor: "pointer", color: caption ? "white" : "rgba(255,255,255,0.55)",
+                fontSize: 13, fontWeight: 500, textShadow: "0 1px 3px rgba(0,0,0,0.6)",
+              }}
+            >
+              <PencilLine size={13} strokeWidth={2} style={{ flexShrink: 0 }} />
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{caption || "Add caption"}</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filmstrip — shown even for a single photo, not just when there's
