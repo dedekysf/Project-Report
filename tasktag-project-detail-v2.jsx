@@ -1872,7 +1872,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
           padding: "20px 24px 18px", background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent)",
         }}>
           {captionEditing ? (
-            <div style={{ position: "relative", width: "100%", maxWidth: 200 }}>
+            <div style={{ position: "relative", width: "100%", maxWidth: 400 }}>
               <Input
                 autoFocus
                 value={caption || ""}
