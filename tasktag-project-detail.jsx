@@ -1870,7 +1870,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
           padding: "20px 24px 18px", background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent)",
         }}>
           {captionEditing ? (
-            <div style={{ position: "relative", width: "100%", maxWidth: 480 }}>
+            <div style={{ position: "relative", width: "100%", maxWidth: 200 }}>
               <Input
                 autoFocus
                 value={caption || ""}
@@ -1880,7 +1880,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
                   if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); onCaptionChange && onCaptionChange(originalIdx, captionStartRef.current); setCaptionEditing(false); }
                 }}
                 placeholder="Add a caption"
-                style={{ fontSize: 12, height: 40, padding: "0 76px 0 12px", textAlign: "center" }}
+                style={{ fontSize: 12, height: 40, padding: "0 76px 0 12px" }}
               />
               <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>
                 <button
