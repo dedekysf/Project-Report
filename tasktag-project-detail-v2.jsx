@@ -3167,7 +3167,11 @@ function ReportsTab({ demoCase }) {
         customRange,
         // This draft's position in the project's save history if it gets
         // saved right now — see pushReport, which assigns the same number.
-        version: reports.length + 1,
+        // Continues the running count only while the period matches the
+        // most recently saved report (reports[0], since pushReport
+        // prepends); a different period starts a fresh Update No. 1
+        // instead of just tacking onto the global save count.
+        version: reports.length > 0 && reports[0].period === period ? reports[0].version + 1 : 1,
         extraNotes: {},
         excludedPhotos: defaultOverflowExclusions(data.groups),
         photoCaptions: {},
