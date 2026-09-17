@@ -2691,25 +2691,35 @@ const buildReportHTML = (report) => {
   const SANS = "-apple-system,BlinkMacSystemFont,'Inter',sans-serif";
   const SERIF = "'Lora',Georgia,serif";
 
-  // Fixed 4-column grid, same sizing as the live PhotoGrid — every photo
-  // shows here (no "+N more" cap; there's nothing left to expand into).
-  // originalIndices maps each surviving photo's position back to its
-  // pre-exclusion index (see applyPhotoExclusions) — the same key
-  // captions are stored under everywhere else.
-  const renderPhotos = (photos, entryKey, captions, originalIndices) => {
-    const cells = (photos || []).map((k, i) => {
+  // Fixed 3-column grid — every photo shows here (no "+N more" cap;
+  // there's nothing left to expand into). Rendered per CHUNK (see
+  // PHOTO_CHUNK below) rather than all of an entry's photos in one
+  // block, so the pagination pass below can place each chunk on
+  // whichever page it fits — the entry's header and its photos flow
+  // across a page break the same way the live draft's "+N more"
+  // continuation blocks do, instead of one oversized entry either
+  // overflowing a page or getting pushed as a whole to the next one.
+  // originalIndices is always a real per-photo array (built by the
+  // caller, identity-mapped when nothing was excluded) — never derived
+  // from the chunk's own 0-based position, which would drift for every
+  // chunk after the first.
+  const renderPhotoChunk = (photos, entryKey, captions, originalIndices, marginTop, isLast) => {
+    const cells = photos.map((k, i) => {
       const src = IMG_MAP[k];
       if (!src) return "";
-      const origIdx = originalIndices ? originalIndices[i] : i;
-      const caption = captions && captions[`${entryKey}_${origIdx}`];
+      const caption = captions && captions[`${entryKey}_${originalIndices[i]}`];
       return h("div", {},
         selfClose("img", { src: toAbsoluteUrl(src), style: "width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:4px;display:block;" }),
-        caption ? h("p", { style: `font-size:12px;font-style:italic;color:#828282;font-family:${SERIF};margin:6px 0 0;` }, caption) : ""
+        caption ? h("p", { style: `font-size:12px;font-style:italic;color:#828282;font-family:${SERIF};text-align:center;margin:6px 0 0;` }, caption) : ""
       );
     }).filter(Boolean);
     if (cells.length === 0) return "";
-    return h("div", { style: "display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:16px;" }, ...cells);
+    // isLast carries the entry's own trailing gap (see PHOTO_CHUNK/
+    // entryHeaderHTML) — every other chunk sits flush against the next.
+    return h("div", { style: `display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:${marginTop}px;margin-bottom:${isLast ? 80 : 0}px;` }, ...cells);
   };
+  // Two rows of the 3-column grid per continuation block.
+  const PHOTO_CHUNK = 6;
 
   const groupLabel = (g) => formatGroupLabel(g, grouping);
 
@@ -2728,7 +2738,7 @@ const buildReportHTML = (report) => {
       h("p", { style: `font-family:${SERIF};font-size:12px;color:#303742;line-height:1.5;margin:0;` }, note.note)
     );
 
-  const entryHTML = (e, attachedNoteHTML, entryKey, captions) => {
+  const entryHeaderHTML = (e, attachedNoteHTML, hasPhotos) => {
     const { kind, daysAgo } = statusForEntry(e);
     const statusMeta = STATUS_META[kind];
     const statusColor = STATUS_HEX[kind];
@@ -2757,24 +2767,26 @@ const buildReportHTML = (report) => {
     const checklistHTML = (e.checklist && e.checklist.length > 0)
       ? h("div", { style: "margin-top:20px;" },
           h("p", { style: `font-family:${SANS};font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;margin:0 0 8px;` }, "Completed this update"),
-          h("div", { style: "display:flex;flex-direction:column;gap:6px;" },
+          h("div", { style: "display:flex;flex-direction:column;gap:8px;" },
             // Only the last 5 — same cap the live view applies.
             ...e.checklist.slice(-5).map(item =>
               h("div", { style: "display:flex;align-items:center;gap:8px;" },
-                h("span", { style: "flex-shrink:0;color:#16a97d;font-size:13px;font-weight:700;" }, "✓"),
-                h("span", { style: `font-family:${SERIF};font-size:13px;color:#303742;` }, item.text)
+                h("span", { style: "flex-shrink:0;color:#16a97d;font-size:12px;font-weight:700;" }, "✓"),
+                h("span", { style: `font-family:${SERIF};font-size:12px;color:#303742;` }, item.text)
               )
             )
           )
         )
       : "";
-    return h("div", { style: "margin-bottom:48px;" },
+    // No photos left to carry the entry's own trailing gap (see
+    // PHOTO_CHUNK/renderPhotoChunk) — this header block carries it
+    // instead, same 80px either way.
+    return h("div", { style: `margin-bottom:${hasPhotos ? 0 : 80}px;` },
       h("p", { style: `font-family:${SERIF};font-size:20px;font-weight:700;color:#0a1629;line-height:1.35;margin:0;` }, e.note),
       h("div", { style: "margin-top:6px;" }, metaLine),
       dividerHTML,
       checklistHTML,
-      attachedNoteHTML || "",
-      e.noPhotos ? "" : renderPhotos(e.photos, entryKey, captions, e.photoOriginalIndices)
+      attachedNoteHTML || ""
     );
   };
 
@@ -2801,7 +2813,30 @@ const buildReportHTML = (report) => {
         g.entries.forEach((e, i) => {
           if (e.isNote) return;
           const next = g.entries[i + 1];
-          groupBlocks.push({ html: entryHTML(e, next && next.isNote ? noteHTML(next) : "", e.entryKey, report.photoCaptions), isLabel: false });
+          const attachedNoteHTML = next && next.isNote ? noteHTML(next) : "";
+          const photos = e.noPhotos ? [] : (e.photos || []);
+          groupBlocks.push({ html: entryHeaderHTML(e, attachedNoteHTML, photos.length > 0), isLabel: false });
+          if (photos.length > 0) {
+            // Identity-mapped fallback when nothing's been excluded (see
+            // applyPhotoExclusions) — never the chunk's own 0-based index,
+            // which would only be correct for the first chunk.
+            const originalIndices = e.photoOriginalIndices || photos.map((_, idx) => idx);
+            for (let start = 0; start < photos.length; start += PHOTO_CHUNK) {
+              const isFirst = start === 0;
+              const isLast = start + PHOTO_CHUNK >= photos.length;
+              groupBlocks.push({
+                html: renderPhotoChunk(
+                  photos.slice(start, start + PHOTO_CHUNK),
+                  e.entryKey,
+                  report.photoCaptions,
+                  originalIndices.slice(start, start + PHOTO_CHUNK),
+                  isFirst ? 16 : 0,
+                  isLast
+                ),
+                isLabel: false,
+              });
+            }
+          }
         });
         return groupBlocks;
       });
@@ -2837,9 +2872,9 @@ const buildReportHTML = (report) => {
 
   const projectName = report.projectName || PROJECT_NAME;
   const address = report.address || PROJECT_ADDRESS;
-  const summaryHTML = h("div", { style: "background:#f7f8fa;border-radius:8px;padding:16px;" },
-    report.summary ? h("p", { style: `font-family:${SERIF};font-size:14px;color:#303742;line-height:1.6;margin:0;` }, report.summary) : ""
-  );
+  const summaryHTML = report.summary
+    ? h("p", { style: `font-family:${SERIF};font-size:14px;color:#303742;line-height:1.6;margin:0;` }, report.summary)
+    : "";
 
   const logoHTML = report.logo
     ? selfClose("img", { src: report.logo, alt: "Company logo", style: "display:block;max-width:100px;height:auto;" })
