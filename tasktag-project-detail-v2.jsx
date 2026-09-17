@@ -1393,7 +1393,14 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
               // getBoundingClientRect) would land relative to that page's
               // own box instead of the viewport, landing in the wrong
               // spot on every page but the first.
-              <div ref={captionPopoverRef} style={{ position: "fixed", top: captionPos.top, left: captionPos.left, zIndex: 300, width: 240 }}>
+              //
+              // The portal also moves this out from under the draft
+              // modal's own stacking context (#draft-chrome, z-index
+              // 2000) — as a sibling of it under <body> now instead of a
+              // descendant, it needs a z-index that beats 2000 directly to
+              // still paint on top, not just the low value (300) that
+              // sufficed against its old, local siblings.
+              <div ref={captionPopoverRef} style={{ position: "fixed", top: captionPos.top, left: captionPos.left, zIndex: 5300, width: 240 }}>
                 <div style={{ position: "absolute", top: -5, left: 12, width: 10, height: 10, background: "white", border: "1px solid var(--tt-grey03)", borderRight: "none", borderBottom: "none", transform: "rotate(45deg)" }} />
                 <div style={{ position: "relative", background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, padding: 8, boxShadow: "0 8px 24px rgba(10,22,41,0.16)" }}>
                   <div style={{ position: "relative" }}>
