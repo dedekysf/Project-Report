@@ -1620,8 +1620,10 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
   const [selectedFilmstrip, setSelectedFilmstrip] = useState({}); // { [photoIndex]: photoKey } — filmstrip checkbox selection
   const [showMoreMenu, setShowMoreMenu] = useState(false); // "..." dropdown (Information/Delete)
   const moreMenuRef = useRef(null);
+  const [captionEditing, setCaptionEditing] = useState(false); // caption input overlaid on the image
+  const captionStartRef = useRef(""); // caption text when editing was opened, for the "Escape reverts" behavior
 
-  useEffect(() => { setRotation(0); setZoom(100); setShowFileDetails(false); setImgDims(null); setShowMoreMenu(false); }, [index]);
+  useEffect(() => { setRotation(0); setZoom(100); setShowFileDetails(false); setImgDims(null); setShowMoreMenu(false); setCaptionEditing(false); }, [index]);
 
   useEffect(() => {
     if (!showMoreMenu) return;
@@ -1860,29 +1862,62 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
           </div>
         )}
 
-        {/* Caption — overlaid directly on the image, using the same
-            always-editable EditableField pattern as the report's note
-            field (renderNoteSlot): plain clickable text once it holds a
-            value, a live input with corner Check/X buttons while editing.
-            Keyed by originalIdx so its internal draft/focus state resets
-            cleanly when the filmstrip moves to a different photo. */}
+        {/* Caption — overlaid directly on the image. Not-editing states
+            (empty prompt or a saved caption) show the sticky-note icon
+            next to hug-content text; editing swaps in a plain input with
+            Check/X inside its own bottom-right corner (no icon), same
+            button styling as EditableField's alwaysEditing mode. */}
         <div style={{
           position: "absolute", left: 0, right: 0, bottom: 0, display: "flex", justifyContent: "center",
           padding: "20px 24px 18px", background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent)",
         }}>
-          <div style={{ position: "relative", width: "100%", maxWidth: 480 }}>
-            <StickyNote size={14} strokeWidth={2} color="rgba(255,255,255,0.6)" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", zIndex: 1 }} />
-            <EditableField
-              key={originalIdx}
-              fieldId={`lightbox_caption_${entryKey}_${originalIdx}`}
-              value={caption || ""}
-              placeholder="Add caption"
-              alwaysEditing
-              onSave={v => onCaptionChange && onCaptionChange(originalIdx, v)}
-              inputStyle={{ fontSize: 12, height: 40, paddingLeft: 30 }}
-              textStyle={{ display: "inline-block", width: "auto", color: "white", paddingLeft: 22, textShadow: "0 1px 3px rgba(0,0,0,0.6)" }}
-            />
-          </div>
+          {captionEditing ? (
+            <div style={{ position: "relative", width: "100%", maxWidth: 480 }}>
+              <Input
+                autoFocus
+                value={caption || ""}
+                onChange={ev => onCaptionChange && onCaptionChange(originalIdx, ev.target.value)}
+                onKeyDown={ev => {
+                  if (ev.key === "Enter") { ev.preventDefault(); setCaptionEditing(false); }
+                  if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); onCaptionChange && onCaptionChange(originalIdx, captionStartRef.current); setCaptionEditing(false); }
+                }}
+                placeholder="Add a caption"
+                style={{ fontSize: 12, height: 40, padding: "0 76px 0 12px" }}
+              />
+              <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>
+                <button
+                  onMouseDown={ev => ev.preventDefault()}
+                  onClick={() => { onCaptionChange && onCaptionChange(originalIdx, captionStartRef.current); setCaptionEditing(false); }}
+                  onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
+                  onMouseLeave={ev => ev.currentTarget.style.background = "none"}
+                  style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0 }}
+                >
+                  <X size={15} strokeWidth={SW} color="var(--tt-grey06)" />
+                </button>
+                <button
+                  onMouseDown={ev => ev.preventDefault()}
+                  onClick={() => setCaptionEditing(false)}
+                  onMouseEnter={ev => ev.currentTarget.style.opacity = "0.85"}
+                  onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
+                  style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: "pointer", padding: 0 }}
+                >
+                  <Check size={15} strokeWidth={SW} color="white" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => { captionStartRef.current = caption || ""; setCaptionEditing(true); }}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 6, maxWidth: 480, background: "none", border: "none",
+                padding: 0, cursor: "pointer", color: caption ? "white" : "rgba(255,255,255,0.55)",
+                fontSize: 13, fontWeight: 500, textShadow: "0 1px 3px rgba(0,0,0,0.6)",
+              }}
+            >
+              <StickyNote size={13} strokeWidth={2} style={{ flexShrink: 0 }} />
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{caption || "Add caption"}</span>
+            </button>
+          )}
         </div>
       </div>
 
