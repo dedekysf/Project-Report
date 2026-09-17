@@ -1930,7 +1930,16 @@ const DUMMY_ENTRIES = [
   // Deliberately at PHOTO_LIMIT (50) — the most recent entry is always the
   // first task item shown, so the over-the-cap "manage photos" UI has
   // something to demo without needing a specific date range.
-  { date: "2026-09-10", note: "Flooring installation started on the ground floor.", photos: ["img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5"] },
+  {
+    date: "2026-09-10", note: "Flooring installation started on the ground floor.",
+    updateSummary: "Old flooring fully removed and subfloor leveled. New hardwood planks are being laid in the living room and hallway.",
+    checklist: [
+      { text: "Remove old flooring throughout the ground floor" },
+      { text: "Level and inspect subfloor for damage" },
+      { text: "Begin hardwood plank installation in living room" },
+    ],
+    photos: ["img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5"],
+  },
   { date: "2026-09-09", note: "Exterior siding repairs completed on the south wall.", photos: ["img9", "img2", "img3", "img7", "img4", "img5", "img6"] },
   { date: "2026-09-08", note: "Final electrical connections completed in the main panel.", photos: ["img9", "img8"] },
   { date: "2026-09-07", note: "Plumbing fixtures installed in all bathrooms.", photos: [] },
@@ -2361,9 +2370,28 @@ const buildReportHTML = (report) => {
       (!e.noPhotos && visiblePhotoCount > 0
         ? dot + `<span style="font-size:11px;font-weight:500;color:#828282;">${visiblePhotoCount} photo${visiblePhotoCount === 1 ? "" : "s"}</span>`
         : "");
+    // Same divider the live view always shows now (see renderEntryBlock) —
+    // the checklist (if any) and/or the attached note both sit below it.
+    const dividerHTML = h("div", { style: "height:1px;background:#e8e8e6;margin-top:16px;" }, "");
+    const checklistHTML = (e.checklist && e.checklist.length > 0)
+      ? h("div", { style: "margin-top:16px;" },
+          e.updateSummary ? h("p", { style: "font-size:13px;color:#303742;line-height:1.5;margin:0 0 12px;" }, e.updateSummary) : "",
+          h("p", { style: "font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;margin:0 0 8px;" }, "Completed this update"),
+          h("div", { style: "display:flex;flex-direction:column;gap:6px;" },
+            ...e.checklist.map(item =>
+              h("div", { style: "display:flex;align-items:center;gap:8px;" },
+                h("span", { style: "flex-shrink:0;color:#16a97d;font-size:13px;font-weight:700;" }, "✓"),
+                h("span", { style: `font-size:13px;color:#828282;${item.done === false ? "" : "text-decoration:line-through;"}` }, item.text)
+              )
+            )
+          )
+        )
+      : "";
     return h("div", { style: "margin-bottom:40px;" },
       h("p", { style: "font-size:18px;font-weight:600;color:#0a1629;line-height:1.35;margin:0;" }, e.note),
       h("div", { style: "margin-top:4px;" }, metaLine),
+      dividerHTML,
+      checklistHTML,
       e.noPhotos ? "" : renderPhotos(e.photos),
       attachedNoteHTML || ""
     );
@@ -3043,8 +3071,31 @@ function ReportsTab({ demoCase }) {
             </>
           )}
         </div>
-        {!!preview.extraNotes[entryKey] && (
-          <div style={{ height: 1, background: "var(--tt-grey03)", marginTop: 16 }} />
+        {/* Always shown now — the checklist (if any) and/or the note both
+            live below it, so it's no longer conditional on a note existing
+            the way it used to be. */}
+        <div style={{ height: 1, background: "var(--tt-grey03)", marginTop: 16 }} />
+        {e.checklist && e.checklist.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            {e.updateSummary && (
+              <p style={{ fontSize: 13, color: "var(--tt-text-2)", lineHeight: 1.5, margin: "0 0 12px" }}>
+                {e.updateSummary}
+              </p>
+            )}
+            <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "0 0 8px" }}>
+              Completed this update
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {e.checklist.map((item, idx) => (
+                <div key={idx} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <Check size={14} strokeWidth={SW} color="var(--tt-secondary)" style={{ flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, color: "var(--tt-grey05)", textDecoration: item.done === false ? "none" : "line-through" }}>
+                    {item.text}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
         {renderNoteSlot(entryKey)}
         {!isPhotoless && (
