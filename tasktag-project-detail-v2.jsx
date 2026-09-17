@@ -2739,7 +2739,7 @@ const buildReportHTML = (report) => {
   // avoids that collapse entirely and gives each gap its exact value.
   const noteHTML = (note) =>
     h("div", { style: "margin-top:16px;" },
-      h("p", { style: `font-family:${SERIF};font-size:12px;color:#303742;line-height:1.5;margin:0;` }, note.note)
+      h("p", { style: `font-family:${SERIF};font-size:12px;color:#303742;line-height:1.8;margin:0;` }, note.note)
     );
 
   const entryHeaderHTML = (e, attachedNoteHTML, hasPhotos) => {
@@ -2755,15 +2755,15 @@ const buildReportHTML = (report) => {
     // live view's flatBlocks pagination does.
     // Meta-line chrome (status/date/owner/photo-count) stays on the sans
     // stack, same reasoning as SANS's own comment above.
-    const dueHTML = `<span style="font-family:${SANS};font-size:11px;font-weight:500;color:#828282;">${fmtDate(parseDate(e.date))}</span>` + dot;
+    const dueHTML = `<span style="font-family:${SANS};font-size:11px;font-weight:500;text-transform:uppercase;color:#828282;">${fmtDate(parseDate(e.date))}</span>` + dot;
     const metaLine =
       `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${statusColor};vertical-align:middle;margin-right:6px;"></span>` +
       `<span style="font-family:${SANS};font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:${statusColor};">${statusMeta.label}${kind === "past_due" && daysAgo > 0 ? ` ${daysAgo} days` : ""}</span>` +
       dot +
       dueHTML +
-      `<span style="font-family:${SANS};font-size:11px;font-weight:500;color:#828282;">${ownerForEntry(e.date)}</span>` +
+      `<span style="font-family:${SANS};font-size:11px;font-weight:500;text-transform:uppercase;color:#828282;">${ownerForEntry(e.date)}</span>` +
       (!e.noPhotos && visiblePhotoCount > 0
-        ? dot + `<span style="font-family:${SANS};font-size:11px;font-weight:500;color:#828282;">${visiblePhotoCount} photo${visiblePhotoCount === 1 ? "" : "s"}</span>`
+        ? dot + `<span style="font-family:${SANS};font-size:11px;font-weight:500;text-transform:uppercase;color:#828282;">${visiblePhotoCount} photo${visiblePhotoCount === 1 ? "" : "s"}</span>`
         : "");
     // Same divider the live view always shows now (see renderEntryBlock) —
     // the checklist (if any) and/or the attached note both sit below it.
@@ -2877,7 +2877,7 @@ const buildReportHTML = (report) => {
   const projectName = report.projectName || PROJECT_NAME;
   const address = report.address || PROJECT_ADDRESS;
   const summaryHTML = report.summary
-    ? h("p", { style: `font-family:${SERIF};font-size:14px;color:#303742;line-height:1.6;margin:0;` }, report.summary)
+    ? h("p", { style: `font-family:${SERIF};font-size:14px;color:#303742;line-height:1.8;margin:0;` }, report.summary)
     : "";
 
   const logoHTML = report.logo
