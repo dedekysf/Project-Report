@@ -13,7 +13,7 @@ import {
   ArrowUpDown, Calendar, AlignJustify, Clock,
   UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, Crown, AlertTriangle,
   RotateCw, ZoomIn, ZoomOut, Folder, ArrowLeft, ArrowRight, Info, MessageSquare,
-  ExternalLink,
+  ExternalLink, Forward,
 } from "lucide-react";
 
 import logoImg from "./src/Img/tasktag-logo.13f1babda8fdbb1b7251572a0fe11f9e.png";
@@ -1618,8 +1618,17 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
   const [showFileDetails, setShowFileDetails] = useState(false);
   const [imgDims, setImgDims] = useState(null);
   const [selectedFilmstrip, setSelectedFilmstrip] = useState({}); // { [photoIndex]: photoKey } — filmstrip checkbox selection
+  const [showMoreMenu, setShowMoreMenu] = useState(false); // "..." dropdown (Information/Delete)
+  const moreMenuRef = useRef(null);
 
-  useEffect(() => { setRotation(0); setZoom(100); setShowFileDetails(false); setImgDims(null); }, [index]);
+  useEffect(() => { setRotation(0); setZoom(100); setShowFileDetails(false); setImgDims(null); setShowMoreMenu(false); }, [index]);
+
+  useEffect(() => {
+    if (!showMoreMenu) return;
+    const handler = e => { if (moreMenuRef.current && !moreMenuRef.current.contains(e.target)) setShowMoreMenu(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showMoreMenu]);
 
   const toggleFilmstripSelect = (i, photoKey) => {
     setSelectedFilmstrip(prev => {
@@ -1707,8 +1716,14 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0, justifySelf: "end" }}>
-          <LightboxIconBtn label="Delete" onClick={() => onDeleteSelected && onDeleteSelected([index])}>
-            <Trash2 size={16} strokeWidth={SW} />
+          <LightboxIconBtn label="Download">
+            <Download size={16} strokeWidth={SW} />
+          </LightboxIconBtn>
+          <LightboxIconBtn label="Share">
+            <Forward size={16} strokeWidth={SW} />
+          </LightboxIconBtn>
+          <LightboxIconBtn label="Copy link to share">
+            <Link size={16} strokeWidth={SW} />
           </LightboxIconBtn>
           <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.15)", margin: "0 6px" }} />
           <LightboxIconBtn label="Rotate" onClick={() => setRotation(r => (r + 90) % 360)}>
@@ -1722,9 +1737,36 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
             <ZoomIn size={16} strokeWidth={SW} />
           </LightboxIconBtn>
           <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.15)", margin: "0 6px" }} />
-          <LightboxIconBtn label="Information" onClick={() => setShowFileDetails(true)}>
-            <Info size={16} strokeWidth={SW} />
-          </LightboxIconBtn>
+          <div ref={moreMenuRef} style={{ position: "relative" }}>
+            <LightboxIconBtn label="More" onClick={() => setShowMoreMenu(o => !o)}>
+              <MoreVertical size={16} strokeWidth={SW} />
+            </LightboxIconBtn>
+            {showMoreMenu && (
+              <div style={{
+                position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 10, width: 200,
+                background: "var(--tt-text-1)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10,
+                boxShadow: "0 12px 32px rgba(0,0,0,0.4)", overflow: "hidden", padding: 4,
+              }}>
+                <button
+                  onClick={() => { setShowFileDetails(true); setShowMoreMenu(false); }}
+                  onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.08)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "none"}
+                  style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "9px 10px", background: "none", border: "none", borderRadius: 6, color: "white", fontSize: 14, fontWeight: 500, cursor: "pointer", textAlign: "left" }}
+                >
+                  <Info size={16} strokeWidth={SW} /> Information
+                </button>
+                <div style={{ height: 1, background: "rgba(255,255,255,0.1)", margin: "4px 0" }} />
+                <button
+                  onClick={() => { setShowMoreMenu(false); onDeleteSelected && onDeleteSelected([index]); }}
+                  onMouseEnter={e => e.currentTarget.style.background = "rgba(229,72,77,0.12)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "none"}
+                  style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "9px 10px", background: "none", border: "none", borderRadius: 6, color: "var(--tt-red)", fontSize: 14, fontWeight: 500, cursor: "pointer", textAlign: "left" }}
+                >
+                  <Trash2 size={16} strokeWidth={SW} /> Delete
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
