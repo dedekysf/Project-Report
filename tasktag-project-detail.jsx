@@ -2712,8 +2712,12 @@ const buildReportHTML = (report) => {
       );
     }).filter(Boolean);
     if (cells.length === 0) return "";
-    // isLast carries the entry's own trailing gap (see PHOTO_CHUNK/
-    // entryHeaderHTML) — every other chunk sits flush against the next.
+    // marginTop keeps consecutive chunks at the same 8px row rhythm as
+    // the grid's own internal gap (so two chunks landing on the same
+    // page read as one continuous grid, not two grids butted together)
+    // — only the very first chunk uses the larger 16px gap down from
+    // the note/checklist above it. isLast carries the entry's own
+    // trailing gap (see PHOTO_CHUNK/entryHeaderHTML).
     return h("div", { style: `display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:${marginTop}px;margin-bottom:${isLast ? 80 : 0}px;` }, ...cells);
   };
   // Two rows of the 3-column grid per continuation block.
@@ -2828,7 +2832,7 @@ const buildReportHTML = (report) => {
                   e.entryKey,
                   report.photoCaptions,
                   originalIndices.slice(start, start + PHOTO_CHUNK),
-                  isFirst ? 16 : 0,
+                  isFirst ? 16 : 8,
                   isLast
                 ),
                 isLabel: false,
@@ -2858,12 +2862,12 @@ const buildReportHTML = (report) => {
   const targetRowHTML =
     h("div", { style: "display:flex;flex-wrap:nowrap;gap:24px;margin-top:16px;align-items:center;margin-bottom:24px;" },
       h("div", { style: "display:flex;align-items:center;gap:8px;" },
-        h("span", { style: `font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;` }, "Target Opening"),
-        report.targetOpening ? h("span", { style: `font-family:${SANS};font-size:12px;font-weight:600;text-transform:uppercase;color:#0a1629;` }, report.targetOpening) : ""
+        h("span", { style: `font-family:${SERIF};font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;` }, "Target Opening"),
+        report.targetOpening ? h("span", { style: `font-family:${SERIF};font-size:10px;font-weight:600;text-transform:uppercase;color:#0a1629;` }, report.targetOpening) : ""
       ),
       h("div", { style: "display:flex;align-items:center;gap:8px;" },
-        h("span", { style: `font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;` }, "Prepared For"),
-        report.clientName ? h("span", { style: `font-family:${SANS};font-size:12px;font-weight:600;text-transform:uppercase;color:#0a1629;` }, report.clientName) : ""
+        h("span", { style: `font-family:${SERIF};font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;` }, "Prepared For"),
+        report.clientName ? h("span", { style: `font-family:${SERIF};font-size:10px;font-weight:600;text-transform:uppercase;color:#0a1629;` }, report.clientName) : ""
       )
     ) +
     h("div", { style: "height:1px;background:#e8e8e6;margin:0 0 24px;" }, "");
@@ -3120,7 +3124,7 @@ function ReportsTab({ demoCase }) {
   // Adds a report to the results list (called only once the user confirms
   // via "Save report" in the preview modal — Generate no longer does this
   // directly).
-  const pushReport = ({ includeSummary, includeNoPhotoTasks, dateRange, period, version, data, extraNotes, excludedPhotos, titleOverrides, projectName, address, logo, companyName, companyAddress, summary, targetOpening, clientName }) => {
+  const pushReport = ({ includeSummary, includeNoPhotoTasks, dateRange, period, version, data, extraNotes, excludedPhotos, titleOverrides, photoCaptions, projectName, address, logo, companyName, companyAddress, summary, targetOpening, clientName }) => {
     const id = Date.now();
     const newReport = {
       id,
@@ -3135,6 +3139,7 @@ function ReportsTab({ demoCase }) {
       extraNotes,
       excludedPhotos,
       titleOverrides,
+      photoCaptions,
       projectName,
       address,
       logo,
