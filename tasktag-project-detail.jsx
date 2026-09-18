@@ -1318,7 +1318,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
                 type="button"
                 onMouseEnter={e => {
                   const r = e.currentTarget.getBoundingClientRect();
-                  setCaptionTooltipPos({ top: r.top - 8, left: r.left });
+                  setCaptionTooltipPos({ top: r.bottom + 6, left: r.left });
                   setCaptionTooltipIdx(i);
                 }}
                 onMouseLeave={() => setCaptionTooltipIdx(null)}
@@ -1354,7 +1354,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
               // Portaled straight to <body> — same contentVisibility/
               // stacking-context reasoning as the lightbox's own caption
               // editor; see its comment for the full explanation.
-              <div style={{ position: "fixed", top: captionTooltipPos.top, left: captionTooltipPos.left, transform: "translateY(-100%)", zIndex: 5300, maxWidth: 220, pointerEvents: "none" }}>
+              <div style={{ position: "fixed", top: captionTooltipPos.top, left: captionTooltipPos.left, zIndex: 5300, maxWidth: 220, pointerEvents: "none" }}>
                 <div style={{ background: "var(--tt-text-1)", color: "white", fontSize: 11, fontWeight: 500, lineHeight: 1.4, padding: "6px 10px", borderRadius: 6, boxShadow: "0 8px 24px rgba(10,22,41,0.24)" }}>
                   {caption}
                 </div>
@@ -4272,8 +4272,8 @@ function ReportsTab({ demoCase }) {
                 </>
               ) : (
                 // TODO(BE): replace with the account's actual per-report photo cap and usage from the API
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, width: 260 }}>
-                  <p style={{ fontSize: 22, fontWeight: 600, color: "var(--tt-text-1)", margin: 0, whiteSpace: "nowrap" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, width: 140 }}>
+                  <p style={{ fontSize: 18, fontWeight: 600, color: "var(--tt-text-1)", margin: 0, whiteSpace: "nowrap" }}>
                     Photo Limit {previewPhotoCount} of {PHOTO_LIMIT}
                   </p>
                   <div style={{ height: 6, borderRadius: 99, background: "var(--tt-grey03)", overflow: "hidden" }}>
