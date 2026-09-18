@@ -1385,6 +1385,24 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, onDeletePhoto, ca
   );
 }
 
+// Manage Photos modal thumbnail — same shimmer-until-loaded behavior as
+// PhotoThumb, but without a click handler of its own since the enclosing
+// button already toggles selection.
+function ManagedPhotoImage({ src }) {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <>
+      {!loaded && <div className="tt-skeleton" style={{ position: "absolute", inset: 0, borderRadius: 0 }} />}
+      <img
+        src={src}
+        alt=""
+        onLoad={() => setLoaded(true)}
+        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: loaded ? 1 : 0, transition: "opacity 0.2s" }}
+      />
+    </>
+  );
+}
+
 // Report-wide photo list, one section per task with photos — opened by
 // hovering the "Photo Limit" indicator (see the draft chrome), not from
 // any single task item anymore. Every photo shows here (both included and
@@ -1455,7 +1473,7 @@ function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoE
         {sections.map(sec => (
           <div key={sec.entryKey} style={{ marginBottom: 20 }}>
             <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 8px" }}>{sec.taskName}</p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(8,1fr)", gap: 10 }}>
               {sec.items.map(({ k, pi }) => {
                 const key = `${sec.entryKey}_${pi}`;
                 const included = !(excludedPhotos && excludedPhotos[key]);
@@ -1476,7 +1494,7 @@ function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoE
                     style={{ position: "relative", padding: 0, border: "none", background: "none", cursor: capped ? "not-allowed" : "pointer", opacity: capped ? 0.45 : 1 }}
                   >
                     <div style={{ position: "relative", width: "100%", aspectRatio: "16/9", borderRadius: 6, overflow: "hidden", outline: included ? "2px solid var(--tt-secondary)" : "2px solid transparent" }}>
-                      <img src={IMG_MAP[k]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                      <ManagedPhotoImage src={IMG_MAP[k]} />
                       <span style={{ position: "absolute", top: 6, right: 6, width: 20, height: 20, borderRadius: "50%", background: included ? "var(--tt-secondary)" : "rgba(10,22,41,0.35)", border: included ? "none" : "1.5px solid white", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         {included && <Check size={12} color="white" strokeWidth={3} />}
                       </span>
