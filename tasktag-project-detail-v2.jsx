@@ -1515,8 +1515,9 @@ function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoE
                           except once checked, it stays visible so the
                           selection state reads at a glance. Withheld
                           entirely until the thumbnail itself has loaded, so
-                          the skeleton shows as just a skeleton. */}
-                      {loaded && (
+                          the skeleton shows as just a skeleton, and skipped
+                          altogether when capped since it can't be selected. */}
+                      {loaded && !capped && (
                         <span
                           className={included ? undefined : "opacity-0 transition-opacity group-hover:opacity-100"}
                           style={{ position: "absolute", top: 6, right: 6, width: 20, height: 20, borderRadius: "50%", background: included ? "var(--tt-secondary)" : "rgba(10,22,41,0.35)", border: included ? "none" : "1.5px solid white", display: "flex", alignItems: "center", justifyContent: "center" }}
