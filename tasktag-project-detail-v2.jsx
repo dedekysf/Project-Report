@@ -189,13 +189,13 @@ const initialsOf = (name) => name.split(" ").map(w => w[0]).filter(Boolean).slic
 const REPORT_ID = `TX-1520-${APP_TODAY.getFullYear()}-${String(APP_TODAY.getMonth() + 1).padStart(2, "0")}`;
 
 // ── Paginated document sizing ──
-// The live preview lays out its document as stacked A4 sheets (each with
-// its own header/footer) instead of one continuous scrolling card, so it
-// reads like a real paginated report. Width matches the reading column
-// this whole panel already uses (800px); height follows from the A4
-// ratio (297:210) at that width.
+// The live preview lays out its document as stacked Letter sheets (each
+// with its own header/footer) instead of one continuous scrolling card,
+// so it reads like a real paginated report. Width matches the reading
+// column this whole panel already uses (800px); height follows from the
+// US Letter ratio (11:8.5) at that width.
 const PAGE_W   = 800;
-const PAGE_H   = Math.round(PAGE_W * 297 / 210);
+const PAGE_H   = Math.round(PAGE_W * 11 / 8.5);
 const PAGE_PAD = 40;
 
 // TODO(BE): replace with the task's actual status/due date from the API —
@@ -1242,7 +1242,7 @@ const PHOTO_GRID_CAP = PHOTO_GRID_COLS; // 1 row before "+N more"
 // repacks pages from a layoutDepsKey that only reacts to shared/lifted
 // state, and the hidden measuring scaffold renders this same component
 // from that same state, so a purely local "expanded" flag would grow the
-// visible page past the A4 boundary without pagination ever finding out.
+// visible page past the Letter boundary without pagination ever finding out.
 //
 // A second circle in the bottom-left corner (icon centered inside it, both
 // axes) is the caption trigger — hover-only, always, even once a caption
@@ -2797,7 +2797,7 @@ const buildReportHTML = (report) => {
   // Flat list of page-able blocks — a label block per group (skipped for
   // day grouping, same reasoning as before) followed by one block per
   // real entry — mirrors the live view's own flatBlocks list, which is
-  // what gets packed onto A4 pages below. A manual note is spliced into
+  // what gets packed onto Letter pages below. A manual note is spliced into
   // g.entries right after the entry it's attached to (isNote:true
   // pseudo-entry) — it's consumed here into that entry's own block
   // instead of becoming its own block in the list. `isLabel` lets the
@@ -2947,7 +2947,7 @@ const buildReportHTML = (report) => {
     )
   );
 
-  // ── Pagination — split into real A4 pages, same as the live draft ──
+  // ── Pagination — split into real Letter pages, same as the live draft ──
   // Real DOM measurement (offsetHeight), same technique as the live
   // view's hidden measuring scaffold: buildReportHTML only ever runs
   // client-side (the download/copy handlers, and the shared-link
@@ -3011,8 +3011,8 @@ const buildReportHTML = (report) => {
   });
   if (current.length > 0 || pages.length === 0) pages.push(current);
 
-  // width/min-height match PAGE_W/PAGE_H exactly (the live view's own A4
-  // proportions — 800 × round(800×297/210)) rather than a loose max-width,
+  // width/min-height match PAGE_W/PAGE_H exactly (the live view's own
+  // Letter proportions — 800 × round(800×11/8.5)) rather than a loose max-width,
   // and the shadow matches the live page card's own
   // "0 1px 3px rgba(10,22,41,0.08)".
   // display:flex + flex-direction:column on .card, with flex:1 on the
@@ -3333,7 +3333,7 @@ function ReportsTab({ demoCase }) {
   // ── Pagination ──
   // Flatten the visible groups into one ordered list of blocks (an
   // optional group-label block, then one block per entry) so they can be
-  // measured and packed onto A4-sized pages, same as a real paginated
+  // measured and packed onto Letter-sized pages, same as a real paginated
   // report would be laid out.
   const flatBlocks = [];
   if (previewData) {
@@ -3789,7 +3789,7 @@ function ReportsTab({ demoCase }) {
   );
 
   // Measure the header/footer and every block once (off-screen, at the
-  // real page content width) and greedily pack them onto A4 pages — the
+  // real page content width) and greedily pack them onto Letter pages — the
   // same technique a real paginated document layout engine uses, just
   // done in JS against actual rendered heights instead of a print
   // engine's own reflow. Page 1 gets the full header; every later page
@@ -4490,7 +4490,7 @@ function ReportsTab({ demoCase }) {
               <div style={{ padding: "24px 20px" }}>
               <div style={{ maxWidth: 800, margin: "0 auto" }}>
                 {previewLoading ? (
-                  // Mirrors the real A4 page below it — same width/padding/
+                  // Mirrors the real Letter page below it — same width/padding/
                   // footer structure — so the loading state doesn't jump to
                   // a different layout once the real draft appears. Entry
                   // rows still mirror the real data (group/photo counts),
@@ -4556,7 +4556,7 @@ function ReportsTab({ demoCase }) {
                         effect it feeds. */}
                     {hiddenMeasuringScaffold}
 
-                    {/* Real, visible pages — stacked A4 sheets, each with
+                    {/* Real, visible pages — stacked Letter sheets, each with
                         its own header/footer, so the preview reads like a
                         real paginated report instead of one long scroll.
                         content-visibility lets the browser skip layout/paint
