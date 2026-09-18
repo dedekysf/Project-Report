@@ -798,6 +798,11 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
     // was seeded from a non-empty value on the text-tag's onClick below),
     // not the field's very first, still-blank fill-in.
     const showCancel = !!(editStartValueRef.current && editStartValueRef.current.trim());
+    // The confirm button only appears once something's actually been
+    // typed — an untouched, still-blank field (its initial default state)
+    // shows neither button, not a permanently-disabled checkmark.
+    const showConfirm = !draftEmpty;
+    const buttonReserve = (showCancel && showConfirm) ? 76 : (showCancel || showConfirm) ? 44 : 12;
     const confirmButton = (
       <button
         disabled={confirmDisabled}
@@ -865,9 +870,9 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
             }}
             placeholder={placeholder}
             rows={2}
-            style={{ fontFamily: "inherit", paddingRight: showCancel ? 76 : 44, overflowY: "hidden", ...inputStyle }}
+            style={{ fontFamily: "inherit", paddingRight: buttonReserve, overflowY: "hidden", ...inputStyle }}
           />
-          <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>{showCancel && cancelButton}{confirmButton}</div>
+          <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>{showCancel && cancelButton}{showConfirm && confirmButton}</div>
         </div>
       </div>
     ) : (
@@ -884,9 +889,9 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
             if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); cancelEdit(); }
           }}
           placeholder={placeholder}
-          style={{ fontFamily: "inherit", padding: showCancel ? "0 76px 0 12px" : "0 44px 0 12px", ...inputStyle }}
+          style={{ fontFamily: "inherit", padding: `0 ${buttonReserve}px 0 12px`, ...inputStyle }}
         />
-        <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>{showCancel && cancelButton}{confirmButton}</div>
+        <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>{showCancel && cancelButton}{showConfirm && confirmButton}</div>
       </div>
     );
   }
@@ -1190,7 +1195,7 @@ function PhotoThumb({ src, onClick }) {
   return (
     <div
       onClick={onClick}
-      style={{ position: "relative", width: "100%", height: 140, borderRadius: 4, overflow: "hidden", cursor: onClick ? "pointer" : "default" }}
+      style={{ position: "relative", width: "100%", aspectRatio: "16/9", borderRadius: 4, overflow: "hidden", cursor: onClick ? "pointer" : "default" }}
     >
       {!loaded && <div className="tt-skeleton" style={{ position: "absolute", inset: 0, borderRadius: 0 }} />}
       <img
@@ -1206,7 +1211,7 @@ function PhotoThumb({ src, onClick }) {
 
 // Shared with ReportsTab's flatBlocks construction, which needs the same
 // chunk size to build continuation blocks for a "+N more" reveal.
-const PHOTO_GRID_COLS = 3;
+const PHOTO_GRID_COLS = 5;
 const PHOTO_GRID_CAP = PHOTO_GRID_COLS; // 1 row before "+N more"
 
 // Photo grid capped to 1 row of 3 — beyond that, the last visible cell
@@ -1240,41 +1245,13 @@ const PHOTO_GRID_CAP = PHOTO_GRID_COLS; // 1 row before "+N more"
 // off the trigger's own bounding rect (so it isn't clipped by the
 // grid/scroll container), with a single input for the caption text. Only
 // one popover is open at a time across the grid.
-function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, onToggleSelect, captions, onCaptionChange, windowStart, windowEnd, onExpand }) {
-  const [openCaptionIdx, setOpenCaptionIdx] = useState(null); // original photo index, or null
-  const [captionPos, setCaptionPos] = useState({ top: 0, left: 0 });
-  const captionTriggerRef = useRef(null); // the specific trigger button last clicked, for scroll repositioning
-  const captionPopoverRef = useRef(null);
-  const captionStartRef = useRef(""); // caption text when the open popover was triggered, for the "no change" disabled check
-
-  useEffect(() => {
-    if (openCaptionIdx === null) return;
-    const handler = e => { if (captionPopoverRef.current && !captionPopoverRef.current.contains(e.target)) setOpenCaptionIdx(null); };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [openCaptionIdx]);
-  // The popover is `position: fixed`, so its top/left are only ever
-  // correct for the scroll position at the moment it opened — without
-  // this, scrolling the modal's body leaves it stranded while the trigger
-  // moves on. `true` (capture phase) is what lets this catch scroll on the
-  // modal's own scroll container, not just window-level scroll. Once the
-  // trigger scrolls fully behind the chrome bar, close instead of relocating
-  // — see isHiddenByChrome.
-  useEffect(() => {
-    if (openCaptionIdx === null) return;
-    const reposition = () => {
-      if (!captionTriggerRef.current) return;
-      const r = captionTriggerRef.current.getBoundingClientRect();
-      if (isHiddenByChrome(r)) { setOpenCaptionIdx(null); return; }
-      setCaptionPos({ top: r.bottom + 8, left: r.left - 6 });
-    };
-    window.addEventListener("scroll", reposition, true);
-    window.addEventListener("resize", reposition);
-    return () => {
-      window.removeEventListener("scroll", reposition, true);
-      window.removeEventListener("resize", reposition);
-    };
-  }, [openCaptionIdx]);
+function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, onToggleSelect, captions, windowStart, windowEnd, onExpand }) {
+  // Captions are read-only here — editable only from the lightbox (see
+  // PhotoLightbox). This is just a hover indicator: the sticky-note icon
+  // only appears when a caption already exists, and hovering it (not
+  // clicking) shows the caption text in a tooltip.
+  const [captionTooltipIdx, setCaptionTooltipIdx] = useState(null); // original photo index, or null
+  const [captionTooltipPos, setCaptionTooltipPos] = useState({ top: 0, left: 0 });
 
   const items = (photos || [])
     .map((k, i) => ({ k, i }))
@@ -1336,23 +1313,22 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
                 {selected && <Check size={12} color="white" strokeWidth={3} />}
               </button>
             )}
-            {!isCapCell && IMG_MAP[k] && onCaptionChange && (
+            {!isCapCell && IMG_MAP[k] && caption && (
               <button
-                onClick={e => {
-                  e.stopPropagation();
-                  captionTriggerRef.current = e.currentTarget;
-                  captionStartRef.current = caption || "";
+                type="button"
+                onMouseEnter={e => {
                   const r = e.currentTarget.getBoundingClientRect();
-                  setCaptionPos({ top: r.bottom + 8, left: r.left - 6 });
-                  setOpenCaptionIdx(prev => prev === i ? null : i);
+                  setCaptionTooltipPos({ top: r.top - 8, left: r.left });
+                  setCaptionTooltipIdx(i);
                 }}
+                onMouseLeave={() => setCaptionTooltipIdx(null)}
                 className="opacity-0 transition-opacity group-hover:opacity-100"
                 style={{
                   position: "absolute", bottom: 6, left: 6,
                   width: 20, height: 20, borderRadius: "50%",
                   border: "none", background: "white",
                   display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
-                  cursor: "pointer", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)",
+                  cursor: "default", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)",
                   zIndex: 2,
                 }}
               >
@@ -1374,72 +1350,18 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
                 +{remaining} more
               </button>
             )}
-            {openCaptionIdx === i && createPortal(
-              // Portaled straight to <body> — pages after the first have
-              // contentVisibility:auto (see visiblePages), which (like a
-              // transform) makes that page div a containing block for its
-              // position:fixed descendants. Left in place, this popover's
-              // computed top/left (real viewport coordinates from
-              // getBoundingClientRect) would land relative to that page's
-              // own box instead of the viewport, landing in the wrong
-              // spot on every page but the first.
-              //
-              // The portal also moves this out from under the draft
-              // modal's own stacking context (#draft-chrome, z-index
-              // 2000) — as a sibling of it under <body> now instead of a
-              // descendant, it needs a z-index that beats 2000 directly to
-              // still paint on top, not just the low value (300) that
-              // sufficed against its old, local siblings.
-              <div ref={captionPopoverRef} style={{ position: "fixed", top: captionPos.top, left: captionPos.left, zIndex: 5300, width: 240 }}>
-                <div style={{ position: "absolute", top: -5, left: 12, width: 10, height: 10, background: "white", border: "1px solid var(--tt-grey03)", borderRight: "none", borderBottom: "none", transform: "rotate(45deg)" }} />
-                <div style={{ position: "relative", background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, padding: 8, boxShadow: "0 8px 24px rgba(10,22,41,0.16)" }}>
-                  <div style={{ position: "relative" }}>
-                    <Input
-                      ref={focusAtEnd}
-                      value={caption || ""}
-                      onChange={ev => onCaptionChange(i, ev.target.value)}
-                      onKeyDown={ev => {
-                        if (ev.key === "Enter") { ev.preventDefault(); setOpenCaptionIdx(null); }
-                        // Unlike Enter, Escape discards this session's
-                        // change — captions auto-save on every keystroke
-                        // (no deferred draft), so "cancel" means reverting
-                        // to whatever it held when the popover opened.
-                        if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); onCaptionChange(i, captionStartRef.current); setOpenCaptionIdx(null); }
-                      }}
-                      placeholder="Add a caption"
-                      style={{ fontSize: 12, height: 32, padding: "0 36px 0 10px" }}
-                    />
-                    {/* Caption already auto-saves on every keystroke — this
-                        button is just a "done" affordance (closes the
-                        popover) and always stays enabled, even with nothing
-                        typed — an empty caption is a valid outcome (the
-                        trigger was opened, then the user decided against
-                        one), unlike every other edit mode's "nothing to
-                        confirm" rule. */}
-                    <button
-                      onClick={() => setOpenCaptionIdx(null)}
-                      onMouseEnter={ev => ev.currentTarget.style.opacity = "0.85"}
-                      onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
-                      style={{
-                        position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)",
-                        width: 24, height: 24, borderRadius: 6, border: "none",
-                        background: "var(--tt-text-1)", cursor: "pointer",
-                        display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
-                      }}
-                    >
-                      <Check size={13} strokeWidth={SW} color="white" />
-                    </button>
-                  </div>
+            {captionTooltipIdx === i && createPortal(
+              // Portaled straight to <body> — same contentVisibility/
+              // stacking-context reasoning as the lightbox's own caption
+              // editor; see its comment for the full explanation.
+              <div style={{ position: "fixed", top: captionTooltipPos.top, left: captionTooltipPos.left, transform: "translateY(-100%)", zIndex: 5300, maxWidth: 220, pointerEvents: "none" }}>
+                <div style={{ background: "var(--tt-text-1)", color: "white", fontSize: 11, fontWeight: 500, lineHeight: 1.4, padding: "6px 10px", borderRadius: 6, boxShadow: "0 8px 24px rgba(10,22,41,0.24)" }}>
+                  {caption}
                 </div>
               </div>,
               document.body
             )}
           </div>
-          {!isCapCell && caption && (
-            <p style={{ fontSize: 11, color: "var(--tt-grey06)", margin: "4px 0 4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "center" }}>
-              {caption}
-            </p>
-          )}
           </div>
         );
       })}
@@ -2659,7 +2581,7 @@ const buildReportHTML = (report) => {
   const SANS = "-apple-system,BlinkMacSystemFont,'Inter',sans-serif";
   const SERIF = "'Lora',Georgia,serif";
 
-  // Fixed 3-column grid — every photo shows here (no "+N more" cap;
+  // Fixed 2-column grid — every photo shows here (no "+N more" cap;
   // there's nothing left to expand into). Rendered per CHUNK (see
   // PHOTO_CHUNK below) rather than all of an entry's photos in one
   // block, so the pagination pass below can place each chunk on
@@ -2688,10 +2610,10 @@ const buildReportHTML = (report) => {
     // — only the very first chunk uses the larger 16px gap down from
     // the note/checklist above it. isLast carries the entry's own
     // trailing gap (see PHOTO_CHUNK/entryHeaderHTML).
-    return h("div", { style: `display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:${marginTop}px;margin-bottom:${isLast ? 80 : 0}px;` }, ...cells);
+    return h("div", { style: `display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:${marginTop}px;margin-bottom:${isLast ? 80 : 0}px;` }, ...cells);
   };
-  // Two rows of the 3-column grid per continuation block.
-  const PHOTO_CHUNK = 6;
+  // Two rows of the 2-column grid per continuation block.
+  const PHOTO_CHUNK = 4;
 
   const groupLabel = (g) => formatGroupLabel(g, grouping);
 
@@ -3499,7 +3421,6 @@ function ReportsTab({ demoCase }) {
             selectedPhotos={selectedPhotos}
             onToggleSelect={previewSaved ? undefined : (idx, photoKey) => togglePhotoSelected(entryKey, idx, photoKey)}
             captions={preview.photoCaptions}
-            onCaptionChange={previewSaved ? undefined : (idx, text) => setPhotoCaption(entryKey, idx, text)}
             windowEnd={hasRevealedContinuation ? PHOTO_GRID_CAP : undefined}
             // "+N more" reveals every remaining photo at once — the
             // flatBlocks chunk loop already stops generating chunks once
@@ -3527,7 +3448,6 @@ function ReportsTab({ demoCase }) {
         selectedPhotos={selectedPhotos}
         onToggleSelect={previewSaved ? undefined : (idx, photoKey) => togglePhotoSelected(entryKey, idx, photoKey)}
         captions={preview.photoCaptions}
-        onCaptionChange={previewSaved ? undefined : (idx, text) => setPhotoCaption(entryKey, idx, text)}
         windowStart={chunk * PHOTO_GRID_CAP}
         windowEnd={isTip ? undefined : (chunk + 1) * PHOTO_GRID_CAP}
         onExpand={() => setExpandedPhotoGroups(p => ({ ...p, [entryKey]: Infinity }))}
@@ -4352,8 +4272,8 @@ function ReportsTab({ demoCase }) {
                 </>
               ) : (
                 // TODO(BE): replace with the account's actual per-report photo cap and usage from the API
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, width: 160 }}>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: 0, whiteSpace: "nowrap" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, width: 260 }}>
+                  <p style={{ fontSize: 22, fontWeight: 600, color: "var(--tt-text-1)", margin: 0, whiteSpace: "nowrap" }}>
                     Photo Limit {previewPhotoCount} of {PHOTO_LIMIT}
                   </p>
                   <div style={{ height: 6, borderRadius: 99, background: "var(--tt-grey03)", overflow: "hidden" }}>
@@ -4401,8 +4321,8 @@ function ReportsTab({ demoCase }) {
                         <div key={ti} style={{ marginBottom: 20 }}>
                           <div className="tt-skeleton" style={{ width: "60%", height: 18, marginBottom: 8 }} />
                           <div className="tt-skeleton" style={{ width: 160, height: 11, marginBottom: 10 }} />
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
-                            {[0, 1, 2].map(pi => (
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8 }}>
+                            {[0, 1, 2, 3, 4].map(pi => (
                               <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "16/9", borderRadius: 4 }} />
                             ))}
                           </div>
@@ -4450,8 +4370,8 @@ function ReportsTab({ demoCase }) {
                     {loadingMore && (
                       <div style={{ width: PAGE_W, margin: "24px 0 0" }}>
                         <div className="tt-skeleton" style={{ width: "85%", height: 16, marginBottom: 10 }} />
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
-                          {[0, 1, 2].map(pi => (
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8 }}>
+                          {[0, 1, 2, 3, 4].map(pi => (
                             <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "16/9", borderRadius: 4 }} />
                           ))}
                         </div>
