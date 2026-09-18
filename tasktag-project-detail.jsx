@@ -1369,19 +1369,27 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, onDeletePhoto, ca
   );
 }
 
-// Full photo list for a task item over the per-task cap — opened from the
-// meta line's "X of Y photos" link (see renderEntryBlock). Every photo
-// shows here (both included and excluded) as a freely checkable/uncheckable
-// thumbnail — but checking one more once already at PER_ENTRY_PHOTO_LIMIT
-// selected is blocked with a warning instead of silently going over,
-// same limit defaultOverflowExclusions uses for a fresh report's default
+// Report-wide photo list, one section per task with photos — opened by
+// hovering the "Photo Limit" indicator (see the draft chrome), not from
+// any single task item anymore. Every photo shows here (both included and
+// excluded) as a freely checkable/uncheckable thumbnail — but checking one
+// more once already at PHOTO_LIMIT selected is blocked with a warning
+// instead of silently going over, same limit
+// defaultGlobalOverflowExclusions uses for a fresh report's default
 // selection.
-function PhotoManagerModal({ photos, excludedPhotos, entryKey, taskName, onSetPhotoExcluded, onClose }) {
-  const items = (photos || []).map((k, i) => ({ k, i })).filter(({ k }) => IMG_MAP[k]);
-  const includedCount = items.filter(({ i }) => !(excludedPhotos && excludedPhotos[`${entryKey}_${i}`])).length;
+function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoExcluded, onClose }) {
+  const sections = groups.flatMap(g => g.entries.map((e, i) => {
+    const entryKey = `${g.key}_${i}`;
+    const items = (e.photos || []).map((k, pi) => ({ k, pi })).filter(({ k }) => IMG_MAP[k]);
+    return items.length > 0 ? { entryKey, taskName: (titleOverrides && titleOverrides[entryKey]) ?? e.note, items } : null;
+  })).filter(Boolean);
+  const includedCount = sections.reduce(
+    (s, sec) => s + sec.items.filter(({ pi }) => !(excludedPhotos && excludedPhotos[`${sec.entryKey}_${pi}`])).length,
+    0
+  );
   const [limitWarning, setLimitWarning] = useState(false);
   const warningTimerRef = useRef(null);
-  const [cappedTooltipIdx, setCappedTooltipIdx] = useState(null); // index of the capped (disabled) photo currently hovered, or null
+  const [cappedTooltipKey, setCappedTooltipKey] = useState(null); // `${entryKey}_${pi}` of the capped (disabled) photo currently hovered, or null
   const [cappedTooltipPos, setCappedTooltipPos] = useState({ top: 0, left: 0 });
 
   useEffect(() => {
@@ -1406,7 +1414,7 @@ function PhotoManagerModal({ photos, excludedPhotos, entryKey, taskName, onSetPh
     >
       <div
         onClick={e => e.stopPropagation()}
-        style={{ width: 560, maxWidth: "calc(100vw - 32px)", maxHeight: "calc(100vh - 64px)", overflowY: "auto", background: "white", borderRadius: 16, padding: 24, boxShadow: "0 16px 48px rgba(10,22,41,0.25)" }}
+        style={{ width: 640, maxWidth: "calc(100vw - 32px)", maxHeight: "calc(100vh - 64px)", overflowY: "auto", background: "white", borderRadius: 16, padding: 24, boxShadow: "0 16px 48px rgba(10,22,41,0.25)" }}
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
           <p style={{ fontSize: 20, fontWeight: 700, color: "var(--tt-text-1)", margin: 0 }}>Manage photos</p>
@@ -1419,47 +1427,52 @@ function PhotoManagerModal({ photos, excludedPhotos, entryKey, taskName, onSetPh
             <X size={20} strokeWidth={SW} />
           </button>
         </div>
-        {taskName && <p style={{ fontSize: 13, color: "var(--tt-grey05)", margin: "0 0 16px" }}>{taskName}</p>}
-        <p style={{ fontSize: 12, fontWeight: 600, color: "var(--tt-text-2)", margin: "0 0 12px" }}>
-          {includedCount} of {items.length} selected
+        <p style={{ fontSize: 12, fontWeight: 600, color: "var(--tt-text-2)", margin: "0 0 16px" }}>
+          {includedCount} of {PHOTO_LIMIT} selected
         </p>
         {limitWarning && (
-          <p style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500, color: "var(--tt-red)", background: "rgba(229,72,77,0.08)", borderRadius: 6, padding: "8px 10px", margin: "0 0 12px" }}>
+          <p style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500, color: "var(--tt-red)", background: "rgba(229,72,77,0.08)", borderRadius: 6, padding: "8px 10px", margin: "0 0 16px" }}>
             <AlertTriangle size={13} strokeWidth={SW} style={{ flexShrink: 0 }} />
-            You can select up to {PER_ENTRY_PHOTO_LIMIT} photos — uncheck one first.
+            You can select up to {PHOTO_LIMIT} photos — uncheck one first.
           </p>
         )}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
-          {items.map(({ k, i }) => {
-            const included = !(excludedPhotos && excludedPhotos[`${entryKey}_${i}`]);
-            const capped = !included && includedCount >= PER_ENTRY_PHOTO_LIMIT;
-            return (
-              <button
-                key={i}
-                onClick={() => {
-                  if (capped) { flashLimitWarning(); return; }
-                  onSetPhotoExcluded(i, included);
-                }}
-                onMouseEnter={capped ? e => {
-                  setCappedTooltipPos({ top: e.clientY, left: e.clientX });
-                  setCappedTooltipIdx(i);
-                } : undefined}
-                onMouseMove={capped ? e => setCappedTooltipPos({ top: e.clientY, left: e.clientX }) : undefined}
-                onMouseLeave={capped ? () => setCappedTooltipIdx(null) : undefined}
-                style={{ position: "relative", padding: 0, border: "none", background: "none", cursor: capped ? "not-allowed" : "pointer", opacity: capped ? 0.45 : 1 }}
-              >
-                <div style={{ position: "relative", width: "100%", aspectRatio: "16/9", borderRadius: 6, overflow: "hidden", outline: included ? "2px solid var(--tt-secondary)" : "2px solid transparent" }}>
-                  <img src={IMG_MAP[k]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                  <span style={{ position: "absolute", top: 6, right: 6, width: 20, height: 20, borderRadius: "50%", background: included ? "var(--tt-secondary)" : "rgba(10,22,41,0.35)", border: included ? "none" : "1.5px solid white", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    {included && <Check size={12} color="white" strokeWidth={3} />}
-                  </span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+        {sections.map(sec => (
+          <div key={sec.entryKey} style={{ marginBottom: 20 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 8px" }}>{sec.taskName}</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
+              {sec.items.map(({ k, pi }) => {
+                const key = `${sec.entryKey}_${pi}`;
+                const included = !(excludedPhotos && excludedPhotos[key]);
+                const capped = !included && includedCount >= PHOTO_LIMIT;
+                return (
+                  <button
+                    key={pi}
+                    onClick={() => {
+                      if (capped) { flashLimitWarning(); return; }
+                      onSetPhotoExcluded(sec.entryKey, pi, included);
+                    }}
+                    onMouseEnter={capped ? e => {
+                      setCappedTooltipPos({ top: e.clientY, left: e.clientX });
+                      setCappedTooltipKey(key);
+                    } : undefined}
+                    onMouseMove={capped ? e => setCappedTooltipPos({ top: e.clientY, left: e.clientX }) : undefined}
+                    onMouseLeave={capped ? () => setCappedTooltipKey(null) : undefined}
+                    style={{ position: "relative", padding: 0, border: "none", background: "none", cursor: capped ? "not-allowed" : "pointer", opacity: capped ? 0.45 : 1 }}
+                  >
+                    <div style={{ position: "relative", width: "100%", aspectRatio: "16/9", borderRadius: 6, overflow: "hidden", outline: included ? "2px solid var(--tt-secondary)" : "2px solid transparent" }}>
+                      <img src={IMG_MAP[k]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                      <span style={{ position: "absolute", top: 6, right: 6, width: 20, height: 20, borderRadius: "50%", background: included ? "var(--tt-secondary)" : "rgba(10,22,41,0.35)", border: included ? "none" : "1.5px solid white", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        {included && <Check size={12} color="white" strokeWidth={3} />}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
-      {cappedTooltipIdx !== null && (
+      {cappedTooltipKey !== null && (
         <div style={{
           position: "fixed", zIndex: 5200,
           top: cappedTooltipPos.top + 16, left: cappedTooltipPos.left + 12,
@@ -2345,38 +2358,6 @@ function formatGroupLabel(g, grouping) {
 // TODO(BE): replace with the account's actual per-report photo cap from the API
 const PHOTO_LIMIT = 50;
 
-function applyPhotoCap(groups, maxPhotos = PHOTO_LIMIT) {
-  // Count total photos
-  let total = groups.reduce((sum, g) => sum + g.entries.reduce((s, e) => s + e.photos.length, 0), 0);
-  if (total <= maxPhotos) return groups;
-
-  // Even sampling: collect all photos with position, sample evenly
-  const all = [];
-  groups.forEach((g, gi) => g.entries.forEach((e, ei) => e.photos.forEach((p, pi) => {
-    all.push({ gi, ei, pi, photo: p });
-  })));
-
-  const step = all.length / maxPhotos;
-  const selected = new Set();
-  for (let i = 0; i < maxPhotos; i++) {
-    selected.add(Math.min(Math.floor(i * step), all.length - 1));
-  }
-
-  // Rebuild groups keeping only selected photos. An entry that started
-  // with photos but got trimmed down to zero by the cap is dropped
-  // entirely — keeping it around as a bare, photo-less title would be
-  // indistinguishable from (and get mislabeled as) a genuinely completed
-  // no-photo task. A genuinely no-photo entry (e.noPhotos, tagged before
-  // capping) is always kept regardless.
-  return groups.map((g, gi) => ({
-    ...g,
-    entries: g.entries.map((e, ei) => ({
-      ...e,
-      photos: e.photos.filter((_, pi) => selected.has(all.findIndex(a => a.gi === gi && a.ei === ei && a.pi === pi))),
-    })).filter(e => e.photos.length > 0 || e.noPhotos),
-  }));
-}
-
 // TODO(BE): replace with the account's actual per-task-item photo cap from the API
 const PER_ENTRY_PHOTO_LIMIT = 15;
 
@@ -2399,6 +2380,29 @@ function defaultOverflowExclusions(groups, maxPerEntry = PER_ENTRY_PHOTO_LIMIT) 
   return excluded;
 }
 
+// Report-wide counterpart to defaultOverflowExclusions — layered on top of
+// it (perEntryExcluded already applied) to bring the total included photo
+// count down to PHOTO_LIMIT, using the same even-sampling approach the old
+// (destructive) applyPhotoCap used, but expressed as excludedPhotos entries
+// instead of physically trimming e.photos, so every photo stays available
+// for the user to reconsider via Manage Photos.
+function defaultGlobalOverflowExclusions(groups, perEntryExcluded, maxTotal = PHOTO_LIMIT) {
+  const included = [];
+  groups.forEach(g => g.entries.forEach((e, i) => {
+    const entryKey = `${g.key}_${i}`;
+    e.photos.forEach((_, pi) => {
+      if (!perEntryExcluded[`${entryKey}_${pi}`]) included.push(`${entryKey}_${pi}`);
+    });
+  }));
+  if (included.length <= maxTotal) return {};
+  const step = included.length / maxTotal;
+  const keep = new Set();
+  for (let i = 0; i < maxTotal; i++) keep.add(Math.min(Math.floor(i * step), included.length - 1));
+  const excluded = {};
+  included.forEach((key, idx) => { if (!keep.has(idx)) excluded[key] = true; });
+  return excluded;
+}
+
 function buildReportData(dateRange, periodStr, customRange, includeNoPhotoTasks = true) {
   const { start, end } = parsePeriodDates(periodStr, dateRange, customRange);
   const grouping = getGrouping(start, end);
@@ -2408,16 +2412,16 @@ function buildReportData(dateRange, periodStr, customRange, includeNoPhotoTasks 
       .map(g => ({ ...g, entries: g.entries.filter(e => e.photos.length > 0) }))
       .filter(g => g.entries.length > 0);
   }
-  // Tag each entry's "no photos" status now, before applyPhotoCap can trim
-  // an otherwise-photographed entry down to zero photos for display —
-  // otherwise a task that merely got capped would be indistinguishable
-  // from one that was genuinely completed with no photos, and both would
-  // wrongly show the "Completed" tag.
+  // Tag each entry's "no photos" status now — the full, uncapped photo
+  // list stays intact from here on; the report-wide 50-photo limit is
+  // enforced via excludedPhotos (see defaultGlobalOverflowExclusions),
+  // not by trimming it out of the data, so Manage Photos can always show
+  // (and let the user reconsider) every photo, not just whatever survived
+  // an earlier automatic sample.
   groups = groups.map(g => ({
     ...g,
     entries: g.entries.map(e => ({ ...e, noPhotos: e.photos.length === 0 })),
   }));
-  groups = applyPhotoCap(groups).filter(g => g.entries.length > 0);
 
   // completed = entries actually attached to this report (countable from
   // what's shown below), total = the whole project's activity log — so the
@@ -2955,7 +2959,7 @@ function ReportsTab({ demoCase }) {
   const [toast,       setToast]       = useState(null); // { type: "success" | "error", message }
   const [deleteTarget, setDeleteTarget] = useState(null); // report pending delete confirmation
   const [lightbox, setLightbox] = useState(null); // { photos, index, caption } | null — full-screen photo viewer
-  const [photoManager, setPhotoManager] = useState(null); // { entryKey, photos, taskName } | null — full photo list modal for an over-the-cap task item
+  const [photoManager, setPhotoManager] = useState(false); // report-wide "manage photos" modal, opened by hovering the Photo Limit indicator
   const [expandedPhotoGroups, setExpandedPhotoGroups] = useState({}); // { [entryKey]: revealedChunkCount } — how many extra "+N more" chunks are showing per entry; lifted (not local to PhotoGrid) so pagination repacks as each one is revealed
   const periodRef     = useRef(null);
   const chipRef       = useRef(null);
@@ -3086,6 +3090,8 @@ function ReportsTab({ demoCase }) {
         showToast("error", "No data for this period");
         return; // don't open the modal on an empty period — just the toast
       }
+      const perEntryExcluded = defaultOverflowExclusions(data.groups);
+      const defaultExcludedPhotos = { ...perEntryExcluded, ...defaultGlobalOverflowExclusions(data.groups, perEntryExcluded) };
       setPreview({
         includeSummary,
         includeNoPhotoTasks,
@@ -3100,7 +3106,7 @@ function ReportsTab({ demoCase }) {
         // instead of just tacking onto the global save count.
         version: reports.length > 0 && reports[0].period === period ? reports[0].version + 1 : 1,
         extraNotes: {},
-        excludedPhotos: defaultOverflowExclusions(data.groups),
+        excludedPhotos: defaultExcludedPhotos,
         photoCaptions: {},
         // System-generated starting point — freely editable from here, and
         // never regenerated for the life of this draft.
@@ -3135,7 +3141,7 @@ function ReportsTab({ demoCase }) {
     setPreviewCopied(false);
     setVisibleCount(10);
     setLoadingMore(false);
-    setPhotoManager(null);
+    setPhotoManager(false);
     setExpandedPhotoGroups({});
   };
 
@@ -3189,11 +3195,12 @@ function ReportsTab({ demoCase }) {
   const previewFinalGroups = previewData
     ? applyExtraNotesToGroups(applyTitleOverrides(applyPhotoExclusions(previewData.groups, preview.excludedPhotos), titleOverrides), preview.extraNotes)
     : [];
-  // Photos actually included in this draft (post-cap) vs. the account's
-  // per-report limit — shown in the modal chrome's Photo Limit indicator.
-  const previewPhotoCount = previewData
-    ? previewData.groups.reduce((s, g) => s + g.entries.reduce((es, e) => es + e.photos.length, 0), 0)
-    : 0;
+  // Photos actually included in this draft (post-exclusions) vs. the
+  // account's per-report limit — shown in the modal chrome's Photo Limit
+  // indicator. Derived from previewFinalGroups (already exclusion-filtered)
+  // rather than raw previewData.groups, so it reflects what's CURRENTLY
+  // included, not the uncapped total before any exclusion was applied.
+  const previewPhotoCount = previewFinalGroups.reduce((s, g) => s + g.entries.reduce((es, e) => es + (e.isNote ? 0 : e.photos.length), 0), 0);
 
   // Infinite scroll over the *displayed* groups (not previewFinalGroups —
   // manual notes are only spliced in for real output, not the live modal).
@@ -3312,9 +3319,9 @@ function ReportsTab({ demoCase }) {
 
   const renderEntryBlock = ({ entryKey, e }) => {
     const displayTitle = titleOverrides[entryKey] ?? e.note;
-    // e.noPhotos is set once in buildReportData, before applyPhotoCap can
-    // zero out an otherwise-photographed entry's photos — an entry merely
-    // capped down to 0 photos must never be shown as photo-less here.
+    // e.noPhotos is set once in buildReportData from the true, uncapped
+    // photo count — an entry with excluded photos must never be shown as
+    // photo-less here just because its currently-included count is 0.
     const isPhotoless = e.noPhotos;
     const { kind } = statusForEntry(e);
     const statusMeta = STATUS_META[kind];
@@ -3361,25 +3368,12 @@ function ReportsTab({ demoCase }) {
           {!isPhotoless && visiblePhotoCount > 0 && (
             <>
               <span style={{ width: 3, height: 3, borderRadius: "50%", background: "var(--tt-grey04)", flexShrink: 0 }} />
-              {/* Over the per-task cap: the plain count becomes a link into
-                  the full photo manager modal, since there's more going on
-                  than the row can show — everything else still just reads
-                  as text. */}
-              {!previewSaved && e.photos.length > PER_ENTRY_PHOTO_LIMIT ? (
-                <button
-                  onClick={() => setPhotoManager({ entryKey, photos: e.photos, taskName: displayTitle })}
-                  onMouseEnter={ev => ev.currentTarget.style.textDecoration = "underline"}
-                  onMouseLeave={ev => ev.currentTarget.style.textDecoration = "none"}
-                  style={{ display: "flex", alignItems: "center", gap: 3, background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 11, fontWeight: 500, color: "var(--tt-grey05)" }}
-                >
-                  {visiblePhotoCount} of {e.photos.length} photos
-                  <ExternalLink size={11} strokeWidth={SW} />
-                </button>
-              ) : (
-                <span style={{ fontSize: 11, fontWeight: 500, color: "var(--tt-grey05)" }}>
-                  {visiblePhotoCount} photo{visiblePhotoCount === 1 ? "" : "s"}
-                </span>
-              )}
+              {/* Plain text always now — Manage Photos moved to a single,
+                  report-wide entry point (the Photo Limit indicator), not
+                  triggered per task item from here anymore. */}
+              <span style={{ fontSize: 11, fontWeight: 500, color: "var(--tt-grey05)" }}>
+                {visiblePhotoCount} photo{visiblePhotoCount === 1 ? "" : "s"}
+              </span>
             </>
           )}
         </div>
@@ -4253,9 +4247,16 @@ function ReportsTab({ demoCase }) {
                 </>
               ) : (
                 // TODO(BE): replace with the account's actual per-report photo cap and usage from the API
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "fit-content" }}>
-                  <p style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", margin: 0, whiteSpace: "nowrap" }}>
+                // Hovering this label (not clicking) opens the report-wide
+                // Manage Photos modal — the single entry point for curating
+                // which photos count toward PHOTO_LIMIT.
+                <div
+                  onMouseEnter={() => setPhotoManager(true)}
+                  style={{ display: "flex", flexDirection: "column", gap: 6, width: "fit-content", cursor: "pointer" }}
+                >
+                  <p style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", margin: 0, whiteSpace: "nowrap" }}>
                     Photo Limit {previewPhotoCount} of {PHOTO_LIMIT}
+                    <ExternalLink size={14} strokeWidth={SW} style={{ flexShrink: 0 }} />
                   </p>
                   <div style={{ width: "90%", height: 6, borderRadius: 99, background: "var(--tt-grey03)", overflow: "hidden" }}>
                     <div style={{ width: `${Math.min(100, (previewPhotoCount / PHOTO_LIMIT) * 100)}%`, height: "100%", borderRadius: 99, background: "var(--tt-secondary)" }} />
@@ -4529,14 +4530,13 @@ function ReportsTab({ demoCase }) {
         />
       )}
 
-      {photoManager && (
+      {photoManager && previewData && (
         <PhotoManagerModal
-          photos={photoManager.photos}
+          groups={previewData.groups}
           excludedPhotos={preview.excludedPhotos}
-          entryKey={photoManager.entryKey}
-          taskName={photoManager.taskName}
-          onSetPhotoExcluded={(idx, excluded) => setPreview(p => ({ ...p, excludedPhotos: { ...p.excludedPhotos, [`${photoManager.entryKey}_${idx}`]: excluded } }))}
-          onClose={() => setPhotoManager(null)}
+          titleOverrides={titleOverrides}
+          onSetPhotoExcluded={(entryKey, idx, excluded) => setPreview(p => ({ ...p, excludedPhotos: { ...p.excludedPhotos, [`${entryKey}_${idx}`]: excluded } }))}
+          onClose={() => setPhotoManager(false)}
         />
       )}
     </div>
