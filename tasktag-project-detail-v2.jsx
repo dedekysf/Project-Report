@@ -1200,7 +1200,7 @@ function PhotoThumb({ src, onClick }) {
   return (
     <div
       onClick={onClick}
-      style={{ position: "relative", width: "100%", aspectRatio: "16/9", borderRadius: 4, overflow: "hidden", cursor: onClick ? "pointer" : "default" }}
+      style={{ position: "relative", width: "100%", height: 140, borderRadius: 4, overflow: "hidden", cursor: onClick ? "pointer" : "default" }}
     >
       {!loaded && <div className="tt-skeleton" style={{ position: "absolute", inset: 0, borderRadius: 0 }} />}
       <img
@@ -2709,7 +2709,7 @@ const buildReportHTML = (report) => {
       if (!src) return "";
       const caption = captions && captions[`${entryKey}_${originalIndices[i]}`];
       return h("div", {},
-        selfClose("img", { src: toAbsoluteUrl(src), style: "width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:4px;display:block;" }),
+        selfClose("img", { src: toAbsoluteUrl(src), style: "width:100%;height:140px;object-fit:cover;border-radius:4px;display:block;" }),
         caption ? h("p", { style: `font-size:12px;font-style:italic;color:#828282;font-family:${SERIF};text-align:center;margin:6px 0 0;` }, caption) : ""
       );
     }).filter(Boolean);
