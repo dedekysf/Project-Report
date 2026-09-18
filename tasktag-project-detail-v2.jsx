@@ -1389,7 +1389,9 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, onDeletePhoto, ca
 
 // Manage Photos modal thumbnail — same shimmer-until-loaded behavior as
 // PhotoThumb, but without a click handler of its own since the enclosing
-// button already toggles selection.
+// button already toggles selection. loading="lazy" defers the actual
+// fetch until the thumbnail nears the modal's own scroll container, so a
+// report with many photos doesn't fire off every request at once.
 function ManagedPhotoImage({ src, onLoad }) {
   const [loaded, setLoaded] = useState(false);
   return (
@@ -1398,6 +1400,8 @@ function ManagedPhotoImage({ src, onLoad }) {
       <img
         src={src}
         alt=""
+        loading="lazy"
+        decoding="async"
         onLoad={() => { setLoaded(true); onLoad && onLoad(); }}
         style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: loaded ? 1 : 0, transition: "opacity 0.2s" }}
       />
