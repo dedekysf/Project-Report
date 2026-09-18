@@ -1480,7 +1480,7 @@ function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoE
               <X size={20} strokeWidth={SW} />
             </button>
           </div>
-          <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-2)", margin: "8px 0 0" }}>
+          <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-2)", margin: "4px 0 0" }}>
             {includedCount} of {PHOTO_LIMIT} selected
           </p>
         </div>
