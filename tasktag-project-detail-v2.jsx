@@ -207,17 +207,17 @@ const PAGE_BOTTOM_BUFFER = 24;
 // TODO(BE): replace with the task's actual status from the API — derived
 // from the entry's date here only because DUMMY_ENTRIES has no status
 // field of its own. Most entries are simply completed (they're a log of
-// work already done); a deterministic minority are flagged in_progress
-// so the report shows both states.
+// work already done); a deterministic minority are flagged open so the
+// report shows both states.
 function statusForEntry(e) {
   const dateStr = typeof e === "string" ? e : e.date;
   const d = parseDate(dateStr);
   const bucket = d.getDate() % 5;
-  return { kind: bucket === 0 ? "in_progress" : "completed" };
+  return { kind: bucket === 0 ? "open" : "completed" };
 }
 const STATUS_META = {
-  completed:   { label: "Completed",   color: "var(--tt-secondary)" },
-  in_progress: { label: "In Progress", color: "var(--tt-blue)" },
+  completed: { label: "Completed", color: "var(--tt-secondary)" },
+  open:      { label: "Open",      color: "var(--tt-blue)" },
 };
 
 // ── Date Range Calendar ──
@@ -2669,7 +2669,7 @@ const buildReportHTML = (report) => {
     return `<${tag}${attrStr}/>`;
   };
 
-  const STATUS_HEX = { completed: "#16a97d", in_progress: "#138eff" };
+  const STATUS_HEX = { completed: "#16a97d", open: "#138eff" };
   // Editorial serif for headline/body content (title, address, summary,
   // task headings, descriptions, captions); small uppercase UI labels
   // (status pills, meta lines, section/footer chrome) stay on the sans
@@ -2738,21 +2738,23 @@ const buildReportHTML = (report) => {
     const statusColor = STATUS_HEX[kind];
     const visiblePhotoCount = (e.photos || []).length;
     const dot = `<span style="display:inline-block;width:3px;height:3px;border-radius:50%;background:#bdbdbd;vertical-align:middle;margin:0 6px;"></span>`;
-    // Matches the live view exactly: the per-entry date always shows
-    // inline (the live meta line has no grouping-based condition on it),
-    // and the section label above only appears for week/month grouping —
-    // see entriesHTML below, which skips it for "day" the same way the
-    // live view's flatBlocks pagination does.
+    // Matches the live view exactly: Open never shows a date (just the
+    // status), while Completed folds its date directly into the status
+    // text — "Completed Sep 9" — with no separator dot between them and
+    // no uppercase transform, per statusPartHTML below. The section label
+    // above only appears for week/month grouping — see entriesHTML below,
+    // which skips it for "day" the same way the live view's flatBlocks
+    // pagination does.
     // Meta-line chrome (status/date/photo-count) stays on the sans stack,
     // same reasoning as SANS's own comment above.
-    const statusHTML =
-      `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${statusColor};vertical-align:middle;margin-right:6px;"></span>` +
-      `<span style="font-family:${SANS};font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:${statusColor};">${statusMeta.label}</span>`;
-    const dateHTML = `<span style="font-family:${SANS};font-size:11px;font-weight:500;text-transform:uppercase;color:#828282;">${kind === "in_progress" ? "Start on " : ""}${fmtDate(parseDate(e.date))}</span>`;
+    const statusDotHTML = `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${statusColor};vertical-align:middle;margin-right:6px;"></span>`;
+    const statusPartHTML = kind === "completed"
+      ? statusDotHTML + `<span style="font-family:${SANS};font-size:11px;font-weight:700;color:${statusColor};">${statusMeta.label} ${fmtDate(parseDate(e.date))}</span>`
+      : statusDotHTML + `<span style="font-family:${SANS};font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:${statusColor};">${statusMeta.label}</span>`;
     const photoCountHTML = (!e.noPhotos && visiblePhotoCount > 0)
       ? `<span style="font-family:${SANS};font-size:11px;font-weight:500;text-transform:uppercase;color:#828282;">${visiblePhotoCount} photo${visiblePhotoCount === 1 ? "" : "s"}</span>`
       : "";
-    const metaLine = [statusHTML, dateHTML, photoCountHTML].filter(Boolean).join(dot);
+    const metaLine = [statusPartHTML, photoCountHTML].filter(Boolean).join(dot);
     // Same divider the live view always shows now (see renderEntryBlock) —
     // the checklist (if any) and/or the attached note both sit below it.
     const dividerHTML = h("div", { style: "height:1px;background:#e8e8e6;margin-top:20px;" }, "");
@@ -2762,7 +2764,7 @@ const buildReportHTML = (report) => {
   };
 
   const checklistLabelHTML = h("div", { style: "margin-top:20px;" },
-    h("p", { style: `font-family:${SANS};font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;margin:0 0 12px;` }, "Completed as of this update")
+    h("p", { style: `font-family:${SANS};font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;margin:0 0 12px;` }, "Checklist items completed as of this update")
   );
 
   const checklistItemRowHTML = (item) =>
@@ -3512,17 +3514,21 @@ function ReportsTab({ demoCase }) {
           textStyle={{ fontSize: 18, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.35", margin: 0 }}
           inputStyle={{ fontSize: 18, fontWeight: 600 }}
         />
-        {/* Status/date meta line — completed (green) or in progress
-            (blue). */}
+        {/* Status/date meta line — Completed (green) folds its date
+            directly into the status text ("Completed Sep 9", no
+            separator dot, no uppercase); Open (blue) shows only the
+            status, no date at all. */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: statusMeta.color, flexShrink: 0 }} />
-          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: statusMeta.color }}>
-            {statusMeta.label}
-          </span>
-          <span style={{ width: 3, height: 3, borderRadius: "50%", background: "var(--tt-grey04)", flexShrink: 0 }} />
-          <span style={{ fontSize: 11, fontWeight: 500, color: "var(--tt-grey05)" }}>
-            {kind === "in_progress" ? "Start on " : ""}{fmtDate(parseDate(e.date))}
-          </span>
+          {kind === "completed" ? (
+            <span style={{ fontSize: 11, fontWeight: 700, color: statusMeta.color }}>
+              {statusMeta.label} {fmtDate(parseDate(e.date))}
+            </span>
+          ) : (
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: statusMeta.color }}>
+              {statusMeta.label}
+            </span>
+          )}
           {!isPhotoless && visiblePhotoCount > 0 && (
             <>
               <span style={{ width: 3, height: 3, borderRadius: "50%", background: "var(--tt-grey04)", flexShrink: 0 }} />
@@ -3594,13 +3600,15 @@ function ReportsTab({ demoCase }) {
         />
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: statusMeta.color, flexShrink: 0 }} />
-          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: statusMeta.color }}>
-            {statusMeta.label}
-          </span>
-          <span style={{ width: 3, height: 3, borderRadius: "50%", background: "var(--tt-grey04)", flexShrink: 0 }} />
-          <span style={{ fontSize: 11, fontWeight: 500, color: "var(--tt-grey05)" }}>
-            {kind === "in_progress" ? "Start on " : ""}{fmtDate(parseDate(e.date))}
-          </span>
+          {kind === "completed" ? (
+            <span style={{ fontSize: 11, fontWeight: 700, color: statusMeta.color }}>
+              {statusMeta.label} {fmtDate(parseDate(e.date))}
+            </span>
+          ) : (
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: statusMeta.color }}>
+              {statusMeta.label}
+            </span>
+          )}
           {!isPhotoless && visiblePhotoCount > 0 && (
             <>
               <span style={{ width: 3, height: 3, borderRadius: "50%", background: "var(--tt-grey04)", flexShrink: 0 }} />
@@ -3612,7 +3620,7 @@ function ReportsTab({ demoCase }) {
         </div>
         <div style={{ height: 1, background: "var(--tt-grey03)", marginTop: 16 }} />
         <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "16px 0 8px" }}>
-          Completed as of this update
+          Checklist items completed as of this update
         </p>
       </div>
     );
