@@ -1390,7 +1390,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, onDeletePhoto, ca
 // Manage Photos modal thumbnail — same shimmer-until-loaded behavior as
 // PhotoThumb, but without a click handler of its own since the enclosing
 // button already toggles selection.
-function ManagedPhotoImage({ src }) {
+function ManagedPhotoImage({ src, onLoad }) {
   const [loaded, setLoaded] = useState(false);
   return (
     <>
@@ -1398,7 +1398,7 @@ function ManagedPhotoImage({ src }) {
       <img
         src={src}
         alt=""
-        onLoad={() => setLoaded(true)}
+        onLoad={() => { setLoaded(true); onLoad && onLoad(); }}
         style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: loaded ? 1 : 0, transition: "opacity 0.2s" }}
       />
     </>
@@ -1427,6 +1427,7 @@ function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoE
   const warningTimerRef = useRef(null);
   const [cappedTooltipKey, setCappedTooltipKey] = useState(null); // `${entryKey}_${pi}` of the capped (disabled) photo currently hovered, or null
   const [cappedTooltipPos, setCappedTooltipPos] = useState({ top: 0, left: 0 });
+  const [loadedPhotos, setLoadedPhotos] = useState({}); // { [entryKey_pi]: true } — outline/checkbox only draw once the thumbnail itself has loaded, so the skeleton shows as just a skeleton
 
   useEffect(() => {
     // Skipped while the shared PhotoLightbox is open on top of this modal
@@ -1484,6 +1485,7 @@ function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoE
                 const key = `${sec.entryKey}_${pi}`;
                 const included = !(excludedPhotos && excludedPhotos[key]);
                 const capped = !included && includedCount >= PHOTO_LIMIT;
+                const loaded = !!loadedPhotos[key];
                 return (
                   <div
                     key={pi}
@@ -1503,17 +1505,21 @@ function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoE
                     {/* Dimmed on capped — the checkbox is part of this
                         "can't select" cue, but the preview button below
                         stays outside it since previewing always works. */}
-                    <div style={{ position: "relative", width: "100%", aspectRatio: "16/9", borderRadius: 6, overflow: "hidden", outline: included ? "2px solid var(--tt-secondary)" : "2px solid transparent", opacity: capped ? 0.45 : 1 }}>
-                      <ManagedPhotoImage src={IMG_MAP[k]} />
+                    <div style={{ position: "relative", width: "100%", aspectRatio: "16/9", borderRadius: 6, overflow: "hidden", outline: loaded && included ? "2px solid var(--tt-secondary)" : "2px solid transparent", opacity: capped ? 0.45 : 1 }}>
+                      <ManagedPhotoImage src={IMG_MAP[k]} onLoad={() => setLoadedPhotos(p => ({ ...p, [key]: true }))} />
                       {/* Hover-revealed like the delete/preview buttons —
                           except once checked, it stays visible so the
-                          selection state reads at a glance. */}
-                      <span
-                        className={included ? undefined : "opacity-0 transition-opacity group-hover:opacity-100"}
-                        style={{ position: "absolute", top: 6, right: 6, width: 20, height: 20, borderRadius: "50%", background: included ? "var(--tt-secondary)" : "rgba(10,22,41,0.35)", border: included ? "none" : "1.5px solid white", display: "flex", alignItems: "center", justifyContent: "center" }}
-                      >
-                        {included && <Check size={12} color="white" strokeWidth={3} />}
-                      </span>
+                          selection state reads at a glance. Withheld
+                          entirely until the thumbnail itself has loaded, so
+                          the skeleton shows as just a skeleton. */}
+                      {loaded && (
+                        <span
+                          className={included ? undefined : "opacity-0 transition-opacity group-hover:opacity-100"}
+                          style={{ position: "absolute", top: 6, right: 6, width: 20, height: 20, borderRadius: "50%", background: included ? "var(--tt-secondary)" : "rgba(10,22,41,0.35)", border: included ? "none" : "1.5px solid white", display: "flex", alignItems: "center", justifyContent: "center" }}
+                        >
+                          {included && <Check size={12} color="white" strokeWidth={3} />}
+                        </span>
+                      )}
                     </div>
                     {onPreviewPhoto && (
                       <button
