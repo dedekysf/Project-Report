@@ -1956,8 +1956,8 @@ const DUMMY_ENTRIES = [
   // something to demo without needing a specific date range.
   {
     date: "2026-09-10", note: "Flooring installation started on the ground floor.",
-    // Deliberately 10 items — more than the 5 the UI shows, to demo the
-    // "only the last 5" truncation on the first (most visible) entry.
+    // Deliberately 10 items — right at the cap the UI shows, to demo a
+    // full checklist section on the first (most visible) entry.
     checklist: [
       { text: "Remove old flooring throughout the ground floor" },
       { text: "Level and inspect subfloor for damage" },
@@ -2662,8 +2662,8 @@ const buildReportHTML = (report) => {
       ? h("div", { style: "margin-top:20px;" },
           h("p", { style: `font-family:${SANS};font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;margin:0 0 12px;` }, "Completed this update"),
           h("div", { style: "display:flex;flex-direction:column;gap:12px;" },
-            // Only the last 5 — same cap the live view applies.
-            ...e.checklist.slice(-5).map(item =>
+            // Only the last 10 — same cap the live view applies.
+            ...e.checklist.slice(-10).map(item =>
               h("div", { style: "display:flex;align-items:center;gap:8px;" },
                 h("span", { style: "flex-shrink:0;color:#16a97d;font-size:12px;font-weight:700;" }, "✓"),
                 h("span", { style: `font-family:${SERIF};font-size:12px;color:#303742;` }, item.text)
@@ -3402,10 +3402,10 @@ function ReportsTab({ demoCase }) {
               Completed this update
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {/* Only the last 5 — earlier items still exist in the data,
+              {/* Only the last 10 — earlier items still exist in the data,
                   just not shown, so the section stays a short recap
                   instead of growing unbounded over a long task. */}
-              {e.checklist.slice(-5).map((item, idx) => (
+              {e.checklist.slice(-10).map((item, idx) => (
                 <div key={idx} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <Check size={14} strokeWidth={SW} color="var(--tt-secondary)" style={{ flexShrink: 0 }} />
                   <span style={{ fontSize: 13, color: "var(--tt-text-2)" }}>
