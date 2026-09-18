@@ -201,8 +201,11 @@ const PAGE_PAD = 40;
 // still fits on a page — now that checklist items pack much more tightly
 // (see checklistItemHTML), this keeps the last item/photo on a page from
 // ever sitting flush against (or, if measurement is ever slightly off,
-// overlapping) the footer's top border.
-const PAGE_BOTTOM_BUFFER = 24;
+// overlapping) the footer's top border. 24px read as too tight in
+// practice (the last checklist item still looked crammed against the
+// footer), so this matches the 40px "breathing room" gap already used
+// elsewhere in this file (e.g. between entries).
+const PAGE_BOTTOM_BUFFER = 40;
 
 // TODO(BE): replace with the task's actual status from the API — derived
 // from the entry's date here only because DUMMY_ENTRIES has no status
