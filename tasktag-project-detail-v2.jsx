@@ -1530,9 +1530,9 @@ function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoE
                       {loaded && !capped && (
                         <span
                           className={included ? undefined : "opacity-0 transition-opacity group-hover:opacity-100"}
-                          style={{ position: "absolute", top: 6, right: 6, width: 20, height: 20, borderRadius: "50%", background: included ? "var(--tt-secondary)" : "rgba(10,22,41,0.35)", border: included ? "none" : "1.5px solid white", display: "flex", alignItems: "center", justifyContent: "center" }}
+                          style={{ position: "absolute", top: 6, right: 6, width: 16, height: 16, borderRadius: "50%", background: included ? "var(--tt-secondary)" : "rgba(10,22,41,0.35)", border: included ? "none" : "1.5px solid white", display: "flex", alignItems: "center", justifyContent: "center" }}
                         >
-                          {included && <Check size={12} color="white" strokeWidth={3} />}
+                          {included && <Check size={10} color="white" strokeWidth={3} />}
                         </span>
                       )}
                     </div>
