@@ -197,14 +197,16 @@ const REPORT_ID = `TX-1520-${APP_TODAY.getFullYear()}-${String(APP_TODAY.getMont
 const PAGE_W   = 800;
 const PAGE_H   = Math.round(PAGE_W * 11 / 8.5);
 const PAGE_PAD = 40;
-// Reserved on top of the footer's own measured height when deciding what
-// still fits on a page — now that checklist items pack much more tightly
-// (see checklistItemHTML), this keeps the last item/photo on a page from
-// ever sitting flush against (or, if measurement is ever slightly off,
-// overlapping) the footer's top border. 24px read as too tight in
-// practice (the last checklist item still looked crammed against the
-// footer), so this matches the 40px "breathing room" gap already used
-// elsewhere in this file (e.g. between entries).
+// Two jobs: (1) reserved on top of the footer's own measured height when
+// deciding what still fits on a page, so the pagination pass leaves this
+// much slack in its budget; (2) applied as a literal paddingBottom on
+// every page's content area, which is what actually GUARANTEES the gap —
+// relying on flex:1 to fill leftover space only works when the measured
+// heights used for packing exactly match what really renders, which
+// isn't reliable enough on its own to keep the last item/photo on a page
+// from ever sitting flush against (or overlapping) the footer. Matches
+// the 40px "breathing room" gap already used elsewhere in this file
+// (e.g. between entries).
 const PAGE_BOTTOM_BUFFER = 40;
 
 // TODO(BE): replace with the task's actual status from the API — derived
@@ -3064,7 +3066,10 @@ const buildReportHTML = (report) => {
   // doesn't fill the full min-height just leaves the footer sitting right
   // after the last block, with the page's remaining empty space stranded
   // below the footer instead of above it.
-  const css = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:${SERIF};background:#f7f8fa;min-height:100vh;padding:32px 24px}.card{background:white;border:1px solid #e8e8e6;border-radius:12px;overflow:hidden;width:${PAGE_W}px;min-height:${PAGE_H}px;margin:0 auto;display:flex;flex-direction:column}.card+.card{margin-top:24px}.card__body{padding:0 ${PAGE_PAD}px;flex:1}`;
+  // card__body's paddingBottom (PAGE_BOTTOM_BUFFER) guarantees the gap to
+  // the footer directly via the box model — see PAGE_BOTTOM_BUFFER's own
+  // comment for why relying on flex:1 alone isn't reliable enough.
+  const css = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:${SERIF};background:#f7f8fa;min-height:100vh;padding:32px 24px}.card{background:white;border:1px solid #e8e8e6;border-radius:12px;overflow:hidden;width:${PAGE_W}px;min-height:${PAGE_H}px;margin:0 auto;display:flex;flex-direction:column}.card+.card{margin-top:24px}.card__body{padding:0 ${PAGE_PAD}px ${PAGE_BOTTOM_BUFFER}px;flex:1}`;
 
   const cardsHTML = pages.map((pageBlocks, pi) =>
     h("div", { class: "card", style: "box-shadow:0 1px 3px rgba(10,22,41,0.08);" },
@@ -4070,7 +4075,12 @@ function ReportsTab({ demoCase }) {
           }}
         >
           {isFirst ? renderFullHeader() : renderRunningHeader()}
-          <div style={{ padding: `0 ${PAGE_PAD}px`, flex: 1 }}>
+          {/* paddingBottom guarantees the gap to the footer directly via
+              the box model — flex:1 filling leftover space only creates a
+              gap when the pagination math's measured heights exactly
+              match what actually renders, which isn't reliable enough on
+              its own (see PAGE_BOTTOM_BUFFER's own comment). */}
+          <div style={{ padding: `0 ${PAGE_PAD}px ${PAGE_BOTTOM_BUFFER}px`, flex: 1 }}>
             {isFirst && previewData.groups.length === 0 && renderNoteSlot("empty")}
             {pageBlocks.map(block => <div key={block.key}>{renderBlock(block)}</div>)}
           </div>
