@@ -1468,21 +1468,23 @@ function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoE
         style={{ width: 640, maxWidth: "calc(100vw - 32px)", maxHeight: "calc(100vh - 64px)", display: "flex", flexDirection: "column", background: "white", borderRadius: 16, boxShadow: "0 16px 48px rgba(10,22,41,0.25)", overflow: "hidden" }}
       >
         {/* Fixed on top — only the section list below scrolls. */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "24px 24px 16px", borderBottom: "1px solid var(--tt-grey03)", flexShrink: 0 }}>
-          <p style={{ fontSize: 20, fontWeight: 700, color: "var(--tt-text-1)", margin: 0 }}>Manage photos</p>
-          <button
-            onClick={onClose}
-            onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
-            onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--tt-text-1)", padding: 4, display: "flex", borderRadius: 6, transition: "background 0.15s" }}
-          >
-            <X size={20} strokeWidth={SW} />
-          </button>
+        <div style={{ padding: "24px 24px 16px", borderBottom: "1px solid var(--tt-grey03)", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <p style={{ fontSize: 20, fontWeight: 700, color: "var(--tt-text-1)", margin: 0 }}>Manage photos</p>
+            <button
+              onClick={onClose}
+              onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              style={{ background: "none", border: "none", cursor: "pointer", color: "var(--tt-text-1)", padding: 4, display: "flex", borderRadius: 6, transition: "background 0.15s" }}
+            >
+              <X size={20} strokeWidth={SW} />
+            </button>
+          </div>
+          <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-2)", margin: "8px 0 0" }}>
+            {includedCount} of {PHOTO_LIMIT} selected
+          </p>
         </div>
         <div style={{ overflowY: "auto", padding: 24 }}>
-        <p style={{ fontSize: 12, fontWeight: 600, color: "var(--tt-text-2)", margin: "0 0 16px" }}>
-          {includedCount} of {PHOTO_LIMIT} selected
-        </p>
         {limitWarning && (
           <p style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500, color: "var(--tt-red)", background: "rgba(229,72,77,0.08)", borderRadius: 6, padding: "8px 10px", margin: "0 0 16px" }}>
             <AlertTriangle size={13} strokeWidth={SW} style={{ flexShrink: 0 }} />
