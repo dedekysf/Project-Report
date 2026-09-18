@@ -1463,9 +1463,10 @@ function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoE
     >
       <div
         onClick={e => e.stopPropagation()}
-        style={{ width: 640, maxWidth: "calc(100vw - 32px)", maxHeight: "calc(100vh - 64px)", overflowY: "auto", background: "white", borderRadius: 16, padding: 24, boxShadow: "0 16px 48px rgba(10,22,41,0.25)" }}
+        style={{ width: 640, maxWidth: "calc(100vw - 32px)", maxHeight: "calc(100vh - 64px)", display: "flex", flexDirection: "column", background: "white", borderRadius: 16, boxShadow: "0 16px 48px rgba(10,22,41,0.25)", overflow: "hidden" }}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+        {/* Fixed on top — only the section list below scrolls. */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "24px 24px 16px", borderBottom: "1px solid var(--tt-grey03)", flexShrink: 0 }}>
           <p style={{ fontSize: 20, fontWeight: 700, color: "var(--tt-text-1)", margin: 0 }}>Manage photos</p>
           <button
             onClick={onClose}
@@ -1476,6 +1477,7 @@ function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoE
             <X size={20} strokeWidth={SW} />
           </button>
         </div>
+        <div style={{ overflowY: "auto", padding: 24 }}>
         <p style={{ fontSize: 12, fontWeight: 600, color: "var(--tt-text-2)", margin: "0 0 16px" }}>
           {includedCount} of {PHOTO_LIMIT} selected
         </p>
@@ -1486,8 +1488,8 @@ function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoE
           </p>
         )}
         {sections.map(sec => (
-          <div key={sec.entryKey} style={{ marginBottom: 20 }}>
-            <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 8px" }}>{sec.taskName}</p>
+          <div key={sec.entryKey} style={{ marginBottom: 40 }}>
+            <p style={{ fontSize: 18, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 8px" }}>{sec.taskName}</p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 10 }}>
               {sec.items.map(({ k, pi }) => {
                 const key = `${sec.entryKey}_${pi}`;
@@ -1556,6 +1558,7 @@ function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoE
             </div>
           </div>
         ))}
+        </div>
       </div>
       {cappedTooltipKey !== null && (
         <div style={{
