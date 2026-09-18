@@ -4263,14 +4263,17 @@ function ReportsTab({ demoCase }) {
                 </>
               ) : (
                 // TODO(BE): replace with the account's actual per-report photo cap and usage from the API
-                // Hovering this label (not clicking) opens the report-wide
-                // Manage Photos modal — the single entry point for curating
-                // which photos count toward PHOTO_LIMIT.
+                // Clicking this label opens the report-wide Manage Photos
+                // modal — the single entry point for curating which photos
+                // count toward PHOTO_LIMIT. Hovering just previews the
+                // affordance by tinting the text/icon secondary green.
                 <div
-                  onMouseEnter={() => setPhotoManager(true)}
+                  onClick={() => setPhotoManager(true)}
+                  onMouseEnter={e => { e.currentTarget.firstElementChild.style.color = "var(--tt-secondary)"; }}
+                  onMouseLeave={e => { e.currentTarget.firstElementChild.style.color = "var(--tt-text-1)"; }}
                   style={{ display: "flex", flexDirection: "column", gap: 6, width: "fit-content", cursor: "pointer" }}
                 >
-                  <p style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", margin: 0, whiteSpace: "nowrap" }}>
+                  <p style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", margin: 0, whiteSpace: "nowrap", transition: "color 0.15s" }}>
                     Photo Limit {previewPhotoCount} of {PHOTO_LIMIT}
                     <ExternalLink size={14} strokeWidth={SW} style={{ flexShrink: 0 }} />
                   </p>
