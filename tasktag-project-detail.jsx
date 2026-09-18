@@ -1507,7 +1507,7 @@ function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoE
                     {/* Dimmed on capped — the checkbox is part of this
                         "can't select" cue, but the preview button below
                         stays outside it since previewing always works. */}
-                    <div style={{ position: "relative", width: "100%", aspectRatio: "16/9", borderRadius: 6, overflow: "hidden", outline: loaded && included ? "2px solid var(--tt-secondary)" : "2px solid transparent", opacity: capped ? 0.45 : 1 }}>
+                    <div style={{ position: "relative", width: "100%", aspectRatio: "16/9", borderRadius: 6, overflow: "hidden", opacity: capped ? 0.45 : 1 }}>
                       <ManagedPhotoImage src={IMG_MAP[k]} onLoad={() => setLoadedPhotos(p => ({ ...p, [key]: true }))} />
                       {/* Hover-revealed like the delete/preview buttons —
                           except once checked, it stays visible so the
