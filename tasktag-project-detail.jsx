@@ -198,28 +198,20 @@ const PAGE_W   = 800;
 const PAGE_H   = Math.round(PAGE_W * 11 / 8.5);
 const PAGE_PAD = 40;
 
-// TODO(BE): replace with the task's actual status/due date from the API —
-// derived from the entry's date here only because DUMMY_ENTRIES has no
-// status field of its own. Most entries are simply completed (they're a
-// log of work already done); a deterministic minority are flagged
-// in_progress or past_due so the report shows all three states.
+// TODO(BE): replace with the task's actual status from the API — derived
+// from the entry's date here only because DUMMY_ENTRIES has no status
+// field of its own. Most entries are simply completed (they're a log of
+// work already done); a deterministic minority are flagged in_progress
+// so the report shows both states.
 function statusForEntry(e) {
   const dateStr = typeof e === "string" ? e : e.date;
   const d = parseDate(dateStr);
-  const daysAgo = Math.round((APP_TODAY - d) / 86400000);
-  // forcePastDue guarantees at least one Past Due example in every report
-  // (see buildReportData) — the daysAgo>14 condition below can never fire
-  // on its own for a short/recent period, since every entry in it is by
-  // definition within the last few days.
-  if (typeof e === "object" && e.forcePastDue) return { kind: "past_due", daysAgo };
   const bucket = d.getDate() % 5;
-  if (bucket === 0) return { kind: daysAgo > 14 ? "past_due" : "in_progress", daysAgo };
-  return { kind: "completed", daysAgo };
+  return { kind: bucket === 0 ? "in_progress" : "completed" };
 }
 const STATUS_META = {
   completed:   { label: "Completed",   color: "var(--tt-secondary)" },
   in_progress: { label: "In Progress", color: "var(--tt-blue)" },
-  past_due:    { label: "Past Due",    color: "var(--tt-red)" },
 };
 
 // ── Date Range Calendar ──
@@ -2040,26 +2032,33 @@ const DUMMY_ENTRIES = [
   // something to demo without needing a specific date range.
   {
     date: "2026-09-10", note: "Flooring installation started on the ground floor.",
-    // Deliberately 7 items — more than the 5 the UI shows, to demo the
+    // Deliberately 10 items — more than the 5 the UI shows, to demo the
     // "only the last 5" truncation on the first (most visible) entry.
     checklist: [
       { text: "Remove old flooring throughout the ground floor" },
       { text: "Level and inspect subfloor for damage" },
+      { text: "Acclimate hardwood planks to room humidity" },
       { text: "Order hardwood plank materials" },
       { text: "Begin hardwood plank installation in living room" },
+      { text: "Install hardwood in dining room" },
       { text: "Install underlayment in hallway" },
       { text: "Fit transition strips between rooms" },
+      { text: "Apply protective finish coat" },
       { text: "Clean and inspect finished flooring" },
     ],
     photos: ["img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5"],
   },
   {
     date: "2026-09-09", note: "Exterior siding repairs completed on the south wall.",
+    // Deliberately 7 items — see the flooring entry above for why.
     checklist: [
       { text: "Remove damaged siding panels" },
+      { text: "Inspect wall for moisture damage" },
       { text: "Repair underlying sheathing" },
+      { text: "Install house wrap over sheathing" },
       { text: "Install new siding panels" },
       { text: "Caulk and seal all seams" },
+      { text: "Touch up paint to match existing siding" },
     ],
     photos: ["img9", "img2", "img3", "img7", "img4", "img5", "img6"],
   },
@@ -2069,6 +2068,7 @@ const DUMMY_ENTRIES = [
       { text: "Install main breaker panel" },
       { text: "Connect circuit wiring" },
       { text: "Label all breakers" },
+      { text: "Verify grounding and bonding" },
       { text: "Test panel for proper voltage" },
     ],
     photos: ["img9", "img8"],
@@ -2077,7 +2077,6 @@ const DUMMY_ENTRIES = [
     date: "2026-09-07", note: "Plumbing fixtures installed in all bathrooms.",
     checklist: [
       { text: "Install sinks and faucets" },
-      { text: "Install toilets" },
       { text: "Connect shower and tub fixtures" },
       { text: "Test all fixtures for leaks" },
     ],
@@ -2086,9 +2085,7 @@ const DUMMY_ENTRIES = [
   {
     date: "2026-09-06", note: "Ceiling lights installed and tested.",
     checklist: [
-      { text: "Mount light fixtures" },
-      { text: "Wire fixtures to switches" },
-      { text: "Test all fixtures for proper operation" },
+      { text: "Install and test all ceiling light fixtures" },
     ],
     photos: ["img8", "img7"],
   },
@@ -2319,12 +2316,6 @@ const DUMMY_ENTRIES = [
   },
 ];
 
-// TODO(BE): replace with the crew member who actually logged each entry,
-// from the API — derived from the entry's date here only because DUMMY_
-// ENTRIES has no owner field of its own.
-const ENTRY_OWNERS = ["Paul Anderson", "Morgan Taylor", "Carlos Smith", "Casey Lin", "Riley Scott"];
-const ownerForEntry = (dateStr) => ENTRY_OWNERS[parseDate(dateStr).getDate() % ENTRY_OWNERS.length];
-
 // TODO(BE): replace with the project's actual task/checklist list from the
 // API — powers the auto-generated summary text and the completion count
 // used there, independent of the dated photo/activity log above (a task
@@ -2506,27 +2497,6 @@ function buildReportData(dateRange, periodStr, customRange, includeNoPhotoTasks 
   }));
   groups = applyPhotoCap(groups).filter(g => g.entries.length > 0);
 
-  // Guarantee at least one Past Due example in every generated report —
-  // the bucket-based status assignment's daysAgo>14 condition can never
-  // fire naturally for a short/recent period, since every entry in it is
-  // by definition from the last few days, so without this a "Last 7 days"
-  // (or similar) report could never show one. Forces it on the earliest
-  // entry in the period if nothing already qualifies on its own.
-  const hasPastDue = groups.some(g => g.entries.some(e => !e.isNote && statusForEntry(e).kind === "past_due"));
-  if (!hasPastDue) {
-    let oldest = null;
-    groups.forEach(g => g.entries.forEach(e => {
-      if (e.isNote) return;
-      if (!oldest || e.date < oldest.date) oldest = e;
-    }));
-    if (oldest) {
-      groups = groups.map(g => ({
-        ...g,
-        entries: g.entries.map(e => e === oldest ? { ...e, forcePastDue: true } : e),
-      }));
-    }
-  }
-
   // completed = entries actually attached to this report (countable from
   // what's shown below), total = the whole project's activity log — so the
   // number is always directly verifiable against the visible entries,
@@ -2680,7 +2650,7 @@ const buildReportHTML = (report) => {
     return `<${tag}${attrStr}/>`;
   };
 
-  const STATUS_HEX = { completed: "#16a97d", in_progress: "#138eff", past_due: "#e5484d" };
+  const STATUS_HEX = { completed: "#16a97d", in_progress: "#138eff" };
   // Editorial serif for headline/body content (title, address, summary,
   // task headings, descriptions, captions); small uppercase UI labels
   // (status pills, meta lines, section/footer chrome) stay on the sans
@@ -2741,7 +2711,7 @@ const buildReportHTML = (report) => {
     );
 
   const entryHeaderHTML = (e, attachedNoteHTML, hasPhotos) => {
-    const { kind, daysAgo } = statusForEntry(e);
+    const { kind } = statusForEntry(e);
     const statusMeta = STATUS_META[kind];
     const statusColor = STATUS_HEX[kind];
     const visiblePhotoCount = (e.photos || []).length;
@@ -2751,18 +2721,16 @@ const buildReportHTML = (report) => {
     // and the section label above only appears for week/month grouping —
     // see entriesHTML below, which skips it for "day" the same way the
     // live view's flatBlocks pagination does.
-    // Meta-line chrome (status/date/owner/photo-count) stays on the sans
-    // stack, same reasoning as SANS's own comment above.
-    const dueHTML = `<span style="font-family:${SANS};font-size:11px;font-weight:500;text-transform:uppercase;color:#828282;">${fmtDate(parseDate(e.date))}</span>` + dot;
-    const metaLine =
+    // Meta-line chrome (status/date/photo-count) stays on the sans stack,
+    // same reasoning as SANS's own comment above.
+    const statusHTML =
       `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${statusColor};vertical-align:middle;margin-right:6px;"></span>` +
-      `<span style="font-family:${SANS};font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:${statusColor};">${statusMeta.label}${kind === "past_due" && daysAgo > 0 ? ` ${daysAgo} days` : ""}</span>` +
-      dot +
-      dueHTML +
-      `<span style="font-family:${SANS};font-size:11px;font-weight:500;text-transform:uppercase;color:#828282;">${ownerForEntry(e.date)}</span>` +
-      (!e.noPhotos && visiblePhotoCount > 0
-        ? dot + `<span style="font-family:${SANS};font-size:11px;font-weight:500;text-transform:uppercase;color:#828282;">${visiblePhotoCount} photo${visiblePhotoCount === 1 ? "" : "s"}</span>`
-        : "");
+      `<span style="font-family:${SANS};font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:${statusColor};">${statusMeta.label}</span>`;
+    const dateHTML = `<span style="font-family:${SANS};font-size:11px;font-weight:500;text-transform:uppercase;color:#828282;">${fmtDate(parseDate(e.date))}</span>`;
+    const photoCountHTML = (!e.noPhotos && visiblePhotoCount > 0)
+      ? `<span style="font-family:${SANS};font-size:11px;font-weight:500;text-transform:uppercase;color:#828282;">${visiblePhotoCount} photo${visiblePhotoCount === 1 ? "" : "s"}</span>`
+      : "";
+    const metaLine = [statusHTML, dateHTML, photoCountHTML].filter(Boolean).join(dot);
     // Same divider the live view always shows now (see renderEntryBlock) —
     // the checklist (if any) and/or the attached note both sit below it.
     const dividerHTML = h("div", { style: "height:1px;background:#e8e8e6;margin-top:20px;" }, "");
@@ -3430,7 +3398,7 @@ function ReportsTab({ demoCase }) {
     // zero out an otherwise-photographed entry's photos — an entry merely
     // capped down to 0 photos must never be shown as photo-less here.
     const isPhotoless = e.noPhotos;
-    const { kind, daysAgo } = statusForEntry(e);
+    const { kind } = statusForEntry(e);
     const statusMeta = STATUS_META[kind];
     const visiblePhotoCount = (e.photos || []).filter(
       (_, i) => !(preview.excludedPhotos && preview.excludedPhotos[`${entryKey}_${i}`])
@@ -3461,20 +3429,16 @@ function ReportsTab({ demoCase }) {
           textStyle={{ fontSize: 18, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.35", margin: 0 }}
           inputStyle={{ fontSize: 18, fontWeight: 600 }}
         />
-        {/* Status/date/owner meta line — completed (green), in progress
-            (blue), or past due (red, with how many days). */}
+        {/* Status/date meta line — completed (green) or in progress
+            (blue). */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: statusMeta.color, flexShrink: 0 }} />
           <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: statusMeta.color }}>
-            {statusMeta.label}{kind === "past_due" && daysAgo > 0 ? ` ${daysAgo} days` : ""}
+            {statusMeta.label}
           </span>
           <span style={{ width: 3, height: 3, borderRadius: "50%", background: "var(--tt-grey04)", flexShrink: 0 }} />
           <span style={{ fontSize: 11, fontWeight: 500, color: "var(--tt-grey05)" }}>
             {fmtDate(parseDate(e.date))}
-          </span>
-          <span style={{ width: 3, height: 3, borderRadius: "50%", background: "var(--tt-grey04)", flexShrink: 0 }} />
-          <span style={{ fontSize: 11, fontWeight: 500, color: "var(--tt-grey05)" }}>
-            {ownerForEntry(e.date)}
           </span>
           {!isPhotoless && visiblePhotoCount > 0 && (
             <>
@@ -3537,7 +3501,11 @@ function ReportsTab({ demoCase }) {
             captions={preview.photoCaptions}
             onCaptionChange={previewSaved ? undefined : (idx, text) => setPhotoCaption(entryKey, idx, text)}
             windowEnd={hasRevealedContinuation ? PHOTO_GRID_CAP : undefined}
-            onExpand={() => setExpandedPhotoGroups(p => ({ ...p, [entryKey]: (p[entryKey] || 0) + 1 }))}
+            // "+N more" reveals every remaining photo at once — the
+            // flatBlocks chunk loop already stops generating chunks once
+            // chunk*PHOTO_GRID_CAP reaches includedCount, so a large
+            // sentinel is safe (it just yields exactly enough chunks).
+            onExpand={() => setExpandedPhotoGroups(p => ({ ...p, [entryKey]: Infinity }))}
           />
         )}
       </div>
@@ -3562,7 +3530,7 @@ function ReportsTab({ demoCase }) {
         onCaptionChange={previewSaved ? undefined : (idx, text) => setPhotoCaption(entryKey, idx, text)}
         windowStart={chunk * PHOTO_GRID_CAP}
         windowEnd={isTip ? undefined : (chunk + 1) * PHOTO_GRID_CAP}
-        onExpand={() => setExpandedPhotoGroups(p => ({ ...p, [entryKey]: (p[entryKey] || 0) + 1 }))}
+        onExpand={() => setExpandedPhotoGroups(p => ({ ...p, [entryKey]: Infinity }))}
       />
     </div>
   );
