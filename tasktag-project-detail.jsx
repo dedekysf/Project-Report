@@ -197,6 +197,12 @@ const REPORT_ID = `TX-1520-${APP_TODAY.getFullYear()}-${String(APP_TODAY.getMont
 const PAGE_W   = 800;
 const PAGE_H   = Math.round(PAGE_W * 11 / 8.5);
 const PAGE_PAD = 40;
+// Reserved on top of the footer's own measured height when deciding what
+// still fits on a page — now that checklist items pack much more tightly
+// (see checklistItemHTML), this keeps the last item/photo on a page from
+// ever sitting flush against (or, if measurement is ever slightly off,
+// overlapping) the footer's top border.
+const PAGE_BOTTOM_BUFFER = 24;
 
 // TODO(BE): replace with the task's actual status from the API — derived
 // from the entry's date here only because DUMMY_ENTRIES has no status
@@ -2715,7 +2721,10 @@ const buildReportHTML = (report) => {
       h("p", { style: `font-family:${SERIF};font-size:12px;color:#303742;line-height:1.8;margin:0;` }, note.note)
     );
 
-  const entryHeaderHTML = (e, attachedNoteHTML, hasPhotos) => {
+  // Title + meta line + divider — shared by both the no-checklist single
+  // block (entryHeaderHTML) and the checklist-item-split path
+  // (entryHeaderOnlyHTML), so the two never drift out of sync.
+  const entryHeaderCoreHTML = (e) => {
     const { kind } = statusForEntry(e);
     const statusMeta = STATUS_META[kind];
     const statusColor = STATUS_HEX[kind];
@@ -2739,31 +2748,49 @@ const buildReportHTML = (report) => {
     // Same divider the live view always shows now (see renderEntryBlock) —
     // the checklist (if any) and/or the attached note both sit below it.
     const dividerHTML = h("div", { style: "height:1px;background:#e8e8e6;margin-top:20px;" }, "");
-    const checklistHTML = (e.checklist && e.checklist.length > 0)
-      ? h("div", { style: "margin-top:20px;" },
-          h("p", { style: `font-family:${SANS};font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;margin:0 0 12px;` }, "Completed as of this update"),
-          h("div", { style: "display:flex;flex-direction:column;gap:12px;" },
-            // Only the last 10 — same cap the live view applies.
-            ...e.checklist.slice(-10).map(item =>
-              h("div", { style: "display:flex;align-items:center;gap:8px;" },
-                h("span", { style: "flex-shrink:0;color:#16a97d;font-size:12px;font-weight:700;" }, "✓"),
-                h("span", { style: `font-family:${SERIF};font-size:12px;color:#303742;` }, item.text)
-              )
-            )
-          )
-        )
-      : "";
-    // No photos left to carry the entry's own trailing gap (see
-    // PHOTO_CHUNK/renderPhotoChunk) — this header block carries it
-    // instead, same 80px either way.
-    return h("div", { style: `margin-bottom:${hasPhotos ? 0 : 80}px;` },
-      h("p", { style: `font-family:${SERIF};font-size:20px;font-weight:700;color:#0a1629;line-height:1.35;margin:0;` }, e.note),
-      h("div", { style: "margin-top:6px;" }, metaLine),
-      dividerHTML,
-      checklistHTML,
+    return h("p", { style: `font-family:${SERIF};font-size:20px;font-weight:700;color:#0a1629;line-height:1.35;margin:0;` }, e.note) +
+      h("div", { style: "margin-top:6px;" }, metaLine) +
+      dividerHTML;
+  };
+
+  const checklistLabelHTML = h("div", { style: "margin-top:20px;" },
+    h("p", { style: `font-family:${SANS};font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;margin:0 0 12px;` }, "Completed as of this update")
+  );
+
+  const checklistItemRowHTML = (item) =>
+    h("div", { style: "display:flex;align-items:center;gap:8px;" },
+      h("span", { style: "flex-shrink:0;color:#16a97d;font-size:12px;font-weight:700;" }, "✓"),
+      h("span", { style: `font-family:${SERIF};font-size:12px;color:#303742;` }, item.text)
+    );
+
+  // Whole-entry block — used only when the entry has no checklist, so
+  // there's nothing to split across pages and the header can safely carry
+  // its own trailing margin/note directly.
+  const entryHeaderHTML = (e, attachedNoteHTML, hasPhotos) =>
+    h("div", { style: `margin-bottom:${hasPhotos ? 0 : 80}px;` },
+      entryHeaderCoreHTML(e),
       attachedNoteHTML || ""
     );
-  };
+
+  // Header-only block for a checklist-bearing entry — title/meta/divider
+  // plus the "Completed as of this update" label, with NO items and no
+  // trailing margin of its own. Paired with its first checklist item via
+  // the same "must fit with next block" rule the pagination pass already
+  // uses for section labels (see isEntryHeader below), so the header never
+  // strands alone without at least one item under it.
+  const entryHeaderOnlyHTML = (e) => entryHeaderCoreHTML(e) + checklistLabelHTML;
+
+  // One checklist item as its own page-able block — items other than the
+  // first each carry the 12px inter-item gap (matching the live view's
+  // gap:6 doubled for the export's own checklist rhythm) via marginTop;
+  // the first item's marginTop is 0 since checklistLabelHTML already owns
+  // that gap via its own margin-bottom. Only the LAST item carries the
+  // entry's trailing margin and any attached manual note, since it's the
+  // entry's true trailing edge whenever a checklist exists.
+  const checklistItemHTML = (item, isFirst, isLast, hasPhotos, attachedNoteHTML) =>
+    h("div", { style: `margin-top:${isFirst ? 0 : 12}px;margin-bottom:${isLast ? (hasPhotos ? 0 : 80) : 0}px;` },
+      checklistItemRowHTML(item)
+    ) + (isLast ? (attachedNoteHTML || "") : "");
 
   // Flat list of page-able blocks — a label block per group (skipped for
   // day grouping, same reasoning as before) followed by one block per
@@ -2790,7 +2817,26 @@ const buildReportHTML = (report) => {
           const next = g.entries[i + 1];
           const attachedNoteHTML = next && next.isNote ? noteHTML(next) : "";
           const photos = e.noPhotos ? [] : (e.photos || []);
-          groupBlocks.push({ html: entryHeaderHTML(e, attachedNoteHTML, photos.length > 0), isLabel: false });
+          const checklistItems = (e.checklist || []).slice(-10);
+          if (checklistItems.length === 0) {
+            groupBlocks.push({ html: entryHeaderHTML(e, attachedNoteHTML, photos.length > 0), isLabel: false });
+          } else {
+            // Split into one block per item (see checklistItemHTML) instead
+            // of one block for the whole entry, so a long checklist can
+            // flow across a page break and fill leftover space instead of
+            // dragging its entire entry (header included) to the next page
+            // whole. isEntryHeader pairs the header with its first item via
+            // the same rule the pagination pass uses for section labels.
+            groupBlocks.push({ html: entryHeaderOnlyHTML(e), isLabel: false, isEntryHeader: true });
+            checklistItems.forEach((item, idx) => {
+              const isFirst = idx === 0;
+              const isLast = idx === checklistItems.length - 1;
+              groupBlocks.push({
+                html: checklistItemHTML(item, isFirst, isLast, photos.length > 0, attachedNoteHTML),
+                isLabel: false,
+              });
+            });
+          }
           if (photos.length > 0) {
             // Identity-mapped fallback when nothing's been excluded (see
             // applyPhotoExclusions) — never the chunk's own 0-based index,
@@ -2965,12 +3011,13 @@ const buildReportHTML = (report) => {
   let isFirstPage = true;
   blocks.forEach((block, i) => {
     const blockH = blockHeights[i];
-    const available = PAGE_H - PAGE_PAD * 2 - (isFirstPage ? headerH : runningHeaderH) - footerH;
-    // A section label must never be stranded alone at the bottom of a
-    // page with its task list starting on the next — check it together
-    // with its very next block (that group's first entry) against the
-    // remaining space, not just the label alone.
-    const fitsCheckH = block.isLabel && i + 1 < blocks.length ? blockH + blockHeights[i + 1] : blockH;
+    const available = PAGE_H - PAGE_PAD * 2 - (isFirstPage ? headerH : runningHeaderH) - footerH - PAGE_BOTTOM_BUFFER;
+    // A section label (or a checklist-bearing entry's header — see
+    // isEntryHeader) must never be stranded alone at the bottom of a page
+    // with its first piece of content starting on the next — check it
+    // together with its very next block against the remaining space, not
+    // just the label/header alone.
+    const fitsCheckH = (block.isLabel || block.isEntryHeader) && i + 1 < blocks.length ? blockH + blockHeights[i + 1] : blockH;
     if (current.length > 0 && used + fitsCheckH > available) {
       pages.push(current);
       current = [];
@@ -3310,7 +3357,25 @@ function ReportsTab({ demoCase }) {
       }
       g.entries.forEach((e, i) => {
         const entryKey = `${g.key}_${i}`;
-        flatBlocks.push({ type: "entry", key: entryKey, entryKey, e });
+        // A checklist-bearing entry splits into a header block plus one
+        // block per item (see renderEntryHeaderBlock/renderChecklistItemBlock)
+        // so a long checklist can flow across a page break and fill
+        // leftover space instead of dragging the whole entry, header
+        // included, to the next page whole. type: "entryHeader" is paired
+        // with its very next block by the pagination pass below, the same
+        // rule already used for section labels — it never strands alone.
+        const checklistItems = (e.checklist || []).slice(-10);
+        if (checklistItems.length === 0) {
+          flatBlocks.push({ type: "entry", key: entryKey, entryKey, e });
+        } else {
+          flatBlocks.push({ type: "entryHeader", key: `${entryKey}_hdr`, entryKey, e });
+          checklistItems.forEach((item, idx) => {
+            flatBlocks.push({
+              type: "checklistItem", key: `${entryKey}_ck${idx}`, entryKey, e, item,
+              isFirst: idx === 0, isLast: idx === checklistItems.length - 1,
+            });
+          });
+        }
         // "+N more" reveals one row of photos at a time as its own,
         // independent block (see renderPhotoContinuationBlock) rather than
         // growing this entry's own block — that's what lets the extra rows
@@ -3456,30 +3521,13 @@ function ReportsTab({ demoCase }) {
             </>
           )}
         </div>
-        {/* Always shown now — the checklist (if any) and/or the note both
-            live below it, so it's no longer conditional on a note existing
-            the way it used to be. */}
+        {/* Always shown now — the note (if any) lives below it, so it's no
+            longer conditional on a note existing the way it used to be.
+            No checklist here — an entry with a checklist uses
+            renderEntryHeaderBlock/renderChecklistItemBlock instead (see
+            flatBlocks), split so a long checklist can flow across a page
+            break instead of dragging this whole entry to the next page. */}
         <div style={{ height: 1, background: "var(--tt-grey03)", marginTop: 16 }} />
-        {e.checklist && e.checklist.length > 0 && (
-          <div style={{ marginTop: 16 }}>
-            <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "0 0 8px" }}>
-              Completed as of this update
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {/* Only the last 10 — earlier items still exist in the data,
-                  just not shown, so the section stays a short recap
-                  instead of growing unbounded over a long task. */}
-              {e.checklist.slice(-10).map((item, idx) => (
-                <div key={idx} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Check size={14} strokeWidth={SW} color="var(--tt-secondary)" style={{ flexShrink: 0 }} />
-                  <span style={{ fontSize: 13, color: "var(--tt-text-2)" }}>
-                    {item.text}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
         {renderNoteSlot(entryKey)}
         {!isPhotoless && (
           <PhotoGrid
@@ -3496,6 +3544,104 @@ function ReportsTab({ demoCase }) {
             // sentinel is safe (it just yields exactly enough chunks).
             onExpand={() => setExpandedPhotoGroups(p => ({ ...p, [entryKey]: Infinity }))}
           />
+        )}
+      </div>
+    );
+  };
+
+  // Header-only rendering for a checklist-bearing entry — title/meta/
+  // divider plus the "Completed as of this update" label, with no items,
+  // no note, and no trailing margin of its own (the last checklist item
+  // block owns those — see renderChecklistItemBlock). Used only when
+  // e.checklist is non-empty; renderEntryBlock above still handles the
+  // whole entry in one piece when there's no checklist to split.
+  const renderEntryHeaderBlock = ({ entryKey, e }) => {
+    const displayTitle = titleOverrides[entryKey] ?? e.note;
+    const isPhotoless = e.noPhotos;
+    const { kind } = statusForEntry(e);
+    const statusMeta = STATUS_META[kind];
+    const visiblePhotoCount = (e.photos || []).filter(
+      (_, i) => !(preview.excludedPhotos && preview.excludedPhotos[`${entryKey}_${i}`])
+    ).length;
+    return (
+      <div>
+        <EditableField
+          fieldId={`title_${entryKey}`}
+          value={displayTitle}
+          disabled={previewSaved}
+          onSave={v => {
+            setTitleOverrides(prev => {
+              if (v && v.trim()) return { ...prev, [entryKey]: v.trim() };
+              const next = { ...prev }; delete next[entryKey]; return next;
+            });
+          }}
+          textStyle={{ fontSize: 18, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.35", margin: 0 }}
+          inputStyle={{ fontSize: 18, fontWeight: 600 }}
+        />
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: statusMeta.color, flexShrink: 0 }} />
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: statusMeta.color }}>
+            {statusMeta.label}
+          </span>
+          <span style={{ width: 3, height: 3, borderRadius: "50%", background: "var(--tt-grey04)", flexShrink: 0 }} />
+          <span style={{ fontSize: 11, fontWeight: 500, color: "var(--tt-grey05)" }}>
+            {kind === "in_progress" ? "Start on " : ""}{fmtDate(parseDate(e.date))}
+          </span>
+          {!isPhotoless && visiblePhotoCount > 0 && (
+            <>
+              <span style={{ width: 3, height: 3, borderRadius: "50%", background: "var(--tt-grey04)", flexShrink: 0 }} />
+              <span style={{ fontSize: 11, fontWeight: 500, color: "var(--tt-grey05)" }}>
+                {visiblePhotoCount} photo{visiblePhotoCount === 1 ? "" : "s"}
+              </span>
+            </>
+          )}
+        </div>
+        <div style={{ height: 1, background: "var(--tt-grey03)", marginTop: 16 }} />
+        <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "16px 0 8px" }}>
+          Completed as of this update
+        </p>
+      </div>
+    );
+  };
+
+  // One checklist item as its own page-able block — see flatBlocks. Items
+  // other than the first each carry the 6px inter-item gap (matching the
+  // old flex `gap: 6`) via marginTop; the first item's marginTop is 0
+  // since renderEntryHeaderBlock's label already owns that gap via its own
+  // margin-bottom. Only the LAST item carries the note slot, the bounded
+  // photo grid, and the entry's own trailing margin, since it's the
+  // entry's true trailing edge whenever a checklist exists.
+  const renderChecklistItemBlock = ({ entryKey, e, item, isFirst, isLast }) => {
+    const displayTitle = titleOverrides[entryKey] ?? e.note;
+    const isPhotoless = e.noPhotos;
+    const visiblePhotoCount = (e.photos || []).filter(
+      (_, i) => !(preview.excludedPhotos && preview.excludedPhotos[`${entryKey}_${i}`])
+    ).length;
+    const hasRevealedContinuation = (expandedPhotoGroups[entryKey] || 0) > 0 && visiblePhotoCount > PHOTO_GRID_CAP;
+    return (
+      <div style={{ marginTop: isFirst ? 0 : 6, marginBottom: isLast ? (hasRevealedContinuation ? 0 : 40) : 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Check size={14} strokeWidth={SW} color="var(--tt-secondary)" style={{ flexShrink: 0 }} />
+          <span style={{ fontSize: 13, color: "var(--tt-text-2)" }}>
+            {item.text}
+          </span>
+        </div>
+        {isLast && (
+          <>
+            {renderNoteSlot(entryKey)}
+            {!isPhotoless && (
+              <PhotoGrid
+                photos={e.photos}
+                onOpen={(photos, idx, originalIndices) => setLightbox({ photos, index: idx, entryDate: e.date, taskName: displayTitle, entryKey, originalIndices })}
+                excludedPhotos={preview.excludedPhotos}
+                entryKey={entryKey}
+                onDeletePhoto={previewSaved ? undefined : (idx) => handleDeletePhoto(entryKey, idx)}
+                captions={preview.photoCaptions}
+                windowEnd={hasRevealedContinuation ? PHOTO_GRID_CAP : undefined}
+                onExpand={() => setExpandedPhotoGroups(p => ({ ...p, [entryKey]: Infinity }))}
+              />
+            )}
+          </>
         )}
       </div>
     );
@@ -3525,6 +3671,8 @@ function ReportsTab({ demoCase }) {
   const renderBlock = (block) => {
     if (block.type === "label") return renderGroupLabelBlock(block.g);
     if (block.type === "photoContinuation") return renderPhotoContinuationBlock(block);
+    if (block.type === "entryHeader") return renderEntryHeaderBlock(block);
+    if (block.type === "checklistItem") return renderChecklistItemBlock(block);
     return renderEntryBlock(block);
   };
 
@@ -3787,13 +3935,14 @@ function ReportsTab({ demoCase }) {
     let isFirstPage = true;
     flatBlocks.forEach((block, i) => {
       const h = blockMeasureRefs.current[block.key]?.offsetHeight || 0;
-      const available = PAGE_H - PAGE_PAD * 2 - (isFirstPage ? headerH : runningHeaderH) - footerH;
-      // A section label must never be stranded alone at the bottom of a
-      // page with its task list starting on the next — check it together
-      // with its very next block (that group's first entry) against the
-      // remaining space, not just the label alone.
+      const available = PAGE_H - PAGE_PAD * 2 - (isFirstPage ? headerH : runningHeaderH) - footerH - PAGE_BOTTOM_BUFFER;
+      // A section label (or a checklist-bearing entry's header — see
+      // "entryHeader" in flatBlocks) must never be stranded alone at the
+      // bottom of a page with its first piece of content starting on the
+      // next — check it together with its very next block against the
+      // remaining space, not just the label/header alone.
       const next = flatBlocks[i + 1];
-      const fitsCheckH = block.type === "label" && next
+      const fitsCheckH = (block.type === "label" || block.type === "entryHeader") && next
         ? h + (blockMeasureRefs.current[next.key]?.offsetHeight || 0)
         : h;
       if (current.length > 0 && used + fitsCheckH > available) {
