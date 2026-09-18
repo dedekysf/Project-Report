@@ -1245,7 +1245,7 @@ const PHOTO_GRID_CAP = PHOTO_GRID_COLS; // 1 row before "+N more"
 // off the trigger's own bounding rect (so it isn't clipped by the
 // grid/scroll container), with a single input for the caption text. Only
 // one popover is open at a time across the grid.
-function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, onToggleSelect, captions, windowStart, windowEnd, onExpand }) {
+function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, onDeletePhoto, captions, windowStart, windowEnd, onExpand }) {
   // Captions are read-only here — editable only from the lightbox (see
   // PhotoLightbox). This is just a hover indicator: the sticky-note icon
   // only appears when a caption already exists, and hovering it (not
@@ -1285,7 +1285,6 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
         // Position within the FULL (unwindowed) items/visiblePhotoKeys
         // array — what the lightbox filmstrip actually indexes by.
         const viewIdx = (windowStart || 0) + viewIdxInWindow;
-        const selected = !!(selectedPhotos && selectedPhotos[`${entryKey}_${i}`]);
         const isCapCell = remaining > 0 && viewIdxInWindow === visibleItems.length - 1;
         const canOpen = !!(IMG_MAP[k] && onOpen) && !isCapCell;
         const caption = captions && captions[`${entryKey}_${i}`];
@@ -1293,24 +1292,25 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, selectedPhotos, o
           <div key={i} className="group" style={{ display: "flex", flexDirection: "column" }}>
           <div
             style={{ position: "relative" }}
-            onMouseEnter={e => { if (canOpen && !selected) e.currentTarget.lastElementChild.style.opacity = "1"; }}
+            onMouseEnter={e => { if (canOpen) e.currentTarget.lastElementChild.style.opacity = "1"; }}
             onMouseLeave={e => { if (canOpen) e.currentTarget.lastElementChild.style.opacity = "0"; }}
           >
             <PhotoThumb src={IMG_MAP[k]} onClick={canOpen ? () => onOpen(visiblePhotoKeys, viewIdx, visibleOriginalIndices) : undefined} />
-            {!isCapCell && IMG_MAP[k] && (
+            {/* Deletes immediately — no confirmation, no multi-select (see
+                handleDeletePhoto). */}
+            {!isCapCell && IMG_MAP[k] && onDeletePhoto && (
               <button
-                onClick={e => { e.stopPropagation(); onToggleSelect && onToggleSelect(i, k); }}
-                disabled={!onToggleSelect}
-                className={`transition-opacity ${selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+                onClick={e => { e.stopPropagation(); onDeletePhoto(i); }}
+                className="opacity-0 transition-opacity group-hover:opacity-100"
                 style={{
                   position: "absolute", top: 6, right: 6, width: 20, height: 20, borderRadius: "50%",
-                  border: selected ? "none" : "1.5px solid white", background: selected ? "var(--tt-secondary)" : "rgba(10,22,41,0.35)",
+                  border: "none", background: "rgba(10,22,41,0.55)",
                   display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
-                  cursor: onToggleSelect ? "pointer" : "default", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)",
+                  cursor: "pointer", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)",
                   zIndex: 2,
                 }}
               >
-                {selected && <Check size={12} color="white" strokeWidth={3} />}
+                <Trash2 size={12} color="white" strokeWidth={2.25} />
               </button>
             )}
             {!isCapCell && IMG_MAP[k] && caption && (
@@ -2955,7 +2955,6 @@ function ReportsTab({ demoCase }) {
   const [toast,       setToast]       = useState(null); // { type: "success" | "error", message }
   const [deleteTarget, setDeleteTarget] = useState(null); // report pending delete confirmation
   const [lightbox, setLightbox] = useState(null); // { photos, index, caption } | null — full-screen photo viewer
-  const [selectedPhotos, setSelectedPhotos] = useState({}); // { [entryKey_photoIndex]: photoKey } — in-progress checkbox selection, not yet deleted
   const [photoManager, setPhotoManager] = useState(null); // { entryKey, photos, taskName } | null — full photo list modal for an over-the-cap task item
   const [expandedPhotoGroups, setExpandedPhotoGroups] = useState({}); // { [entryKey]: revealedChunkCount } — how many extra "+N more" chunks are showing per entry; lifted (not local to PhotoGrid) so pagination repacks as each one is revealed
   const periodRef     = useRef(null);
@@ -3123,7 +3122,6 @@ function ReportsTab({ demoCase }) {
       setVisibleCount(10);
       setLoadingMore(false);
       setGenerating(false);
-      setSelectedPhotos({});
     }, 900);
   };
 
@@ -3137,7 +3135,6 @@ function ReportsTab({ demoCase }) {
     setPreviewCopied(false);
     setVisibleCount(10);
     setLoadingMore(false);
-    setSelectedPhotos({});
     setPhotoManager(null);
     setExpandedPhotoGroups({});
   };
@@ -3168,7 +3165,6 @@ function ReportsTab({ demoCase }) {
     setPreviewLoading(true);
     setVisibleCount(10); // new period = new dataset, restart infinite scroll from the top
     setLoadingMore(false);
-    setSelectedPhotos({}); // entry/photo indices no longer line up with a different dataset
     const t = setTimeout(() => {
       setPreviewLoading(false);
       const data = buildReportData(preview.dateRange, preview.period, preview.customRange, preview.includeNoPhotoTasks);
@@ -3418,8 +3414,7 @@ function ReportsTab({ demoCase }) {
             onOpen={(photos, idx, originalIndices) => setLightbox({ photos, index: idx, entryDate: e.date, taskName: displayTitle, entryKey, originalIndices })}
             excludedPhotos={preview.excludedPhotos}
             entryKey={entryKey}
-            selectedPhotos={selectedPhotos}
-            onToggleSelect={previewSaved ? undefined : (idx, photoKey) => togglePhotoSelected(entryKey, idx, photoKey)}
+            onDeletePhoto={previewSaved ? undefined : (idx) => handleDeletePhoto(entryKey, idx)}
             captions={preview.photoCaptions}
             windowEnd={hasRevealedContinuation ? PHOTO_GRID_CAP : undefined}
             // "+N more" reveals every remaining photo at once — the
@@ -3445,8 +3440,7 @@ function ReportsTab({ demoCase }) {
         onOpen={(photos, idx, originalIndices) => setLightbox({ photos, index: idx, entryDate: e.date, taskName: titleOverrides[entryKey] ?? e.note, entryKey, originalIndices })}
         excludedPhotos={preview.excludedPhotos}
         entryKey={entryKey}
-        selectedPhotos={selectedPhotos}
-        onToggleSelect={previewSaved ? undefined : (idx, photoKey) => togglePhotoSelected(entryKey, idx, photoKey)}
+        onDeletePhoto={previewSaved ? undefined : (idx) => handleDeletePhoto(entryKey, idx)}
         captions={preview.photoCaptions}
         windowStart={chunk * PHOTO_GRID_CAP}
         windowEnd={isTip ? undefined : (chunk + 1) * PHOTO_GRID_CAP}
@@ -3700,7 +3694,6 @@ function ReportsTab({ demoCase }) {
   const layoutDepsKey = preview
     ? JSON.stringify({ ...preview, logo: preview.logo ? preview.logo.length : 0 })
       + "|" + JSON.stringify(titleOverrides)
-      + "|" + JSON.stringify(selectedPhotos)
       + "|" + JSON.stringify(expandedPhotoGroups)
       + "|" + previewSaved
       + "|" + flatBlocks.map(b => b.key).join(",")
@@ -3848,20 +3841,13 @@ function ReportsTab({ demoCase }) {
     }
   };
 
-  // Checking a photo just marks it selected (green check) — it still shows
-  // in the grid until the selection toolbar's Delete is clicked, at which
-  // point selected keys move into preview.excludedPhotos (permanently
-  // filtered everywhere, including from the live grid).
-  const togglePhotoSelected = (entryKey, photoIndex, photoKey) => {
-    setSelectedPhotos(prev => {
-      const key = `${entryKey}_${photoIndex}`;
-      const next = { ...prev };
-      if (next[key]) delete next[key]; else next[key] = photoKey;
-      return next;
-    });
+  // Deletes immediately (no confirmation, no multi-select) — moves this one
+  // photo straight into preview.excludedPhotos (permanently filtered
+  // everywhere, including from the live grid). The original photo itself
+  // is never touched, only excluded from this report.
+  const handleDeletePhoto = (entryKey, photoIndex) => {
+    setPreview(p => ({ ...p, excludedPhotos: { ...p.excludedPhotos, [`${entryKey}_${photoIndex}`]: true } }));
   };
-
-  const clearPhotoSelection = () => setSelectedPhotos({});
 
   // Keyed the same way as excludedPhotos/extraNotes — `${entryKey}_${photoIndex}`
   // against the original, unspliced entry — so it survives note-splicing and
@@ -3873,11 +3859,6 @@ function ReportsTab({ demoCase }) {
       if (text) next[key] = text; else delete next[key];
       return { ...p, photoCaptions: next };
     });
-  };
-
-  const handleDeleteSelectedPhotos = () => {
-    setPreview(p => ({ ...p, excludedPhotos: { ...p.excludedPhotos, ...Object.fromEntries(Object.keys(selectedPhotos).map(k => [k, true])) } }));
-    setSelectedPhotos({});
   };
 
   const handlePreviewDownload = () => {
@@ -3915,8 +3896,8 @@ function ReportsTab({ demoCase }) {
       // Straight back to the reports table — Download/Copy link for this
       // report are already one click away from its row there, so there's
       // no reason to detour through the locked read-only preview chrome
-      // first (closePreview resets previewSaved/activeEditField/
-      // selectedPhotos/etc. along with actually closing the modal).
+      // first (closePreview resets previewSaved/activeEditField/etc.
+      // along with actually closing the modal).
       closePreview();
     }, 900);
   };
@@ -4380,53 +4361,6 @@ function ReportsTab({ demoCase }) {
                   </>
                 )}
 
-                {/* Selection toolbar — sticky to the bottom of the scroll
-                    viewport (not fixed to the screen) so it naturally
-                    inherits this same maxWidth:800 box's width and
-                    horizontal position — including the scrollbar-gutter
-                    reservation above — instead of having to duplicate that
-                    centering math against the raw viewport. Delete acts
-                    immediately (no confirmation modal) since the "original
-                    photo won't be deleted" disclaimer is always visible
-                    right here; it moves the selection into excludedPhotos
-                    (filtered everywhere). */}
-                {Object.keys(selectedPhotos).length > 0 && (
-                  <div style={{
-                    position: "sticky", bottom: 0, zIndex: 100,
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    boxSizing: "border-box", padding: "12px 20px",
-                    background: "var(--tt-grey06)",
-                  }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <button
-                        onClick={clearPhotoSelection}
-                        onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}
-                        onMouseLeave={e => e.currentTarget.style.background = "none"}
-                        style={{ background: "none", border: "1.5px solid rgba(255,255,255,0.6)", borderRadius: "50%", width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "white", padding: 0, flexShrink: 0, transition: "background 0.15s" }}
-                      >
-                        <X size={13} strokeWidth={SW} />
-                      </button>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                        <span style={{ fontSize: 13, fontWeight: 500, color: "white" }}>
-                          {Object.keys(selectedPhotos).length} item{Object.keys(selectedPhotos).length > 1 ? "s" : ""} selected
-                        </span>
-                        <span style={{ fontSize: 12, color: "white" }}>
-                          The original photo won't be deleted.
-                        </span>
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <button
-                        onClick={handleDeleteSelectedPhotos}
-                        onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.08)"}
-                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                        style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: "1px solid rgba(255,255,255,0.4)", color: "white", cursor: "pointer", padding: "6px 12px", borderRadius: 8, fontSize: 13, fontWeight: 500, transition: "background 0.15s" }}
-                      >
-                        <Trash2 size={14} strokeWidth={SW} /> Delete
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
               </div>
             </div>
