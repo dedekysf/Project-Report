@@ -1405,6 +1405,40 @@ function ManagedPhotoImage({ src }) {
   );
 }
 
+// Full-size preview of a single Manage Photos thumbnail — its own overlay,
+// stacked above the modal (not replacing it), so closing the preview
+// leaves Manage Photos open exactly as it was.
+function ManagePhotoPreview({ src, onClose }) {
+  useEffect(() => {
+    const handler = e => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, zIndex: 5400, background: "rgba(10,22,41,0.75)", display: "flex", alignItems: "center", justifyContent: "center", padding: 32 }}
+    >
+      <button
+        onClick={onClose}
+        onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.2)"}
+        onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.12)"}
+        style={{ position: "absolute", top: 20, right: 20, width: 36, height: 36, borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "background 0.15s" }}
+      >
+        <X size={18} color="white" strokeWidth={SW} />
+      </button>
+      <img
+        src={src}
+        alt=""
+        onClick={e => e.stopPropagation()}
+        style={{ maxWidth: "90vw", maxHeight: "90vh", borderRadius: 8, objectFit: "contain", boxShadow: "0 24px 64px rgba(0,0,0,0.4)" }}
+      />
+    </div>,
+    document.body
+  );
+}
+
 // Report-wide photo list, one section per task with photos — opened by
 // hovering the "Photo Limit" indicator (see the draft chrome), not from
 // any single task item anymore. Every photo shows here (both included and
@@ -1427,12 +1461,16 @@ function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoE
   const warningTimerRef = useRef(null);
   const [cappedTooltipKey, setCappedTooltipKey] = useState(null); // `${entryKey}_${pi}` of the capped (disabled) photo currently hovered, or null
   const [cappedTooltipPos, setCappedTooltipPos] = useState({ top: 0, left: 0 });
+  const [previewSrc, setPreviewSrc] = useState(null); // full-size preview overlay, stacked above this modal — not this modal's own close
 
   useEffect(() => {
+    // Skipped while the preview overlay is open — its own Escape handler
+    // should close just the preview, not this modal underneath it.
+    if (previewSrc) return;
     const handler = e => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [onClose]);
+  }, [onClose, previewSrc]);
 
   // Auto-dismisses the warning a couple seconds after the blocked attempt
   // that raised it, rather than leaving it stuck until the user notices.
@@ -1475,14 +1513,15 @@ function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoE
         {sections.map(sec => (
           <div key={sec.entryKey} style={{ marginBottom: 20 }}>
             <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 8px" }}>{sec.taskName}</p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(8,1fr)", gap: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 10 }}>
               {sec.items.map(({ k, pi }) => {
                 const key = `${sec.entryKey}_${pi}`;
                 const included = !(excludedPhotos && excludedPhotos[key]);
                 const capped = !included && includedCount >= PHOTO_LIMIT;
                 return (
-                  <button
+                  <div
                     key={pi}
+                    className="group"
                     onClick={() => {
                       if (capped) { flashLimitWarning(); return; }
                       onSetPhotoExcluded(sec.entryKey, pi, included);
@@ -1493,15 +1532,23 @@ function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoE
                     } : undefined}
                     onMouseMove={capped ? e => setCappedTooltipPos({ top: e.clientY, left: e.clientX }) : undefined}
                     onMouseLeave={capped ? () => setCappedTooltipKey(null) : undefined}
-                    style={{ position: "relative", padding: 0, border: "none", background: "none", cursor: capped ? "not-allowed" : "pointer", opacity: capped ? 0.45 : 1 }}
+                    style={{ position: "relative", cursor: capped ? "not-allowed" : "pointer", opacity: capped ? 0.45 : 1 }}
                   >
                     <div style={{ position: "relative", width: "100%", aspectRatio: "16/9", borderRadius: 6, overflow: "hidden", outline: included ? "2px solid var(--tt-secondary)" : "2px solid transparent" }}>
                       <ManagedPhotoImage src={IMG_MAP[k]} />
                       <span style={{ position: "absolute", top: 6, right: 6, width: 20, height: 20, borderRadius: "50%", background: included ? "var(--tt-secondary)" : "rgba(10,22,41,0.35)", border: included ? "none" : "1.5px solid white", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         {included && <Check size={12} color="white" strokeWidth={3} />}
                       </span>
+                      <button
+                        type="button"
+                        onClick={e => { e.stopPropagation(); setPreviewSrc(IMG_MAP[k]); }}
+                        className="opacity-0 transition-opacity group-hover:opacity-100"
+                        style={{ position: "absolute", bottom: 6, left: 6, width: 20, height: 20, borderRadius: "50%", border: "none", background: "white", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: "pointer", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)", zIndex: 2 }}
+                      >
+                        <ExternalLink size={11} color="var(--tt-grey06)" strokeWidth={2.25} />
+                      </button>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -1520,6 +1567,7 @@ function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoE
           Unselect an image first
         </div>
       )}
+      {previewSrc && <ManagePhotoPreview src={previewSrc} onClose={() => setPreviewSrc(null)} />}
     </div>
   );
 }
