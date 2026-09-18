@@ -1496,34 +1496,43 @@ function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoE
                     } : undefined}
                     onMouseMove={capped ? e => setCappedTooltipPos({ top: e.clientY, left: e.clientX }) : undefined}
                     onMouseLeave={capped ? () => setCappedTooltipKey(null) : undefined}
-                    style={{ position: "relative", cursor: capped ? "not-allowed" : "pointer", opacity: capped ? 0.45 : 1 }}
+                    style={{ position: "relative", cursor: capped ? "not-allowed" : "pointer" }}
                   >
-                    <div style={{ position: "relative", width: "100%", aspectRatio: "16/9", borderRadius: 6, overflow: "hidden", outline: included ? "2px solid var(--tt-secondary)" : "2px solid transparent" }}>
+                    {/* Dimmed on capped — the checkbox is part of this
+                        "can't select" cue, but the preview button below
+                        stays outside it since previewing always works. */}
+                    <div style={{ position: "relative", width: "100%", aspectRatio: "16/9", borderRadius: 6, overflow: "hidden", outline: included ? "2px solid var(--tt-secondary)" : "2px solid transparent", opacity: capped ? 0.45 : 1 }}>
                       <ManagedPhotoImage src={IMG_MAP[k]} />
-                      <span style={{ position: "absolute", top: 6, right: 6, width: 20, height: 20, borderRadius: "50%", background: included ? "var(--tt-secondary)" : "rgba(10,22,41,0.35)", border: included ? "none" : "1.5px solid white", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {/* Hover-revealed like the delete/preview buttons —
+                          except once checked, it stays visible so the
+                          selection state reads at a glance. */}
+                      <span
+                        className={included ? undefined : "opacity-0 transition-opacity group-hover:opacity-100"}
+                        style={{ position: "absolute", top: 6, right: 6, width: 20, height: 20, borderRadius: "50%", background: included ? "var(--tt-secondary)" : "rgba(10,22,41,0.35)", border: included ? "none" : "1.5px solid white", display: "flex", alignItems: "center", justifyContent: "center" }}
+                      >
                         {included && <Check size={12} color="white" strokeWidth={3} />}
                       </span>
-                      {onPreviewPhoto && (
-                        <button
-                          type="button"
-                          onClick={e => {
-                            e.stopPropagation();
-                            onPreviewPhoto({
-                              photos: sec.items.map(it => it.k),
-                              index: sec.items.findIndex(it => it.pi === pi),
-                              originalIndices: sec.items.map(it => it.pi),
-                              entryDate: sec.date,
-                              taskName: sec.taskName,
-                              entryKey: sec.entryKey,
-                            });
-                          }}
-                          className="opacity-0 transition-opacity group-hover:opacity-100"
-                          style={{ position: "absolute", bottom: 6, left: 6, width: 20, height: 20, borderRadius: "50%", border: "none", background: "white", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: "pointer", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)", zIndex: 2 }}
-                        >
-                          <ExternalLink size={11} color="var(--tt-grey06)" strokeWidth={2.25} />
-                        </button>
-                      )}
                     </div>
+                    {onPreviewPhoto && (
+                      <button
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation();
+                          onPreviewPhoto({
+                            photos: sec.items.map(it => it.k),
+                            index: sec.items.findIndex(it => it.pi === pi),
+                            originalIndices: sec.items.map(it => it.pi),
+                            entryDate: sec.date,
+                            taskName: sec.taskName,
+                            entryKey: sec.entryKey,
+                          });
+                        }}
+                        className="opacity-0 transition-opacity group-hover:opacity-100"
+                        style={{ position: "absolute", bottom: 6, left: 6, width: 20, height: 20, borderRadius: "50%", border: "none", background: "white", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: "pointer", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)", zIndex: 2 }}
+                      >
+                        <ExternalLink size={11} color="var(--tt-grey06)" strokeWidth={2.25} />
+                      </button>
+                    )}
                   </div>
                 );
               })}
