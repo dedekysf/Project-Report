@@ -4272,11 +4272,11 @@ function ReportsTab({ demoCase }) {
                 </>
               ) : (
                 // TODO(BE): replace with the account's actual per-report photo cap and usage from the API
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, width: 140 }}>
-                  <p style={{ fontSize: 18, fontWeight: 600, color: "var(--tt-text-1)", margin: 0, whiteSpace: "nowrap" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "fit-content" }}>
+                  <p style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", margin: 0, whiteSpace: "nowrap" }}>
                     Photo Limit {previewPhotoCount} of {PHOTO_LIMIT}
                   </p>
-                  <div style={{ height: 6, borderRadius: 99, background: "var(--tt-grey03)", overflow: "hidden" }}>
+                  <div style={{ width: "90%", height: 6, borderRadius: 99, background: "var(--tt-grey03)", overflow: "hidden" }}>
                     <div style={{ width: `${Math.min(100, (previewPhotoCount / PHOTO_LIMIT) * 100)}%`, height: "100%", borderRadius: 99, background: "var(--tt-secondary)" }} />
                   </div>
                 </div>
