@@ -2057,9 +2057,12 @@ const PERIOD_RANGE = {
 
 // ── Dummy data ──
 const DUMMY_ENTRIES = [
-  // Deliberately at PHOTO_LIMIT (50) — the most recent entry is always the
-  // first task item shown, so the over-the-cap "manage photos" UI has
-  // something to demo without needing a specific date range.
+  // Deliberately well over PER_ENTRY_PHOTO_LIMIT (15) — the most recent
+  // entry is always the first task item shown, so the over-the-cap
+  // "manage photos" UI has something to demo without needing a specific
+  // date range. Kept at 30 (not the full PHOTO_LIMIT of 50) so the
+  // prototype's default/first-load state stays manageable to click
+  // through.
   {
     date: "2026-09-10", note: "Flooring installation started on the ground floor.",
     // Deliberately 10 items — right at the cap the UI shows, to demo a
@@ -2076,7 +2079,7 @@ const DUMMY_ENTRIES = [
       { text: "Apply protective finish coat" },
       { text: "Clean and inspect finished flooring" },
     ],
-    photos: ["img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5"],
+    photos: ["img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3"],
   },
   {
     date: "2026-09-09", note: "Exterior siding repairs completed on the south wall.",
