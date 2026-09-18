@@ -2648,7 +2648,7 @@ const buildReportHTML = (report) => {
     const statusHTML =
       `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${statusColor};vertical-align:middle;margin-right:6px;"></span>` +
       `<span style="font-family:${SANS};font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:${statusColor};">${statusMeta.label}</span>`;
-    const dateHTML = `<span style="font-family:${SANS};font-size:11px;font-weight:500;text-transform:uppercase;color:#828282;">${kind === "in_progress" ? "Start: " : ""}${fmtDate(parseDate(e.date))}</span>`;
+    const dateHTML = `<span style="font-family:${SANS};font-size:11px;font-weight:500;text-transform:uppercase;color:#828282;">${kind === "in_progress" ? "Start on " : ""}${fmtDate(parseDate(e.date))}</span>`;
     const photoCountHTML = (!e.noPhotos && visiblePhotoCount > 0)
       ? `<span style="font-family:${SANS};font-size:11px;font-weight:500;text-transform:uppercase;color:#828282;">${visiblePhotoCount} photo${visiblePhotoCount === 1 ? "" : "s"}</span>`
       : "";
@@ -3356,7 +3356,7 @@ function ReportsTab({ demoCase }) {
           </span>
           <span style={{ width: 3, height: 3, borderRadius: "50%", background: "var(--tt-grey04)", flexShrink: 0 }} />
           <span style={{ fontSize: 11, fontWeight: 500, color: "var(--tt-grey05)" }}>
-            {kind === "in_progress" ? "Start: " : ""}{fmtDate(parseDate(e.date))}
+            {kind === "in_progress" ? "Start on " : ""}{fmtDate(parseDate(e.date))}
           </span>
           {!isPhotoless && visiblePhotoCount > 0 && (
             <>
