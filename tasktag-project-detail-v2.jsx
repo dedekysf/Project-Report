@@ -1254,6 +1254,8 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, onDeletePhoto, ca
   // clicking) shows the caption text in a tooltip.
   const [captionTooltipIdx, setCaptionTooltipIdx] = useState(null); // original photo index, or null
   const [captionTooltipPos, setCaptionTooltipPos] = useState({ top: 0, left: 0 });
+  const [deleteTooltipIdx, setDeleteTooltipIdx] = useState(null); // original photo index, or null
+  const [deleteTooltipPos, setDeleteTooltipPos] = useState({ top: 0, left: 0 });
 
   const items = (photos || [])
     .map((k, i) => ({ k, i }))
@@ -1303,6 +1305,12 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, onDeletePhoto, ca
             {!isCapCell && IMG_MAP[k] && onDeletePhoto && (
               <button
                 onClick={e => { e.stopPropagation(); onDeletePhoto(i); }}
+                onMouseEnter={e => {
+                  const r = e.currentTarget.getBoundingClientRect();
+                  setDeleteTooltipPos({ top: r.bottom + 6, left: r.right });
+                  setDeleteTooltipIdx(i);
+                }}
+                onMouseLeave={() => setDeleteTooltipIdx(null)}
                 className="opacity-0 transition-opacity group-hover:opacity-100"
                 style={{
                   position: "absolute", top: 6, right: 6, width: 20, height: 20, borderRadius: "50%",
@@ -1314,6 +1322,14 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, onDeletePhoto, ca
               >
                 <Trash2 size={12} color="white" strokeWidth={2.25} />
               </button>
+            )}
+            {deleteTooltipIdx === i && createPortal(
+              <div style={{ position: "fixed", top: deleteTooltipPos.top, left: deleteTooltipPos.left, zIndex: 5300, maxWidth: 200, pointerEvents: "none" }}>
+                <div style={{ background: "var(--tt-text-1)", color: "white", fontSize: 11, fontWeight: 500, lineHeight: 1.4, padding: "6px 10px", borderRadius: 6, boxShadow: "0 8px 24px rgba(10,22,41,0.24)" }}>
+                  The original photo won't be deleted — only removed from this report.
+                </div>
+              </div>,
+              document.body
             )}
             {!isCapCell && IMG_MAP[k] && caption && (
               <button
@@ -2670,7 +2686,7 @@ const buildReportHTML = (report) => {
     const dividerHTML = h("div", { style: "height:1px;background:#e8e8e6;margin-top:20px;" }, "");
     const checklistHTML = (e.checklist && e.checklist.length > 0)
       ? h("div", { style: "margin-top:20px;" },
-          h("p", { style: `font-family:${SANS};font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;margin:0 0 12px;` }, "Completed this update"),
+          h("p", { style: `font-family:${SANS};font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;margin:0 0 12px;` }, "Completed as of this update"),
           h("div", { style: "display:flex;flex-direction:column;gap:12px;" },
             // Only the last 10 — same cap the live view applies.
             ...e.checklist.slice(-10).map(item =>
@@ -3398,7 +3414,7 @@ function ReportsTab({ demoCase }) {
         {e.checklist && e.checklist.length > 0 && (
           <div style={{ marginTop: 16 }}>
             <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "0 0 8px" }}>
-              Completed this update
+              Completed as of this update
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {/* Only the last 10 — earlier items still exist in the data,
