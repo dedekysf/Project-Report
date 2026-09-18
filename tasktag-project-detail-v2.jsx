@@ -1494,7 +1494,7 @@ function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoE
         {sections.map(sec => (
           <div key={sec.entryKey} style={{ marginBottom: 40 }}>
             <p style={{ fontSize: 18, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 2px" }}>{sec.taskName}</p>
-            <p style={{ fontSize: 12, fontWeight: 500, color: "var(--tt-grey05)", margin: "0 0 8px" }}>
+            <p style={{ fontSize: 12, fontWeight: 500, color: "var(--tt-grey05)", margin: "0 0 12px" }}>
               {sec.items.filter(({ pi }) => !(excludedPhotos && excludedPhotos[`${sec.entryKey}_${pi}`])).length} of {sec.items.length} selected
             </p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 10 }}>
