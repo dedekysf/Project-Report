@@ -4058,16 +4058,15 @@ function ReportsTab({ demoCase }) {
             background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 12,
             boxShadow: "0 1px 3px rgba(10,22,41,0.08)",
             display: "flex", flexDirection: "column",
-            // Page 1 stays fully rendered (no content-visibility) — it
-            // holds the only interactive header fields (Target Opening
-            // etc.), and content-visibility:auto has been known to leave
-            // stale paints on a descendant after a state-only update in
-            // some Chrome versions, which made date selection look like it
-            // silently did nothing even though the DOM had updated.
-            ...(isFirst ? {} : {
-              contentVisibility: "auto",
-              containIntrinsicSize: `${PAGE_W}px ${PAGE_H}px`,
-            }),
+            // No content-visibility on ANY page (not just page 1) — it's
+            // been known to leave stale paints on a descendant after a
+            // state-only update in some Chrome versions (page 1 was
+            // already exempted for this; the checklist item-level
+            // splitting made every page's content depend on far more
+            // fine-grained state, which made this show up on later pages
+            // too — e.g. a checklist row visually overlapping the block
+            // after it following an unrelated state update elsewhere on
+            // the page).
           }}
         >
           {isFirst ? renderFullHeader() : renderRunningHeader()}
@@ -4691,14 +4690,12 @@ function ReportsTab({ demoCase }) {
                     {/* Real, visible pages — stacked Letter sheets, each with
                         its own header/footer, so the preview reads like a
                         real paginated report instead of one long scroll.
-                        content-visibility lets the browser skip layout/paint
-                        for pages currently off-screen, which matters once
-                        there are more than a couple of these (each one is a
-                        fairly heavy subtree — full header, entries, photo
-                        grids) — without it, scrolling a long report got
-                        noticeably janky. containIntrinsicSize keeps the
-                        scrollbar/scroll position stable while a page is
-                        skipped. Memoized above (visiblePages). */}
+                        No content-visibility here (see the page card's own
+                        style comment) — it traded scroll perf for
+                        occasional stale-paint glitches, which got worse
+                        once checklist items split into many small,
+                        state-dependent blocks per page. Memoized above
+                        (visiblePages). */}
                     {visiblePages}
 
                     {/* Infinite scroll: one skeleton item while the next batch "loads" */}
