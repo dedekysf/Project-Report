@@ -573,8 +573,8 @@ function ReportCheckbox({ active, label, onClick }) {
 }
 
 // ── Exclusive edit-mode coordination ──
-// Only one EditableField (or TargetOpeningField) may be in edit mode at a
-// time across the whole document — opening one closes whichever other
+// Only one EditableField may be in edit mode at a time across the whole
+// document — opening one closes whichever other
 // field was open, the same way a browser only lets one <details> in a
 // group stay open. Backed by a single { activeField, setActiveField } pair
 // held in ReportsTab and handed down via context (rather than threading
@@ -1057,7 +1057,7 @@ const resizeImageToDataURL = (file, maxDim = 64) => new Promise((resolve, reject
 // image itself (max-width 80px, height auto) so a wide logo isn't
 // squeezed into a small square. While the file is being read, a small
 // spinner replaces the placeholder/image.
-function LogoUploadBox({ src, onChange, disabled }) {
+function LogoUploadBox({ src, onChange, disabled, maxWidth = 80 }) {
   const inputRef = useRef(null);
   const [loading, setLoading] = useState(false);
 
@@ -1079,14 +1079,14 @@ function LogoUploadBox({ src, onChange, disabled }) {
         position: "relative", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
         cursor: disabled || loading ? "default" : "pointer",
         ...(src
-          ? { maxWidth: 80, height: "auto" }
+          ? { maxWidth, height: "auto" }
           : { width: 48, height: 48, borderRadius: 8, overflow: "hidden", border: "1px dashed var(--tt-grey04)", background: "var(--tt-grey01)" }),
       }}
     >
       {loading ? (
         <span style={{ width: 18, height: 18, borderRadius: "50%", border: "2px solid var(--tt-grey03)", borderTopColor: "var(--tt-text-2)", display: "inline-block", animation: "tt-spin 0.75s linear infinite" }} />
       ) : src ? (
-        <img src={src} alt="Company logo" style={{ display: "block", maxWidth: 80, width: "100%", height: "auto" }} />
+        <img src={src} alt="Company logo" style={{ display: "block", maxWidth, width: "100%", height: "auto" }} />
       ) : (
         <FileImage size={18} strokeWidth={SW} color="var(--tt-grey05)" />
       )}
@@ -1103,55 +1103,6 @@ function LogoUploadBox({ src, onChange, disabled }) {
   );
 }
 
-// ── Target Opening — single-date field ──
-// Its own component (not just inline JSX) so the calendar's anchor ref is
-// per-instance — needed now that the full header (this field included)
-// renders once per page rather than once for the whole document. Plugs
-// into the same exclusive edit-mode coordination as EditableField (see
-// ActiveEditContext above), via its own fieldId.
-function TargetOpeningField({ fieldId, value, disabled, onApply }) {
-  const { activeField, setActiveField } = useContext(ActiveEditContext);
-  const anchorRef = useRef(null);
-  const open = !disabled && activeField === fieldId;
-  const [displayValue, setDisplayValue] = useState(value || "");
-
-  useEffect(() => { setDisplayValue(value || ""); }, [value]);
-
-  if (disabled) {
-    return <p style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "var(--tt-text-1)", margin: 0 }}>{displayValue || "—"}</p>;
-  }
-
-  return (
-    <div className="tt-editable-wrap" ref={anchorRef} style={{ position: "relative" }}>
-      <p
-        onClick={() => setActiveField(open ? null : fieldId)}
-        onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey03)"}
-        onMouseLeave={ev => ev.currentTarget.style.background = "none"}
-        style={{ display: "inline-block", position: "relative", fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "var(--tt-text-1)", textDecoration: displayValue ? "none" : "underline", margin: 0, cursor: "pointer" }}
-      >
-        {displayValue || "Add target date"}
-      </p>
-      {open && (
-        <DateRangeCalendar
-          anchorRef={anchorRef}
-          allowFuture
-          singleDate
-          alwaysBelow
-          onClose={() => setActiveField(null)}
-          onApply={(start) => {
-            if (start) {
-              const [y, m, d] = start.split("-");
-              const formatted = new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-              setDisplayValue(formatted);
-              onApply(formatted);
-            }
-            setActiveField(null);
-          }}
-        />
-      )}
-    </div>
-  );
-}
 
 // ── Fixed-position tooltip button ──
 // Renders tooltip via a fixed div that escapes overflow clipping
@@ -2633,6 +2584,30 @@ const IMG_MAP = {
   img9: img9Src,
 };
 
+// Every photo key across this period's own task entries (duplicates and
+// all — a photo used by more than one entry is just proportionally more
+// likely to be picked, which is fine) — the pool the cover image (see
+// preview.coverImage/report.coverImage) is drawn from.
+const collectPhotoPool = (groups) => {
+  const keys = [];
+  (groups || []).forEach(g => g.entries.forEach(e => {
+    if (e.isNote || e.noPhotos) return;
+    (e.photos || []).forEach(k => keys.push(k));
+  }));
+  return keys;
+};
+// Picks a random photo key from the pool, excluding `exclude` when
+// there's another distinct option — used both for the initial pick (no
+// `exclude`) and the cover's "change photo" control (re-rolling away
+// from the current one). Falls back to `exclude` itself (or null) when
+// there's nothing else to switch to.
+const pickRandomPhoto = (groups, exclude) => {
+  const pool = collectPhotoPool(groups);
+  const choices = exclude ? pool.filter(k => k !== exclude) : pool;
+  if (choices.length === 0) return exclude || (pool[0] ?? null);
+  return choices[Math.floor(Math.random() * choices.length)];
+};
+
 // Resolves an asset path (a Vite-imported URL) against the current page so
 // a downloaded, standalone HTML file still loads its images correctly no
 // matter where it's opened from.
@@ -2656,7 +2631,7 @@ const desanitizePeriodFromUrl = (period) => period.replace(/_/g, " ").replace(/-
 // Builds the same report content (header, meta, schedule status, task
 // rollup, grouped notes + photos) as a standalone HTML string, shared by
 // both the "Download" button and the copy-link shared view.
-// Mirrors the live draft/preview's own visual design (renderFullHeader,
+// Mirrors the live draft/preview's own visual design (renderCoverPage,
 // renderEntryBlock, renderPageFooter) as static HTML, since the downloaded
 // file and the "Copy link" content are meant to look like the same
 // document, not a separate, simpler layout — the two intentional
@@ -2686,9 +2661,16 @@ const buildReportHTML = (report) => {
   const SANS = "-apple-system,BlinkMacSystemFont,'Inter',sans-serif";
   const SERIF = "'Lora',Georgia,serif";
 
-  // Fixed 2-column grid — every photo shows here (no "+N more" cap;
-  // there's nothing left to expand into). Rendered per CHUNK (see
-  // PHOTO_CHUNK below) rather than all of an entry's photos in one
+  // Masonry, 2-column — every photo shows here (no "+N more" cap; there's
+  // nothing left to expand into), at its own natural size rather than
+  // cropped to a fixed tile like the live draft's grid (see PhotoGrid):
+  // there's no interactive lightbox left to see the full frame in once
+  // this is a static export, so the export itself has to show it.
+  // A CSS column-count layout (not CSS grid) is what actually produces
+  // masonry — each photo keeps its own height and the two columns
+  // interleave to stay balanced, rather than every row being pinned to
+  // its tallest cell's height the way a grid would. Rendered per CHUNK
+  // (see PHOTO_CHUNK below) rather than all of an entry's photos in one
   // block, so the pagination pass below can place each chunk on
   // whichever page it fits — the entry's header and its photos flow
   // across a page break the same way the live draft's "+N more"
@@ -2703,19 +2685,22 @@ const buildReportHTML = (report) => {
       const src = IMG_MAP[k];
       if (!src) return "";
       const caption = captions && captions[`${entryKey}_${originalIndices[i]}`];
-      return h("div", {},
-        selfClose("img", { src: toAbsoluteUrl(src), style: "width:100%;height:140px;object-fit:cover;border-radius:4px;display:block;" }),
+      // break-inside:avoid keeps a photo (and its caption) from splitting
+      // across the two CSS columns; margin-bottom is what stands in for
+      // row-gap, which column-count layouts don't support.
+      return h("div", { style: "break-inside:avoid;margin-bottom:8px;" },
+        selfClose("img", { src: toAbsoluteUrl(src), style: "width:100%;height:auto;border-radius:4px;display:block;" }),
         caption ? h("p", { style: `font-size:12px;font-style:italic;color:#828282;font-family:${SERIF};text-align:center;margin:6px 0 0;` }, caption) : ""
       );
     }).filter(Boolean);
     if (cells.length === 0) return "";
-    // marginTop keeps consecutive chunks at the same 8px row rhythm as
-    // the grid's own internal gap (so two chunks landing on the same
-    // page read as one continuous grid, not two grids butted together)
-    // — only the very first chunk uses the larger 16px gap down from
-    // the note/checklist above it. isLast carries the entry's own
-    // trailing gap (see PHOTO_CHUNK/entryHeaderHTML).
-    return h("div", { style: `display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:${marginTop}px;margin-bottom:${isLast ? 80 : 0}px;` }, ...cells);
+    // marginTop keeps consecutive chunks at the same 8px rhythm as the
+    // columns' own column-gap (so two chunks landing on the same page
+    // read as one continuous masonry, not two butted together) — only
+    // the very first chunk uses the larger 16px gap down from the
+    // note/checklist above it. isLast carries the entry's own trailing
+    // gap (see PHOTO_CHUNK/entryHeaderHTML).
+    return h("div", { style: `column-count:2;column-gap:8px;margin-top:${marginTop}px;margin-bottom:${isLast ? 80 : 0}px;` }, ...cells);
   };
   // Two rows of the 2-column grid per continuation block.
   const PHOTO_CHUNK = 4;
@@ -2891,23 +2876,11 @@ const buildReportHTML = (report) => {
         h("span", { style: `font-family:${SERIF};font-size:28px;font-weight:700;font-style:italic;color:#0a1629;flex-shrink:0;line-height:1;` }, `${pct}%`)
       )
     : "";
-
-  // Row/box/divider structure always renders (matching the live page's
-  // fixed layout exactly, spacing included) — only the individual text
-  // values are conditional, since an "Add target date"-style placeholder
-  // prompt has no meaning in a static, non-editable export.
-  const targetRowHTML =
-    h("div", { style: "display:flex;flex-wrap:nowrap;gap:24px;margin-top:16px;align-items:center;margin-bottom:24px;" },
-      h("div", { style: "display:flex;align-items:center;gap:8px;" },
-        h("span", { style: `font-family:${SERIF};font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;` }, "Target Opening"),
-        report.targetOpening ? h("span", { style: `font-family:${SERIF};font-size:10px;font-weight:600;text-transform:uppercase;color:#0a1629;` }, report.targetOpening) : ""
-      ),
-      h("div", { style: "display:flex;align-items:center;gap:8px;" },
-        h("span", { style: `font-family:${SERIF};font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;` }, "Prepared For"),
-        report.clientName ? h("span", { style: `font-family:${SERIF};font-size:10px;font-weight:600;text-transform:uppercase;color:#0a1629;` }, report.clientName) : ""
-      )
-    ) +
-    h("div", { style: "height:1px;background:#e8e8e6;margin:0 0 24px;" }, "");
+  // Its own pagination block (not part of any header) — see the
+  // pagination pass below, which always packs blocks fresh onto their
+  // own running-header pages, after the cover and (when present) the
+  // dedicated summary page.
+  if (progressHTML) blocks.unshift({ html: progressHTML, isLabel: false });
 
   const projectName = report.projectName || PROJECT_NAME;
   const address = report.address || PROJECT_ADDRESS;
@@ -2915,51 +2888,76 @@ const buildReportHTML = (report) => {
     ? h("p", { style: `font-family:${SERIF};font-size:14px;color:#303742;line-height:1.8;margin:0;` }, report.summary)
     : "";
 
-  const logoHTML = report.logo
-    ? selfClose("img", { src: report.logo, alt: "Company logo", style: "display:block;max-width:100px;height:auto;" })
-    : "";
+  // Company name/address — shared between the cover header (right-aligned,
+  // alongside email/phone) and the running header (left-aligned, on its
+  // own, no logo — see runningHeaderHTML). companyAddressHTML's own
+  // trailing margin assumes another line (email or phone) might follow it
+  // on the cover; harmless on the running header, where it's always last.
   const companyNameHTML = report.companyName
     ? h("p", { style: `font-family:${SANS};font-size:14px;font-weight:700;color:#0a1629;margin:0 0 2px;` }, report.companyName)
     : "";
   const companyAddressHTML = report.companyAddress
-    ? h("p", { style: `font-family:${SANS};font-size:11px;font-weight:400;color:#828282;margin:0;` }, report.companyAddress)
+    ? h("p", { style: `font-family:${SANS};font-size:11px;font-weight:400;color:#828282;margin:0 0 2px;` }, report.companyAddress)
     : "";
-  const identityLeft = (logoHTML || companyNameHTML || companyAddressHTML)
-    ? h("div", { style: "display:flex;align-items:center;gap:12px;" },
-        logoHTML,
-        h("div", {}, companyNameHTML, companyAddressHTML)
+  const companyEmailHTML = report.companyEmail
+    ? h("p", { style: `font-family:${SANS};font-size:11px;font-weight:400;color:#828282;margin:0 0 2px;` }, report.companyEmail)
+    : "";
+  const companyPhoneHTML = report.companyPhone
+    ? h("p", { style: `font-family:${SANS};font-size:11px;font-weight:400;color:#828282;margin:0;` }, report.companyPhone)
+    : "";
+
+  // ── Cover (page 1) — its own one-off page: logo (capped 200px) on the
+  // left, company name/address/email/phone stacked on the right, then
+  // project name/address, Prepared For + "By <owner>", and one photo
+  // pulled at random from this period's own task photos (see
+  // pickRandomPhoto/report.coverImage — chosen once, when the report was
+  // generated, not re-rolled on every export). No footer, no "VIA
+  // TASKTAG" mark, no Update No./period line — the cover format is
+  // distinct from every content page in this document.
+  const coverLogoHTML = report.logo
+    ? selfClose("img", { src: report.logo, alt: "Company logo", style: "display:block;max-width:200px;height:auto;" })
+    : "";
+  const coverHeaderHTML = h("div", { style: "display:flex;align-items:flex-start;justify-content:space-between;gap:24px;" },
+    coverLogoHTML || h("div", {}, ""),
+    h("div", { style: "text-align:right;" }, companyNameHTML, companyAddressHTML, companyEmailHTML, companyPhoneHTML)
+  );
+  const coverMetaHTML = h("div", { style: "display:flex;flex-wrap:wrap;gap:24px;align-items:center;margin-bottom:40px;" },
+    report.clientName
+      ? h("div", { style: "display:flex;align-items:center;gap:8px;" },
+          h("span", { style: `font-family:${SERIF};font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;` }, "Prepared For"),
+          h("span", { style: `font-family:${SERIF};font-size:12px;font-weight:600;text-transform:uppercase;color:#0a1629;` }, report.clientName)
+        )
+      : "",
+    h("span", { style: `font-family:${SERIF};font-size:12px;font-weight:600;text-transform:uppercase;color:#828282;` }, `By ${POINT_OF_CONTACT_NAME}`)
+  );
+  const coverImageSrc = report.coverImage && IMG_MAP[report.coverImage];
+  const coverImageHTML = coverImageSrc
+    ? h("div", { style: "border-radius:12px;overflow:hidden;" },
+        selfClose("img", { src: toAbsoluteUrl(coverImageSrc), alt: "", style: "display:block;width:100%;max-height:360px;object-fit:cover;" })
       )
-    : h("div", {}, "");
-  const identityRowHTML = h("div", { style: "display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;" },
-    identityLeft,
-    h("div", { style: "white-space:nowrap;margin-top:10px;" },
-      h("span", { style: `font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;line-height:1;` }, "VIA TASKTAG")
+    : "";
+  const coverHTML = h("div", { class: "card", style: "box-shadow:0 1px 3px rgba(10,22,41,0.08);" },
+    h("div", { style: `padding:${PAGE_PAD}px;display:flex;flex-direction:column;` },
+      coverHeaderHTML,
+      h("div", { style: "margin-top:64px;" },
+        h("h1", { style: `font-family:${SERIF};font-size:40px;font-weight:700;color:#0a1629;line-height:1.1;margin:0 0 8px;` }, projectName),
+        h("p", { style: `font-family:${SERIF};font-size:15px;font-weight:400;font-style:italic;color:#828282;line-height:1.3;margin:0 0 32px;` }, address),
+        coverMetaHTML,
+        coverImageHTML
+      )
     )
   );
-  const updateLineHTML = h("p", { style: `font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#303742;margin:0 0 12px;` }, `Update No. ${report.version} \xB7 ${report.period}`);
 
-  // Full (page 1) vs. running (page 2+) header — mirrors renderFullHeader/
-  // renderRunningHeader/renderCompanyIdentityRow exactly, each self-padded
-  // (padding:PAGE_PAD PAGE_PAD 0) rather than relying on a wrapping CSS
-  // class, since with multiple pages there's no longer a single
-  // "card__header" — every page needs its own header/footer sitting
-  // directly in that page's own card.
-  const fullHeaderHTML = h("div", { style: `padding:${PAGE_PAD}px ${PAGE_PAD}px 0;` },
-    identityRowHTML +
-    h("div", { style: "height:1px;background:#e8e8e6;margin-bottom:24px;" }, "") +
-    h("div", { style: "margin-bottom:32px;" },
-      updateLineHTML,
-      h("div", { style: "display:flex;flex-direction:column;gap:6px;" },
-        h("h2", { style: `font-family:${SERIF};font-size:32px;font-weight:700;color:#0a1629;line-height:1.1;margin:0;` }, projectName),
-        h("p", { style: `font-family:${SERIF};font-size:14px;font-weight:400;font-style:italic;color:#828282;line-height:1.2;margin:0;` }, address)
+  // Running header (every page after the cover) — company name/address
+  // as plain text and the "VIA TASKTAG" mark, deliberately without the
+  // logo (that only ever shows on the cover).
+  const runningHeaderHTML = h("div", { style: `padding:${PAGE_PAD}px ${PAGE_PAD}px 0;` },
+    h("div", { style: "display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;" },
+      h("div", {}, companyNameHTML, companyAddressHTML),
+      h("div", { style: "white-space:nowrap;margin-top:10px;" },
+        h("span", { style: `font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;line-height:1;` }, "VIA TASKTAG")
       )
     ) +
-    summaryHTML +
-    targetRowHTML +
-    progressHTML
-  );
-  const runningHeaderHTML = h("div", { style: `padding:${PAGE_PAD}px ${PAGE_PAD}px 0;` },
-    identityRowHTML +
     h("div", { style: "height:1px;background:#e8e8e6;margin-bottom:24px;" }, "")
   );
 
@@ -2981,6 +2979,21 @@ const buildReportHTML = (report) => {
       )
     )
   );
+
+  // Summary page — its own dedicated page (running header + footer),
+  // right after the cover, only when there's summary text to show; when
+  // there isn't, this contributes nothing and progress/entries simply
+  // become the page right after the cover instead.
+  const summaryPageHTML = summaryHTML
+    ? h("div", { class: "card", style: "box-shadow:0 1px 3px rgba(10,22,41,0.08);" },
+        runningHeaderHTML,
+        h("div", { class: "card__body" },
+          h("p", { style: `font-family:${SANS};font-size:14px;font-weight:600;color:#0a1629;margin:0 0 12px;` }, "Summary"),
+          summaryHTML
+        ),
+        footerHTML
+      )
+    : "";
 
   // ── Pagination — split into real Letter pages, same as the live draft ──
   // Real DOM measurement (offsetHeight), same technique as the live
@@ -3012,24 +3025,25 @@ const buildReportHTML = (report) => {
     scaffold.appendChild(el);
     return el;
   };
-  const headerEl = appendMeasureEl(fullHeaderHTML);
   const runningHeaderEl = appendMeasureEl(runningHeaderHTML);
   const footerEl = appendMeasureEl(footerHTML);
   const blockEls = blocks.map(b => appendMeasureEl(b.html, PAGE_W - PAGE_PAD * 2));
 
-  const headerH = headerEl.offsetHeight;
   const runningHeaderH = runningHeaderEl.offsetHeight;
   const footerH = footerEl.offsetHeight;
   const blockHeights = blockEls.map(el => el.offsetHeight);
   document.body.removeChild(measureRoot);
 
-  const pages = [];
+  // The cover and (when present) the summary page are each their own
+  // fixed, standalone page — see coverHTML/summaryPageHTML — so
+  // progress/entries always pack fresh against runningHeaderH starting
+  // from the very first block, with no "page 1" special-casing left here.
+  const contentPages = [];
   let current = [];
   let used = 0;
-  let isFirstPage = true;
+  const available = PAGE_H - PAGE_PAD * 2 - runningHeaderH - footerH - PAGE_BOTTOM_BUFFER;
   blocks.forEach((block, i) => {
     const blockH = blockHeights[i];
-    const available = PAGE_H - PAGE_PAD * 2 - (isFirstPage ? headerH : runningHeaderH) - footerH - PAGE_BOTTOM_BUFFER;
     // A section label (or a checklist-bearing entry's header — see
     // isEntryHeader) must never be stranded alone at the bottom of a page
     // with its first piece of content starting on the next — check it
@@ -3037,15 +3051,14 @@ const buildReportHTML = (report) => {
     // just the label/header alone.
     const fitsCheckH = (block.isLabel || block.isEntryHeader) && i + 1 < blocks.length ? blockH + blockHeights[i + 1] : blockH;
     if (current.length > 0 && used + fitsCheckH > available) {
-      pages.push(current);
+      contentPages.push(current);
       current = [];
       used = 0;
-      isFirstPage = false;
     }
     current.push(block.html);
     used += blockH;
   });
-  if (current.length > 0 || pages.length === 0) pages.push(current);
+  if (current.length > 0 || contentPages.length === 0) contentPages.push(current);
 
   // width/min-height match PAGE_W/PAGE_H exactly (the live view's own
   // Letter proportions — 800 × round(800×11/8.5)) rather than a loose max-width,
@@ -3063,13 +3076,14 @@ const buildReportHTML = (report) => {
   // comment for why relying on flex:1 alone isn't reliable enough.
   const css = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:${SERIF};background:#f7f8fa;min-height:100vh;padding:32px 24px}.card{background:white;border:1px solid #e8e8e6;border-radius:12px;overflow:hidden;width:${PAGE_W}px;min-height:${PAGE_H}px;margin:0 auto;display:flex;flex-direction:column}.card+.card{margin-top:24px}.card__body{padding:0 ${PAGE_PAD}px ${PAGE_BOTTOM_BUFFER}px;flex:1}`;
 
-  const cardsHTML = pages.map((pageBlocks, pi) =>
+  const contentPagesHTML = contentPages.map(pageBlocks =>
     h("div", { class: "card", style: "box-shadow:0 1px 3px rgba(10,22,41,0.08);" },
-      pi === 0 ? fullHeaderHTML : runningHeaderHTML,
+      runningHeaderHTML,
       h("div", { class: "card__body" }, pageBlocks.join("")),
       footerHTML
     )
   ).join("");
+  const cardsHTML = coverHTML + summaryPageHTML + contentPagesHTML;
 
   const title = "Project Report";
   return "<!DOCTYPE html>" +
@@ -3100,7 +3114,7 @@ function ReportsTab({ demoCase }) {
   // every previously-saved report's download/copy output, so a later
   // update to it retroactively applies everywhere instead of only going
   // forward from the report it was captured on.
-  const [companyIdentity, setCompanyIdentity] = useState({ logo: null, companyName: "", companyAddress: "" });
+  const [companyIdentity, setCompanyIdentity] = useState({ logo: null, companyName: "", companyAddress: "", companyEmail: "", companyPhone: "" });
   const [lastSavedId, setLastSavedId] = useState(null); // highlights the most recently saved row in the results table
   const [openPeriod,  setOpenPeriod]  = useState(false);
   const [toast,       setToast]       = useState(null); // { type: "success" | "error", message }
@@ -3132,8 +3146,8 @@ function ReportsTab({ demoCase }) {
   const [generating,       setGenerating]        = useState(false); // Generate button's own disabled/spinner state, before the panel appears
   const [saving,           setSaving]             = useState(false); // Save report button's own disabled/spinner state, before the toast appears
   const previewPanelRef = useRef(null);
-  // Which EditableField/TargetOpeningField (by fieldId) is currently in
-  // edit mode — only one at a time across the whole document. Handed down
+  // Which EditableField (by fieldId) is currently in edit mode — only one
+  // at a time across the whole document. Handed down
   // via ActiveEditContext instead of threading it through every render
   // function's props.
   const [activeEditField, setActiveEditField] = useState(null);
@@ -3164,7 +3178,7 @@ function ReportsTab({ demoCase }) {
   // Adds a report to the results list (called only once the user confirms
   // via "Save report" in the preview modal — Generate no longer does this
   // directly).
-  const pushReport = ({ includeSummary, includeNoPhotoTasks, dateRange, period, version, data, extraNotes, excludedPhotos, titleOverrides, photoCaptions, projectName, address, logo, companyName, companyAddress, summary, targetOpening, clientName }) => {
+  const pushReport = ({ includeSummary, includeNoPhotoTasks, dateRange, period, version, data, extraNotes, excludedPhotos, titleOverrides, photoCaptions, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, summary, clientName, coverImage }) => {
     const id = Date.now();
     const newReport = {
       id,
@@ -3185,9 +3199,11 @@ function ReportsTab({ demoCase }) {
       logo,
       companyName,
       companyAddress,
+      companyEmail,
+      companyPhone,
       summary,
-      targetOpening,
       clientName,
+      coverImage,
     };
     setReports(prev => [newReport, ...prev]);
     // Saving is what promotes this draft's identity to "the" company
@@ -3195,7 +3211,7 @@ function ReportsTab({ demoCase }) {
     // report's download/copy switches to it too (see handleDownload/
     // handleCopy, which read companyIdentity instead of their own
     // frozen report.logo/companyName/companyAddress).
-    setCompanyIdentity({ logo, companyName, companyAddress });
+    setCompanyIdentity({ logo, companyName, companyAddress, companyEmail, companyPhone });
     setLastSavedId(id);
     setTimeout(() => {
       setReports(prev => prev.map(r => r.id === id ? { ...r, status: "done" } : r));
@@ -3264,9 +3280,15 @@ function ReportsTab({ demoCase }) {
         logo: companyIdentity.logo,
         companyName: companyIdentity.companyName,
         companyAddress: companyIdentity.companyAddress,
+        companyEmail: companyIdentity.companyEmail,
+        companyPhone: companyIdentity.companyPhone,
         summary: "",
-        targetOpening: "",
         clientName: "",
+        // One random photo from this period's own task photos — picked
+        // once, here, rather than derived at render time, so it stays put
+        // across re-renders; the cover's own "Change photo" control
+        // re-rolls it (see pickRandomPhoto).
+        coverImage: pickRandomPhoto(data.groups),
       });
       setActiveEditField(null);
       setTitleOverrides({});
@@ -3372,6 +3394,19 @@ function ReportsTab({ demoCase }) {
   // report would be laid out.
   const flatBlocks = [];
   if (previewData) {
+    // Summary (see renderSummaryBlock) is always present, regardless of
+    // the "Task summary" toggle — that only ever gated progress, right
+    // below it, not the free-text summary. Both are their own pagination
+    // blocks (not part of any header) rather than rendered on the cover,
+    // so page 1 stays the fixed cover (see renderCoverPage/pageLayout
+    // effect below) and page 2 always opens with them instead. The
+    // export gives summary a fully dedicated page of its own instead of
+    // sharing page 2 with progress/entries — see buildReportHTML's
+    // summaryPageHTML.
+    flatBlocks.push({ type: "summary", key: "summary" });
+    if (preview.includeSummary) {
+      flatBlocks.push({ type: "progress", key: "progress" });
+    }
     visibleGroups.forEach(g => {
       if (previewData.grouping !== "day") {
         flatBlocks.push({ type: "label", key: `label_${g.key}`, g });
@@ -3695,125 +3730,41 @@ function ReportsTab({ demoCase }) {
     </div>
   );
 
-  const renderBlock = (block) => {
-    if (block.type === "label") return renderGroupLabelBlock(block.g);
-    if (block.type === "photoContinuation") return renderPhotoContinuationBlock(block);
-    if (block.type === "entryHeader") return renderEntryHeaderBlock(block);
-    if (block.type === "checklistItem") return renderChecklistItemBlock(block);
-    return renderEntryBlock(block);
-  };
-
-  // Full header — renders identically on every page (this is now the
-  // *only* header variant; there's no separate lightweight running
-  // header for later pages). Logo/company identity, editable project
-  // identity, summary + progress, and Target Opening/Prepared For.
-  //
-  // The logo/company identity row is the only thing that repeats on every
-  // page (see renderRunningHeader) — factored out so both variants render
-  // it identically.
-  // `editable` is false for every repeat of this row on pages 2+ (and in the
-  // hidden measuring scaffold's running-header copy) — company name/address
-  // share a single fieldId, so if every repeat stayed interactive, clicking
-  // to edit on one page would flip every other page's copy into edit mode
-  // too (they all watch the same ActiveEditContext.activeField). Only the
-  // page-1 (full header) copy is ever actually editable; the rest just
-  // mirror its committed value as plain, non-interactive text/image.
-  const renderCompanyIdentityRow = (editable = true) => (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <LogoUploadBox
-          src={preview.logo}
-          disabled={!editable || previewSaved}
-          onChange={url => setPreview(p => ({ ...p, logo: url }))}
-        />
-        <div>
-          {/* TODO(BE): replace with the firm's actual name from the API */}
-          <EditableField
-            fieldId="companyName"
-            value={preview.companyName}
-            placeholder="Add company name"
-            placeholderStyle={{ color: "var(--tt-text-1)" }}
-            disabled={!editable || previewSaved}
-            popover
-            onSave={v => setPreview(p => ({ ...p, companyName: v }))}
-            textStyle={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 2px" }}
-          />
-          <EditableField
-            fieldId="companyAddress"
-            value={preview.companyAddress}
-            placeholder="Add company address"
-            disabled={!editable || previewSaved}
-            popover
-            onSave={v => setPreview(p => ({ ...p, companyAddress: v }))}
-            textStyle={{ fontSize: 11, fontWeight: 400, color: "var(--tt-grey05)", margin: 0 }}
-          />
+  // Progress — entries logged this period vs. total on record, gated by
+  // the same "Task summary" checkbox the HTML export uses. Its own
+  // pagination block (see flatBlocks) rather than part of the header, so
+  // it always starts fresh on page 2 together with the rest of the
+  // content instead of sitting on page 1 underneath the intro header.
+  const renderProgressBlock = () => (
+    <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 56 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 8px" }}>
+          {previewData.completed} of {previewData.total} tasks complete
+        </p>
+        <div style={{ height: 6, background: "var(--tt-grey03)", borderRadius: 99, overflow: "hidden" }}>
+          <div style={{ width: `${previewData.pct}%`, height: "100%", background: "var(--tt-secondary)", borderRadius: 99 }} />
         </div>
       </div>
-      {/* Period now lives above the project name (the "Update No. X ·
-          period" row in renderFullHeader) — this slot is just a plain
-          attribution mark instead. */}
-      <div style={{ whiteSpace: "nowrap", marginTop: 10 }}>
-        <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", lineHeight: 1 }}>
-          VIA TASKTAG
-        </span>
-      </div>
+      <span style={{ fontSize: 28, fontWeight: 700, fontStyle: "italic", color: "var(--tt-text-1)", flexShrink: 0, lineHeight: 1 }}>
+        {previewData.pct}%
+      </span>
     </div>
   );
 
-  const renderFullHeader = () => (
-    <div style={{ padding: `${PAGE_PAD}px ${PAGE_PAD}px 0` }}>
-      {renderCompanyIdentityRow()}
-      <div style={{ height: 1, background: "var(--tt-grey03)", marginBottom: 20 }} />
-
-      {/* "Update No. X · period" — X is this draft's position in the
-          project's save history (reports.length + 1, so the very first
-          save reads "Update No. 1"), not tied to the period itself: the
-          same period can be regenerated and saved more than once, so the
-          period alone can't tell two saves apart (see the results table,
-          which shows this same pairing for that reason). Row 2: project
-          name — editable the same way as a task name, and sized like the
-          old summary headline now that it's the document's real title.
-          Row 3: address, in normal (not all-caps) text, also editable.
-          Neither is required — an empty field just shows its placeholder.
-          Summary and its progress bar sit directly below, with Target
-          Opening/Prepared For after. */}
-      <div style={{ marginBottom: 24 }}>
-        <p style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "var(--tt-grey05)", margin: "0 0 12px" }}>
-          Update No. {preview.version} · {preview.period}
-        </p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <EditableField
-            fieldId="projectName"
-            value={preview.projectName}
-            placeholder={PROJECT_NAME}
-            disabled={previewSaved}
-            onSave={v => setPreview(p => ({ ...p, projectName: v }))}
-            textStyle={{ fontSize: 28, fontWeight: 700, color: "var(--tt-text-1)", lineHeight: 1, margin: 0 }}
-            inputStyle={{ fontSize: 28, fontWeight: 700, lineHeight: 1, color: "var(--tt-text-1)" }}
-          />
-          <EditableField
-            fieldId="address"
-            value={preview.address}
-            placeholder={PROJECT_ADDRESS}
-            disabled={previewSaved}
-            onSave={v => setPreview(p => ({ ...p, address: v }))}
-            textStyle={{ fontSize: 13, fontWeight: 400, color: "var(--tt-grey05)", lineHeight: 1, margin: 0 }}
-            inputStyle={{ fontSize: 13, fontWeight: 400, lineHeight: 1, color: "var(--tt-grey05)" }}
-          />
-        </div>
-      </div>
-
-      {/* Summary — set apart in its own grey02 box like a project
-          description, with its "Summary"/"Optional" label row inside that
-          same box (not above it). The box is owned here, not by
-          EditableField's `boxed` (which would nest the label outside the
-          card), so the textarea fills the card directly underneath the
-          label. The label itself is passed in as `aboveWhenEditing` rather
-          than rendered here directly — EditableField only shows it
-          alongside the live textarea, hiding it once summary flips to
-          plain text (confirmed, or the whole report saved/`disabled`). */}
-      <div style={{ background: "var(--tt-grey02)", borderRadius: 12, padding: 16 }}>
-        <EditableField
+  // Summary — set apart in its own grey02 box like a project description,
+  // with its "Summary"/"Optional" label row inside that same box (not
+  // above it). The box is owned here, not by EditableField's `boxed`
+  // (which would nest the label outside the card), so the textarea fills
+  // the card directly underneath the label. The label itself is passed in
+  // as `aboveWhenEditing` rather than rendered here directly —
+  // EditableField only shows it alongside the live textarea, hiding it
+  // once summary flips to plain text (confirmed, or the whole report
+  // saved/`disabled`). Its own pagination block (see flatBlocks), always
+  // present regardless of the "Task summary" toggle — that only ever
+  // gates renderProgressBlock, right below it once both are queued.
+  const renderSummaryBlock = () => (
+    <div style={{ background: "var(--tt-grey02)", borderRadius: 12, padding: 16, marginBottom: 24 }}>
+      <EditableField
         fieldId="summary"
         value={preview.summary}
         placeholder="Add a high-level overview of the progress made during this period..."
@@ -3829,22 +3780,110 @@ function ReportsTab({ demoCase }) {
         onSave={v => setPreview(p => ({ ...p, summary: v }))}
         textStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, margin: 0 }}
         inputStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6 }}
+      />
+    </div>
+  );
+
+  const renderBlock = (block) => {
+    if (block.type === "label") return renderGroupLabelBlock(block.g);
+    if (block.type === "summary") return renderSummaryBlock();
+    if (block.type === "photoContinuation") return renderPhotoContinuationBlock(block);
+    if (block.type === "entryHeader") return renderEntryHeaderBlock(block);
+    if (block.type === "progress") return renderProgressBlock();
+    if (block.type === "checklistItem") return renderChecklistItemBlock(block);
+    return renderEntryBlock(block);
+  };
+
+  // ── Cover (page 1) ──
+  // A dedicated, one-off page — no footer, never shares space with
+  // flatBlocks' content (summary/progress/entries always start fresh on
+  // page 2 instead — see the pageLayout effect below). Header: logo on
+  // the left, capped wider than the small mark used everywhere else (see
+  // LogoUploadBox's maxWidth — running header/footer have none at all),
+  // company name/address/email/phone stacked on the right. No "VIA
+  // TASKTAG" mark here; that only shows on the running header from page 2
+  // on.
+  const renderCoverHeader = () => (
+    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24 }}>
+      <LogoUploadBox
+        src={preview.logo}
+        onChange={url => setPreview(p => ({ ...p, logo: url }))}
+        disabled={previewSaved}
+        maxWidth={200}
+      />
+      <div style={{ textAlign: "right" }}>
+        {/* TODO(BE): replace with the firm's actual name from the API */}
+        <EditableField
+          fieldId="companyName"
+          value={preview.companyName}
+          placeholder="Add company name"
+          placeholderStyle={{ color: "var(--tt-text-1)" }}
+          disabled={previewSaved}
+          popover
+          onSave={v => setPreview(p => ({ ...p, companyName: v }))}
+          textStyle={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 2px" }}
+        />
+        <EditableField
+          fieldId="companyAddress"
+          value={preview.companyAddress}
+          placeholder="Add company address"
+          disabled={previewSaved}
+          popover
+          onSave={v => setPreview(p => ({ ...p, companyAddress: v }))}
+          textStyle={{ fontSize: 11, fontWeight: 400, color: "var(--tt-grey05)", margin: "0 0 2px" }}
+        />
+        <EditableField
+          fieldId="companyEmail"
+          value={preview.companyEmail}
+          placeholder="Add company email"
+          disabled={previewSaved}
+          popover
+          onSave={v => setPreview(p => ({ ...p, companyEmail: v }))}
+          textStyle={{ fontSize: 11, fontWeight: 400, color: "var(--tt-grey05)", margin: "0 0 2px" }}
+        />
+        <EditableField
+          fieldId="companyPhone"
+          value={preview.companyPhone}
+          placeholder="Add company phone"
+          disabled={previewSaved}
+          popover
+          onSave={v => setPreview(p => ({ ...p, companyPhone: v }))}
+          textStyle={{ fontSize: 11, fontWeight: 400, color: "var(--tt-grey05)", margin: 0 }}
         />
       </div>
+    </div>
+  );
 
-      <div style={{ height: 1, background: "var(--tt-grey03)", margin: "16px 0 8px" }} />
-
-      <div style={{ display: "flex", flexWrap: "nowrap", gap: 24, alignItems: "center", marginBottom: 24 }}>
-        <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: 8 }}>
-          <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: 0, flexShrink: 0 }}>Target Opening</p>
-          <TargetOpeningField
-            fieldId="targetOpening"
-            value={preview.targetOpening}
-            disabled={previewSaved}
-            onApply={formatted => setPreview(p => ({ ...p, targetOpening: formatted }))}
-          />
-        </div>
-        <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: 8 }}>
+  // Cover content — project name/address, Prepared For, the owning PM
+  // ("By ..." — always POINT_OF_CONTACT_NAME, the same person credited in
+  // the footer on every other page; every project has exactly one owner,
+  // so this isn't a separate editable field), and one photo pulled at
+  // random from this period's own task photos (see pickRandomPhoto/
+  // preview.coverImage — chosen once, when the report was generated, not
+  // re-rolled on every render), swappable via its own "Change photo"
+  // control.
+  const renderCoverContent = () => (
+    <div style={{ marginTop: 64 }}>
+      <EditableField
+        fieldId="projectName"
+        value={preview.projectName}
+        placeholder={PROJECT_NAME}
+        disabled={previewSaved}
+        onSave={v => setPreview(p => ({ ...p, projectName: v }))}
+        textStyle={{ fontSize: 40, fontWeight: 700, color: "var(--tt-text-1)", lineHeight: 1.1, margin: "0 0 8px" }}
+        inputStyle={{ fontSize: 40, fontWeight: 700, lineHeight: 1.1, color: "var(--tt-text-1)" }}
+      />
+      <EditableField
+        fieldId="address"
+        value={preview.address}
+        placeholder={PROJECT_ADDRESS}
+        disabled={previewSaved}
+        onSave={v => setPreview(p => ({ ...p, address: v }))}
+        textStyle={{ fontSize: 15, fontWeight: 400, fontStyle: "italic", color: "var(--tt-grey05)", lineHeight: 1.3, margin: "0 0 32px" }}
+        inputStyle={{ fontSize: 15, fontWeight: 400, fontStyle: "italic", color: "var(--tt-grey05)" }}
+      />
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 24, alignItems: "center", marginBottom: 40 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: 0, flexShrink: 0 }}>Prepared For</p>
           <EditableField
             fieldId="clientName"
@@ -3857,37 +3896,51 @@ function ReportsTab({ demoCase }) {
             textStyle={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: preview.clientName ? "var(--tt-text-1)" : "var(--tt-grey05)", margin: 0 }}
           />
         </div>
+        <p style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "var(--tt-grey05)", margin: 0 }}>
+          By {POINT_OF_CONTACT_NAME}
+        </p>
       </div>
-
-      <div style={{ height: 1, background: "var(--tt-grey03)", margin: "0 0 24px" }} />
-
-      {/* Progress — entries logged this period vs. total on record, gated
-          by the same "Task summary" checkbox the HTML export uses. */}
-      {preview.includeSummary && previewData && (
-        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 56 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 8px" }}>
-              {previewData.completed} of {previewData.total} tasks complete
-            </p>
-            <div style={{ height: 6, background: "var(--tt-grey03)", borderRadius: 99, overflow: "hidden" }}>
-              <div style={{ width: `${previewData.pct}%`, height: "100%", background: "var(--tt-secondary)", borderRadius: 99 }} />
-            </div>
-          </div>
-          <span style={{ fontSize: 28, fontWeight: 700, fontStyle: "italic", color: "var(--tt-text-1)", flexShrink: 0, lineHeight: 1 }}>
-            {previewData.pct}%
-          </span>
+      {preview.coverImage && IMG_MAP[preview.coverImage] && (
+        <div style={{ position: "relative", borderRadius: 12, overflow: "hidden" }}>
+          <img src={IMG_MAP[preview.coverImage]} alt="" style={{ display: "block", width: "100%", maxHeight: 360, objectFit: "cover" }} />
+          {!previewSaved && (
+            <button
+              onClick={() => setPreview(p => ({ ...p, coverImage: pickRandomPhoto(previewData.groups, p.coverImage) }))}
+              style={{ position: "absolute", bottom: 12, right: 12, display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 999, border: "none", background: "rgba(10,22,41,0.65)", color: "white", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+            >
+              <RotateCw size={13} strokeWidth={2.25} />
+              Change photo
+            </button>
+          )}
         </div>
       )}
     </div>
   );
 
-  // Running header — pages 2+: only the logo/company identity row
-  // repeats. Everything else on the full header (period, project
-  // name/address, summary, progress, Target Opening/Prepared For) is
-  // page-1-only content, not repeated.
+  const renderCoverPage = () => (
+    <div style={{ padding: PAGE_PAD, display: "flex", flexDirection: "column", flex: 1 }}>
+      {renderCoverHeader()}
+      {renderCoverContent()}
+    </div>
+  );
+
+  // Running header — every page after the cover: company name/address as
+  // plain text (editing lives on the cover; see renderCoverHeader) and
+  // the "VIA TASKTAG" mark, deliberately without the logo (that only ever
+  // shows on the cover).
   const renderRunningHeader = () => (
     <div style={{ padding: `${PAGE_PAD}px ${PAGE_PAD}px 0` }}>
-      {renderCompanyIdentityRow(false)}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <div>
+          {preview.companyName && <p style={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 2px" }}>{preview.companyName}</p>}
+          {preview.companyAddress && <p style={{ fontSize: 11, fontWeight: 400, color: "var(--tt-grey05)", margin: 0 }}>{preview.companyAddress}</p>}
+        </div>
+        <div style={{ whiteSpace: "nowrap", marginTop: 10 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", lineHeight: 1 }}>
+            VIA TASKTAG
+          </span>
+        </div>
+      </div>
       <div style={{ height: 1, background: "var(--tt-grey03)", marginBottom: 24 }} />
     </div>
   );
@@ -3918,14 +3971,13 @@ function ReportsTab({ demoCase }) {
     </div>
   );
 
-  // Measure the header/footer and every block once (off-screen, at the
-  // real page content width) and greedily pack them onto Letter pages — the
-  // same technique a real paginated document layout engine uses, just
-  // done in JS against actual rendered heights instead of a print
-  // engine's own reflow. Page 1 gets the full header; every later page
-  // gets the lighter running header, so only page 1 reserves headerH —
-  // the rest reserve runningHeaderH.
-  const headerMeasureRef = useRef(null);
+  // Measure the running header/footer and every block once (off-screen,
+  // at the real page content width) and greedily pack them onto Letter
+  // pages — the same technique a real paginated document layout engine
+  // uses, just done in JS against actual rendered heights instead of a
+  // print engine's own reflow. Page 1 is always the fixed cover (see
+  // renderCoverPage) and never takes any of this — every packed page
+  // reserves runningHeaderH.
   const runningHeaderMeasureRef = useRef(null);
   const footerMeasureRef = useRef(null);
   const blockMeasureRefs = useRef({});
@@ -3952,17 +4004,20 @@ function ReportsTab({ demoCase }) {
       if (pageLayout !== null) setPageLayout(null);
       return;
     }
-    const headerH = headerMeasureRef.current?.offsetHeight || 0;
     const runningHeaderH = runningHeaderMeasureRef.current?.offsetHeight || 0;
     const footerH = footerMeasureRef.current?.offsetHeight || 0;
 
-    const pages = [];
+    // Page 1 is always the fixed cover (see renderCoverPage) — pushed
+    // here as an empty placeholder since it never carries any of
+    // flatBlocks' content (flatBlocks itself is never actually empty:
+    // renderSummaryBlock is always queued). Packing starts fresh on page
+    // 2, measured against runningHeaderH from the very first block.
+    const pages = [[]];
     let current = [];
     let used = 0;
-    let isFirstPage = true;
+    const available = PAGE_H - PAGE_PAD * 2 - runningHeaderH - footerH - PAGE_BOTTOM_BUFFER;
     flatBlocks.forEach((block, i) => {
       const h = blockMeasureRefs.current[block.key]?.offsetHeight || 0;
-      const available = PAGE_H - PAGE_PAD * 2 - (isFirstPage ? headerH : runningHeaderH) - footerH - PAGE_BOTTOM_BUFFER;
       // A section label (or a checklist-bearing entry's header — see
       // "entryHeader" in flatBlocks) must never be stranded alone at the
       // bottom of a page with its first piece of content starting on the
@@ -3976,12 +4031,11 @@ function ReportsTab({ demoCase }) {
         pages.push(current);
         current = [];
         used = 0;
-        isFirstPage = false;
       }
       current.push(block);
       used += h;
     });
-    if (current.length > 0 || pages.length === 0) pages.push(current);
+    pages.push(current);
 
     const nextKey = pages.map(p => p.map(b => b.key).join(",")).join("|");
     setPageLayout(prev => {
@@ -3991,13 +4045,13 @@ function ReportsTab({ demoCase }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layoutDepsKey]);
 
-  // The hidden scaffold and the visible pages both call renderFullHeader/
+  // The hidden scaffold and the visible pages both call renderRunningHeader/
   // renderBlock/etc. for potentially dozens of entries and their photos —
   // memoized on the same signature as the layout effect above, so an
   // unrelated re-render of this tab reuses the same React elements instead
   // of rebuilding (and having React reconcile) this whole subtree again.
   const hiddenMeasuringScaffold = useMemo(() => {
-    // renderFullHeader/etc. read straight from `preview` with no
+    // renderRunningHeader/etc. read straight from `preview` with no
     // null-check (they're only ever meant to be called while the preview
     // modal is open) — this hook still runs on every render regardless,
     // including before "Generate" is ever clicked, so it must bail out
@@ -4007,20 +4061,16 @@ function ReportsTab({ demoCase }) {
       <div aria-hidden="true" style={{ visibility: "hidden", height: 0, overflow: "hidden" }}>
         {/* Pinned to a static, always-null activeField — this scaffold
             exists purely to measure static rendered heights, but it
-            renders the SAME EditableField/TargetOpeningField instances
-            (with the same fieldId strings) as the visible page, which by
-            default read the real, shared ActiveEditContext. Without this
-            override, opening the visible Target Opening calendar also
-            "opens" this hidden copy's own invisible DateRangeCalendar,
-            which registers its own document-level outside-click listener.
-            That listener has no idea the real calendar's DOM exists, so it
-            treats every click on the real (visible) calendar as an outside
-            click and force-closes the whole field — the date looked like
-            it was never being saved, when actually the selection was being
-            cancelled out from under it a moment after being applied. */}
+            renders the SAME EditableField instances (with the same
+            fieldId strings) as the visible page, which by default read
+            the real, shared ActiveEditContext. Without this override,
+            opening a field on the visible page would also "open" this
+            hidden copy's own invisible instance, whose own document-level
+            outside-click listener has no idea the real one's DOM exists —
+            it would treat every click on the real (visible) field as an
+            outside click and force-close it. */}
         <ActiveEditContext.Provider value={INERT_ACTIVE_EDIT}>
           <div style={{ width: PAGE_W }}>
-            <div ref={headerMeasureRef}>{renderFullHeader()}</div>
             <div ref={runningHeaderMeasureRef}>{renderRunningHeader()}</div>
             <div ref={footerMeasureRef}>{renderPageFooter()}</div>
             {flatBlocks.map(block => (
@@ -4040,7 +4090,7 @@ function ReportsTab({ demoCase }) {
     // render commits — so on the very render where `preview` first becomes
     // null (e.g. pressing Escape to close), this memo can still see the
     // OLD, non-null pageLayout from before, and would go on to call
-    // renderFullHeader/renderRunningHeader (which read preview.* directly)
+    // renderCoverPage/renderRunningHeader (which read preview.* directly)
     // with preview already null. Guard on both.
     if (!pageLayout || !preview) return null;
     return pageLayout.pages.map((pageBlocks, pi) => {
@@ -4065,17 +4115,25 @@ function ReportsTab({ demoCase }) {
             // the page).
           }}
         >
-          {isFirst ? renderFullHeader() : renderRunningHeader()}
-          {/* paddingBottom guarantees the gap to the footer directly via
-              the box model — flex:1 filling leftover space only creates a
-              gap when the pagination math's measured heights exactly
-              match what actually renders, which isn't reliable enough on
-              its own (see PAGE_BOTTOM_BUFFER's own comment). */}
-          <div style={{ padding: `0 ${PAGE_PAD}px ${PAGE_BOTTOM_BUFFER}px`, flex: 1 }}>
-            {isFirst && previewData.groups.length === 0 && renderNoteSlot("empty")}
-            {pageBlocks.map(block => <div key={block.key}>{renderBlock(block)}</div>)}
-          </div>
-          {renderPageFooter()}
+          {isFirst ? renderCoverPage() : (
+            <>
+              {renderRunningHeader()}
+              {/* paddingBottom guarantees the gap to the footer directly
+                  via the box model — flex:1 filling leftover space only
+                  creates a gap when the pagination math's measured
+                  heights exactly match what actually renders, which
+                  isn't reliable enough on its own (see
+                  PAGE_BOTTOM_BUFFER's own comment). */}
+              <div style={{ padding: `0 ${PAGE_PAD}px ${PAGE_BOTTOM_BUFFER}px`, flex: 1 }}>
+                {/* Page 1 is always the cover, so the empty-period note
+                    always belongs on page 2 — the first (and, in that
+                    case, only) page flatBlocks ever packs onto. */}
+                {pi === 1 && previewData.groups.length === 0 && renderNoteSlot("empty")}
+                {pageBlocks.map(block => <div key={block.key}>{renderBlock(block)}</div>)}
+              </div>
+              {renderPageFooter()}
+            </>
+          )}
         </div>
       );
     });
@@ -4142,7 +4200,7 @@ function ReportsTab({ demoCase }) {
         showToast("error", "Save failed. Try again.");
         return;
       }
-      pushReport({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, version: preview.version, data: { ...previewData, groups: finalGroups }, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides, photoCaptions: preview.photoCaptions, projectName: preview.projectName, address: preview.address, logo: preview.logo, companyName: preview.companyName, companyAddress: preview.companyAddress, summary: preview.summary, targetOpening: preview.targetOpening, clientName: preview.clientName });
+      pushReport({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, version: preview.version, data: { ...previewData, groups: finalGroups }, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides, photoCaptions: preview.photoCaptions, projectName: preview.projectName, address: preview.address, logo: preview.logo, companyName: preview.companyName, companyAddress: preview.companyAddress, companyEmail: preview.companyEmail, companyPhone: preview.companyPhone, summary: preview.summary, clientName: preview.clientName, coverImage: preview.coverImage });
       setDateRange("since_last");
       setSaving(false);
       showToast("success", "Report saved");
@@ -4165,7 +4223,7 @@ function ReportsTab({ demoCase }) {
   const handleDownload = (report) => {
     // Company identity always reflects the latest save, not this report's
     // own (possibly older) snapshot — see companyIdentity.
-    const html = buildReportHTML({ ...report, logo: companyIdentity.logo, companyName: companyIdentity.companyName, companyAddress: companyIdentity.companyAddress });
+    const html = buildReportHTML({ ...report, logo: companyIdentity.logo, companyName: companyIdentity.companyName, companyAddress: companyIdentity.companyAddress, companyEmail: companyIdentity.companyEmail, companyPhone: companyIdentity.companyPhone });
     const fileName = "report_" + sanitizePeriodForUrl(report.period) + ".html";
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -4229,11 +4287,15 @@ function ReportsTab({ demoCase }) {
     // no such constraint) still includes it in full.
     if (companyIdentity.companyName) params.set("companyName", companyIdentity.companyName);
     if (companyIdentity.companyAddress) params.set("companyAddress", companyIdentity.companyAddress);
+    if (companyIdentity.companyEmail) params.set("companyEmail", companyIdentity.companyEmail);
+    if (companyIdentity.companyPhone) params.set("companyPhone", companyIdentity.companyPhone);
     // "summary" is already taken (the includeSummary toggle above) — the
     // summary text content gets its own key.
     if (report.summary) params.set("summaryText", report.summary);
-    if (report.targetOpening) params.set("targetOpening", report.targetOpening);
     if (report.clientName) params.set("clientName", report.clientName);
+    // Just the IMG_MAP key (e.g. "img3"), not the resolved asset URL —
+    // cheap to carry in the link, same as clientName above.
+    if (report.coverImage) params.set("coverImage", report.coverImage);
     const url = `${window.location.href.split("?")[0]}?${params.toString()}`;
     try { await navigator.clipboard.writeText(url); }
     catch {
@@ -4860,7 +4922,7 @@ function ReportPaywall() {
 // period, included sections, excluded photos, and any manually-added
 // notes) — rebuilt on the fly rather than fetched from storage, so a
 // shared link works on any device/browser and can never 404.
-function ReportPage({ dateRange, period, version, includeSummary, includeNoPhotoTasks, notesParam, excludedParam, titlesParam, captionsParam, projectName, address, logo, companyName, companyAddress, summaryText, targetOpening, clientName }) {
+function ReportPage({ dateRange, period, version, includeSummary, includeNoPhotoTasks, notesParam, excludedParam, titlesParam, captionsParam, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, summaryText, clientName, coverImage }) {
   let data = buildReportData(dateRange, period, null, includeNoPhotoTasks);
   let groups = data.groups;
   // Always runs (even with nothing excluded) — this is what embeds each
@@ -4891,7 +4953,7 @@ function ReportPage({ dateRange, period, version, includeSummary, includeNoPhoto
     catch { /* malformed/tampered param — ignore */ }
   }
   data = { ...data, groups };
-  const html = buildReportHTML({ includeSummary, period, version, data, projectName, address, logo, companyName, companyAddress, summary: summaryText, targetOpening, clientName, photoCaptions });
+  const html = buildReportHTML({ includeSummary, period, version, data, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, summary: summaryText, clientName, coverImage, photoCaptions });
 
   return (
     <iframe
@@ -4923,9 +4985,11 @@ export default function ProjectDetail() {
       logo={params.get("logo")}
       companyName={params.get("companyName")}
       companyAddress={params.get("companyAddress")}
+      companyEmail={params.get("companyEmail")}
+      companyPhone={params.get("companyPhone")}
       summaryText={params.get("summaryText")}
-      targetOpening={params.get("targetOpening")}
       clientName={params.get("clientName")}
+      coverImage={params.get("coverImage")}
     />
   );
 
