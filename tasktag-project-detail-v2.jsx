@@ -13,7 +13,7 @@ import {
   ArrowUpDown, Calendar, AlignJustify, Clock,
   UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, Crown, AlertTriangle,
   RotateCw, ZoomIn, ZoomOut, Folder, ArrowLeft, ArrowRight, Info, StickyNote,
-  ExternalLink, Forward, Loader, Mail, Phone, Upload,
+  ExternalLink, Forward, Loader, Mail, Phone, Upload, GripVertical,
 } from "lucide-react";
 
 import logoImg from "./src/Img/tasktag-logo.13f1babda8fdbb1b7251572a0fe11f9e.png";
@@ -3572,6 +3572,7 @@ function ReportsTab({ demoCase }) {
   const [photoManager, setPhotoManager] = useState(false); // report-wide "manage photos" modal, opened by hovering the Photo Limit indicator
   const [expandedPhotoGroups, setExpandedPhotoGroups] = useState({}); // { [entryKey]: revealedChunkCount } — how many extra "+N more" chunks are showing per entry; lifted (not local to PhotoGrid) so every PhotoGrid call for that entry (see renderTaskSection's chunkNums) agrees on how many chunks to render
   const [expandedChecklists, setExpandedChecklists] = useState({}); // { [entryKey]: true } — "Show more" toggled for that entry's checklist (default collapsed to the first 3 items)
+  const [draggedChecklist, setDraggedChecklist] = useState(null); // { entryKey, idx } | null — the item currently being drag-reordered, if any
   const periodRef     = useRef(null);
   const chipRef       = useRef(null);
   // Fixed positioning so this dropdown isn't clipped by an ancestor's
@@ -4007,6 +4008,18 @@ function ReportsTab({ demoCase }) {
     // never actually become visible.
     setExpandedChecklists(p => ({ ...p, [entryKey]: true }));
   };
+  // Drag-reorder (see the grip handle in renderTaskSection) — fromIdx/
+  // toIdx are both real indices into the full (already 10-capped)
+  // checklist, same as every other mutation here, not indices into
+  // whatever subset happens to be visibleChecklistItems right now.
+  const reorderChecklistItem = (entryKey, e, fromIdx, toIdx) => {
+    if (fromIdx === toIdx) return;
+    const next = getChecklist(entryKey, e);
+    const reordered = [...next];
+    const [moved] = reordered.splice(fromIdx, 1);
+    reordered.splice(toIdx, 0, moved);
+    setChecklistOverrides(p => ({ ...p, [entryKey]: reordered }));
+  };
 
   // Rendered under every entry's photo list (and once for the empty-period
   // state) as a plain, always-editable input — no separate "Add a note"
@@ -4141,33 +4154,76 @@ function ReportsTab({ demoCase }) {
               // at all, there's nothing to act on while the row is already
               // a live input.
               const isEditingThisItem = !previewSaved && (!item.text.trim() || activeEditField === checklistFieldId);
+              const isBeingDragged = draggedChecklist?.entryKey === entryKey && draggedChecklist?.idx === idx;
               return (
-                <div key={idx} className="group" style={{ marginTop: idx === 0 ? 0 : 6, display: "flex", alignItems: "center", gap: 8 }}>
+                <div
+                  key={idx}
+                  className="group"
+                  style={{
+                    marginTop: idx === 0 ? 0 : 6, display: "flex", alignItems: "center", gap: 8,
+                    paddingBottom: 2, transition: "border-color 0.15s",
+                    // Just the line accent (no background fill) — the
+                    // reference screenshot's own highlight, marking which
+                    // row is actually in motion without also tinting it.
+                    borderBottom: `2px solid ${isBeingDragged ? "var(--tt-secondary)" : "transparent"}`,
+                  }}
+                  // Live reorder, not just on drop — dragging over another
+                  // row immediately swaps it into that row's position (a
+                  // real reorderChecklistItem call, not a visual-only
+                  // preview), so the rest of the list visibly shifts out
+                  // of the way as you drag, the way most drag-reorder
+                  // lists behave. onDrop below then just cleans up —
+                  // the order is already correct by the time it fires.
+                  onDragOver={!previewSaved ? ev => {
+                    ev.preventDefault();
+                    if (draggedChecklist && draggedChecklist.entryKey === entryKey && draggedChecklist.idx !== idx) {
+                      reorderChecklistItem(entryKey, e, draggedChecklist.idx, idx);
+                      setDraggedChecklist({ entryKey, idx });
+                    }
+                  } : undefined}
+                  onDrop={!previewSaved ? ev => { ev.preventDefault(); setDraggedChecklist(null); } : undefined}
+                >
                   {previewSaved ? (
                     <Check size={14} strokeWidth={SW} color="var(--tt-secondary)" style={{ flexShrink: 0 }} />
                   ) : !isEditingThisItem && (
                     // No separate Edit affordance — the text itself is
                     // already the click-to-edit target (EditableField's
-                    // own alwaysEditing text branch), so the only other
-                    // action here is delete. One icon crossfading with
-                    // Check needs no width change, just an opacity swap —
-                    // both occupy the exact same 14x14 footprint.
-                    <div className="relative flex-shrink-0 h-[14px] w-[14px]">
+                    // own alwaysEditing text branch). Grip (reorder) and
+                    // Trash (delete) crossfade in together, so — like the
+                    // old Edit+Trash pairing — the column widens on hover
+                    // to fit both instead of permanently reserving that
+                    // space (see the Show More/Add Item comment below,
+                    // tuned against this same resting 14px width).
+                    <div className="relative flex-shrink-0 h-[14px] w-[14px] transition-[width] duration-150 ease-out group-hover:w-[34px]">
                       <Check
                         size={14} strokeWidth={SW} color="var(--tt-secondary)"
                         className="transition-opacity duration-150 group-hover:opacity-0"
                         style={{ position: "absolute", left: 0, top: 0 }}
                       />
-                      {/* Deletes immediately — no confirmation, same as
-                          everywhere else in this draft (photos, notes). */}
-                      <button
-                        type="button"
-                        onClick={() => deleteChecklistItem(entryKey, e, idx)}
-                        className="opacity-0 transition-opacity duration-150 group-hover:opacity-100"
-                        style={{ position: "absolute", left: 0, top: 0, width: 14, height: 14, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "none", padding: 0, cursor: "pointer", color: "var(--tt-grey06)" }}
-                      >
-                        <Trash2 size={13} strokeWidth={SW} />
-                      </button>
+                      <div className="absolute left-0 top-0 flex items-center gap-1.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                        {/* Native HTML5 drag-and-drop — draggable lives on
+                            just this handle (not the whole row, which
+                            still needs normal clicks/text-selection to
+                            work), the row itself is the drop target (see
+                            onDragOver/onDrop above). */}
+                        <div
+                          draggable
+                          onDragStart={() => setDraggedChecklist({ entryKey, idx })}
+                          onDragEnd={() => setDraggedChecklist(null)}
+                          style={{ flexShrink: 0, width: 14, height: 14, display: "flex", alignItems: "center", justifyContent: "center", cursor: "grab", color: "var(--tt-grey06)" }}
+                        >
+                          <GripVertical size={13} strokeWidth={SW} />
+                        </div>
+                        {/* Deletes immediately — no confirmation, same as
+                            everywhere else in this draft (photos, notes). */}
+                        <button
+                          type="button"
+                          onClick={() => deleteChecklistItem(entryKey, e, idx)}
+                          style={{ flexShrink: 0, width: 14, height: 14, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "none", padding: 0, cursor: "pointer", color: "var(--tt-grey06)" }}
+                        >
+                          <Trash2 size={13} strokeWidth={SW} />
+                        </button>
+                      </div>
                     </div>
                   )}
                   {previewSaved ? (
@@ -5629,9 +5685,9 @@ function ReportsTab({ demoCase }) {
                         <div key={section.key} style={skeletonCardStyle}>
                           <div style={{ padding: PAGE_PAD }}>
                             <div className="tt-skeleton" style={{ width: 180, height: 90, borderRadius: 8, marginBottom: 24 }} />
-                            <div className="tt-skeleton" style={{ width: "50%", height: 22, marginBottom: 4 }} />
-                            <div className="tt-skeleton" style={{ width: "35%", height: 14, marginBottom: 16 }} />
-                            <div style={{ display: "flex", gap: 8 }}>
+                            <div className="tt-skeleton" style={{ width: "50%", height: 22, marginBottom: 8 }} />
+                            <div className="tt-skeleton" style={{ width: "35%", height: 14, marginBottom: 12 }} />
+                            <div style={{ display: "flex", gap: 16 }}>
                               <div className="tt-skeleton" style={{ width: 160, height: 14 }} />
                               <div className="tt-skeleton" style={{ width: 120, height: 14 }} />
                             </div>
@@ -5646,11 +5702,15 @@ function ReportsTab({ demoCase }) {
                             <div className="tt-skeleton" style={{ width: "100%", height: 240, borderRadius: 12, marginBottom: 32 }} />
                             <div className="tt-skeleton" style={{ width: 100, height: 11, marginBottom: 8 }} />
                             <div className="tt-skeleton" style={{ width: "70%", height: 26, marginBottom: 8 }} />
-                            <div className="tt-skeleton" style={{ width: "50%", height: 16, marginBottom: 20 }} />
-                            <div style={{ display: "flex", gap: 32 }}>
+                            <div className="tt-skeleton" style={{ width: "50%", height: 16, marginBottom: 32 }} />
+                            <div style={{ display: "flex", gap: 24, marginBottom: 40 }}>
                               <div className="tt-skeleton" style={{ width: 120, height: 16 }} />
                               <div className="tt-skeleton" style={{ width: 120, height: 16 }} />
                             </div>
+                            {/* Additional Information — same free-text
+                                pattern as Summary, see renderCoverContent. */}
+                            <div className="tt-skeleton" style={{ width: 160, height: 14, marginBottom: 8 }} />
+                            <div className="tt-skeleton" style={{ width: "100%", height: 60, borderRadius: 8 }} />
                           </div>
                         </div>
                       );
@@ -5674,11 +5734,34 @@ function ReportsTab({ demoCase }) {
                     if (section.type === "task") {
                       const e = section.e;
                       const photoCount = Math.min(e?.photos?.length || 0, 5);
+                      // Same 10-item hard cap getChecklist itself enforces,
+                      // then collapsed to CHECKLIST_COLLAPSE_COUNT — the
+                      // real default, unexpanded view (see renderTaskSection).
+                      const checklistCount = Math.min((e?.checklist || []).length, 10);
+                      const checklistPreviewCount = Math.min(checklistCount, CHECKLIST_COLLAPSE_COUNT);
                       return (
                         <div key={section.key} style={skeletonCardStyle}>
                           <div style={{ padding: PAGE_PAD }}>
                             <div className="tt-skeleton" style={{ width: "60%", height: 18, marginBottom: 8 }} />
-                            <div className="tt-skeleton" style={{ width: 160, height: 11, marginBottom: 10 }} />
+                            <div className="tt-skeleton" style={{ width: 160, height: 11 }} />
+                            <div style={{ height: 1, background: "var(--tt-grey03)", marginTop: 16 }} />
+                            {checklistCount > 0 && (
+                              <div style={{ marginTop: 16 }}>
+                                <div className="tt-skeleton" style={{ width: 220, height: 11, marginBottom: 8 }} />
+                                {Array.from({ length: checklistPreviewCount }, (_, ci) => (
+                                  <div key={ci} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: ci === 0 ? 0 : 6 }}>
+                                    <div className="tt-skeleton" style={{ width: 14, height: 14, borderRadius: 4, flexShrink: 0 }} />
+                                    <div className="tt-skeleton" style={{ width: ci % 2 === 0 ? "60%" : "45%", height: 13 }} />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {/* Note — always a live input while loading
+                                (previewLoading only ever happens on an
+                                unsaved draft, see renderNoteSlot). */}
+                            <div style={{ marginTop: 16, marginBottom: 12 }}>
+                              <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8 }} />
+                            </div>
                             {photoCount > 0 && (
                               <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8 }}>
                                 {Array.from({ length: photoCount }, (_, pi) => (
