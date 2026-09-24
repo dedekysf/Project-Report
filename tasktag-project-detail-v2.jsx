@@ -1261,6 +1261,15 @@ function LogoUploadBox({ src, onChange, disabled, width = 180 }) {
       ) : src ? (
         <>
           <img src={src} alt="Company logo" style={{ display: "block", width: "100%", height: "auto" }} />
+          {/* Same darkening overlay a task's own PhotoGrid thumbnail shows
+              on hover (rgba(10,22,41,0.25) over the whole image) — this
+              box didn't have one before, just the corner button, which
+              read inconsistently against every other hoverable image in
+              this app. pointer-events-none so it doesn't intercept the
+              click that's still meant for the box itself. */}
+          {!disabled && (
+            <div className="absolute inset-0 bg-[rgba(10,22,41,0.25)] opacity-0 transition-opacity duration-150 group-hover:opacity-100 pointer-events-none" />
+          )}
           {/* Hover-revealed, same corner-edit affordance/pattern as
               PhotoGrid's own per-photo delete button — whole-box click
               already re-opens the file picker (see onClick above), this
@@ -4471,6 +4480,14 @@ function ReportsTab({ demoCase }) {
               )}
               <span style={{ fontSize: 10, fontWeight: 500, color: "var(--tt-grey05)" }}>(Landscape Preferred)</span>
             </button>
+          )}
+          {coverImageSrc && !previewSaved && (
+            // Same darkening overlay a task's own PhotoGrid thumbnail
+            // shows on hover (rgba(10,22,41,0.25) over the whole image) —
+            // the parent's own overflow:hidden/borderRadius above already
+            // clips this to match, no radius needed here. pointer-events-
+            // none so it doesn't intercept the edit button's own click.
+            <div className="absolute inset-0 bg-[rgba(10,22,41,0.25)] opacity-0 transition-opacity duration-150 group-hover:opacity-100 pointer-events-none" />
           )}
           {coverImageSrc && !previewSaved && (
             <button
