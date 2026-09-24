@@ -167,6 +167,18 @@ style.textContent = `
     to   { transform: scaleX(1); }
   }
 
+  /* A loader icon that replaces an image/empty-state via a ternary (Logo,
+     Highlight Photo, Footer avatar) mounts fresh rather than toggling an
+     existing element's opacity, so a plain CSS transition on it has
+     nothing to animate from — this keyframe is what actually fades it in
+     instead of it just snapping into view. Combined with tt-spin via a
+     comma-separated animation list (both apply to the same element at
+     once). */
+  @keyframes tt-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
 
   /* CTA button — icon + text */
   .tt-cta-btn {
@@ -1224,7 +1236,7 @@ function LogoUploadBox({ src, onChange, disabled, width = 180 }) {
 
   return (
     <div
-      className="tt-editable-wrap"
+      className={`tt-editable-wrap${src ? " group" : ""}`}
       onClick={() => !disabled && !loading && inputRef.current?.click()}
       style={{
         position: "relative", flexShrink: 0, display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
@@ -1245,9 +1257,31 @@ function LogoUploadBox({ src, onChange, disabled, width = 180 }) {
       }}
     >
       {loading ? (
-        <Loader size={18} strokeWidth={SW} color="var(--tt-text-2)" style={{ display: "block", animation: "tt-spin 0.75s linear infinite" }} />
+        <Loader size={18} strokeWidth={SW} color="var(--tt-text-2)" style={{ display: "block", animation: "tt-spin 0.75s linear infinite, tt-fade-in 0.15s ease-out" }} />
       ) : src ? (
-        <img src={src} alt="Company logo" style={{ display: "block", width: "100%", height: "auto" }} />
+        <>
+          <img src={src} alt="Company logo" style={{ display: "block", width: "100%", height: "auto" }} />
+          {/* Hover-revealed, same corner-edit affordance/pattern as
+              PhotoGrid's own per-photo delete button — whole-box click
+              already re-opens the file picker (see onClick above), this
+              is just the visible cue that it's editable. stopPropagation
+              only to avoid double-firing the same click handler both
+              here and on the box itself. */}
+          {!disabled && (
+            <button
+              onClick={e => { e.stopPropagation(); !loading && inputRef.current?.click(); }}
+              className="opacity-0 transition-opacity group-hover:opacity-100"
+              style={{
+                position: "absolute", top: 6, right: 6, width: 20, height: 20, borderRadius: "50%",
+                border: "none", background: "rgba(10,22,41,0.55)",
+                display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+                cursor: "pointer", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)",
+              }}
+            >
+              <Pencil size={12} color="white" strokeWidth={2.25} />
+            </button>
+          )}
+        </>
       ) : (
         <>
           <Upload size={24} strokeWidth={SW} color="var(--tt-grey06)" />
@@ -3867,10 +3901,11 @@ function ReportsTab({ demoCase }) {
   // edit — same as the section's own heading), truncated with a tooltip
   // on hover rather than a generic "Task N" — flat across every entry
   // regardless of date grouping (day/week/month); a group's own label
-  // (see renderGroupLabelBlock) still shows inline above the first task
-  // of a new group, just not as its own nav entry. Footer (point of
-  // contact name/role/photo) is always last — it's a report-wide
-  // signature, not tied to any specific task.
+  // (week/month only, e.g. "September 2026") shows in the sidebar instead
+  // (see navGroups), above the first task of a new group there, not
+  // inline in the section content and not as its own separate nav entry.
+  // Footer (point of contact name/role/photo) is always last — it's a
+  // report-wide signature, not tied to any specific task.
   const sections = [];
   if (previewData) {
     sections.push({ key: "coverHeader", type: "coverHeader", navLabel: "Cover Header" });
@@ -3907,11 +3942,16 @@ function ReportsTab({ demoCase }) {
     } else if (s.type === "summary") {
       navGroups.push({ type: "leaf", key: s.key, label: s.navLabel, icon: AlignJustify });
     } else if (s.type === "task") {
+      // Week/month grouping shows here instead of as its own heading
+      // inside the section content (see renderTaskSection/sectionCards) —
+      // day grouping carries no such label at all, same "day" exclusion
+      // that heading used to have.
+      const groupLabel = (s.g && previewData.grouping !== "day") ? formatGroupLabel(s.g, previewData.grouping) : null;
       const last = navGroups[navGroups.length - 1];
       if (last && last.type === "group" && last.label === "Task List") {
-        last.children.push({ key: s.key, label: s.navLabel });
+        last.children.push({ key: s.key, label: s.navLabel, groupLabel });
       } else {
-        navGroups.push({ type: "group", label: "Task List", icon: Hash, children: [{ key: s.key, label: s.navLabel }] });
+        navGroups.push({ type: "group", label: "Task List", icon: Hash, children: [{ key: s.key, label: s.navLabel, groupLabel }] });
       }
     } else if (s.type === "footer") {
       // IdCard, not Users — this section is one person's own signature
@@ -3931,7 +3971,12 @@ function ReportsTab({ demoCase }) {
   // near handleDeletePhoto — sections/sectionCards invoke renderTaskSection
   // synchronously during this same render pass, so a later declaration
   // would still be in its temporal dead zone at that point.
-  const getChecklist = (entryKey, e) => checklistOverrides[entryKey] ?? (e.checklist || []);
+  // slice(-10) — never more than 10 items, same hard cap the export's own
+  // checklistLabelHTML/slice(-10) already enforces (that one truncates a
+  // raw e.checklist longer than 10 down to its most recent 10); capping it
+  // here too means the draft can never even start from/hold more than 10,
+  // not just refuse to add an 11th on top of however many already exist.
+  const getChecklist = (entryKey, e) => (checklistOverrides[entryKey] ?? (e.checklist || [])).slice(-10);
   const updateChecklistItem = (entryKey, e, idx, text) => {
     const next = getChecklist(entryKey, e).map((item, i) => (i === idx ? { ...item, text } : item));
     setChecklistOverrides(p => ({ ...p, [entryKey]: next }));
@@ -3941,7 +3986,12 @@ function ReportsTab({ demoCase }) {
     setChecklistOverrides(p => ({ ...p, [entryKey]: next }));
   };
   const addChecklistItem = (entryKey, e) => {
-    const next = [...getChecklist(entryKey, e), { text: "" }];
+    const current = getChecklist(entryKey, e);
+    // Belt and suspenders — the UI already hides Add item at 10 (see
+    // renderTaskSection), this just makes the 10-item cap a real
+    // invariant of the function itself, not only a UI affordance.
+    if (current.length >= 10) return;
+    const next = [...current, { text: "" }];
     setChecklistOverrides(p => ({ ...p, [entryKey]: next }));
     // Auto-expand — otherwise a new item added while collapsed to the
     // first CHECKLIST_COLLAPSE_COUNT would land past that cutoff and
@@ -3983,21 +4033,6 @@ function ReportsTab({ demoCase }) {
     );
   };
 
-  // Week/month sections read as proper section titles (18px); day sections
-  // stay a small uppercase date badge — formatGroupLabel already drops the
-  // photo count for week/month, this just covers the type scale.
-  const renderGroupLabelBlock = (g) => {
-    const grouping = previewData.grouping;
-    const isPeriodSection = grouping === "week" || grouping === "month";
-    return (
-      <p style={isPeriodSection
-        ? { fontSize: 16, fontWeight: 600, color: "var(--tt-grey05)", textTransform: "uppercase", padding: "8px 0", margin: 0 }
-        : { fontSize: 11, fontWeight: 600, color: "var(--tt-grey05)", letterSpacing: "0.06em", textTransform: "uppercase", padding: "8px 0", margin: 0 }
-      }>
-        {formatGroupLabel(g, grouping).toUpperCase()}
-      </p>
-    );
-  };
 
   // One task section = one entry, shown in full — title, meta, checklist
   // (if any), note, and every photo — rather than split across
@@ -4089,49 +4124,95 @@ function ReportsTab({ demoCase }) {
             <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "16px 0 8px" }}>
               Checklist items completed as of this update
             </p>
-            {visibleChecklistItems.map((item, idx) => (
-              <div key={idx} className="group" style={{ marginTop: idx === 0 ? 0 : 6, display: "flex", alignItems: "center", gap: 8 }}>
-                <Check size={14} strokeWidth={SW} color="var(--tt-secondary)" style={{ flexShrink: 0 }} />
-                {previewSaved ? (
-                  <span style={{ fontSize: 13, color: "var(--tt-text-2)" }}>{item.text}</span>
-                ) : (
-                  <>
-                    <input
-                      value={item.text}
-                      onChange={ev => updateChecklistItem(entryKey, e, idx, ev.target.value)}
-                      placeholder="Checklist item"
-                      style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "none", padding: 0, fontFamily: "inherit", fontSize: 13, color: "var(--tt-text-2)" }}
-                    />
-                    {/* Hover-revealed, matching PhotoGrid's own per-item
-                        delete affordance — deletes immediately, no
-                        confirmation, same as everywhere else in this
-                        draft (photos, notes). */}
-                    <button
-                      onClick={() => deleteChecklistItem(entryKey, e, idx)}
-                      className="opacity-0 transition-opacity group-hover:opacity-100"
-                      style={{ flexShrink: 0, width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "none", padding: 0, cursor: "pointer", color: "var(--tt-grey05)" }}
-                    >
-                      <X size={14} strokeWidth={SW} />
-                    </button>
-                  </>
-                )}
-              </div>
-            ))}
-            {!previewSaved && (
-              <button
-                onClick={() => addChecklistItem(entryKey, e)}
-                style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 6, border: "none", background: "none", padding: 0, cursor: "pointer", color: "var(--tt-text-2)", fontSize: 12, fontWeight: 500 }}
-              >
-                <Plus size={14} strokeWidth={SW} /> Add item
-              </button>
-            )}
+            {visibleChecklistItems.map((item, idx) => {
+              const checklistFieldId = `checklist_${entryKey}_${idx}`;
+              // Same "is this field actually live" condition EditableField
+              // itself uses internally (isEmpty, or it's the shared
+              // activeField) — while true, no check/edit/trash icon shows
+              // at all, there's nothing to act on while the row is already
+              // a live input.
+              const isEditingThisItem = !previewSaved && (!item.text.trim() || activeEditField === checklistFieldId);
+              return (
+                <div key={idx} className="group" style={{ marginTop: idx === 0 ? 0 : 6, display: "flex", alignItems: "center", gap: 8 }}>
+                  {previewSaved ? (
+                    <Check size={14} strokeWidth={SW} color="var(--tt-secondary)" style={{ flexShrink: 0 }} />
+                  ) : !isEditingThisItem && (
+                    // No separate Edit affordance — the text itself is
+                    // already the click-to-edit target (EditableField's
+                    // own alwaysEditing text branch), so the only other
+                    // action here is delete. One icon crossfading with
+                    // Check needs no width change, just an opacity swap —
+                    // both occupy the exact same 14x14 footprint.
+                    <div className="relative flex-shrink-0 h-[14px] w-[14px]">
+                      <Check
+                        size={14} strokeWidth={SW} color="var(--tt-secondary)"
+                        className="transition-opacity duration-150 group-hover:opacity-0"
+                        style={{ position: "absolute", left: 0, top: 0 }}
+                      />
+                      {/* Deletes immediately — no confirmation, same as
+                          everywhere else in this draft (photos, notes). */}
+                      <button
+                        type="button"
+                        onClick={() => deleteChecklistItem(entryKey, e, idx)}
+                        className="opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+                        style={{ position: "absolute", left: 0, top: 0, width: 14, height: 14, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "none", padding: 0, cursor: "pointer", color: "var(--tt-grey06)" }}
+                      >
+                        <Trash2 size={13} strokeWidth={SW} />
+                      </button>
+                    </div>
+                  )}
+                  {previewSaved ? (
+                    <span style={{ fontSize: 13, color: "var(--tt-text-2)" }}>{item.text}</span>
+                  ) : (
+                    // Same edit mode as the task note (renderNoteSlot) —
+                    // alwaysEditing, so an empty item still starts as a
+                    // live input, but once it holds text it reads as plain
+                    // clickable text (hover-highlighted) and only becomes
+                    // a real bordered input box again on click, with the
+                    // same confirm/cancel affordance every other
+                    // alwaysEditing field has — not a bare, borderless,
+                    // always-live <input> committing on every keystroke.
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <EditableField
+                        fieldId={checklistFieldId}
+                        value={item.text}
+                        placeholder="Checklist item"
+                        alwaysEditing
+                        onSave={v => updateChecklistItem(entryKey, e, idx, v)}
+                        textStyle={{ fontSize: 13, color: "var(--tt-text-2)", margin: 0 }}
+                        inputStyle={{ fontSize: 13, height: 40 }}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {/* Show more/less right under the list, indented 22px (the
+                icon column's own resting 14px width + the row's own 8px
+                gap — it only widens to 34px on hover, not at rest) to
+                line up under each item's own text rather than its icon
+                column — reads as "more of this text", not a new checklist
+                row of its own. Add item then sits below THAT, flush left
+                instead (no indent) so it lines up with the icon column —
+                it's adding a new row, not more text under the last one. */}
             {checklistItems.length > CHECKLIST_COLLAPSE_COUNT && (
               <button
                 onClick={() => setExpandedChecklists(p => ({ ...p, [entryKey]: !checklistExpanded }))}
-                style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 4, border: "none", background: "none", padding: 0, cursor: "pointer", color: "var(--tt-grey05)", fontSize: 12, fontWeight: 500 }}
+                style={{ marginTop: 8, marginLeft: 22, display: "flex", alignItems: "center", gap: 4, border: "none", background: "none", padding: 0, cursor: "pointer", color: "var(--tt-grey05)", fontSize: 12, fontWeight: 500 }}
               >
                 {checklistExpanded ? "Show less" : `Show ${checklistItems.length - CHECKLIST_COLLAPSE_COUNT} more`}
                 {checklistExpanded ? <ChevronUp size={14} strokeWidth={SW} /> : <ChevronDown size={14} strokeWidth={SW} />}
+              </button>
+            )}
+            {/* Capped at 10 items total — once the list is already at that
+                cap, Add item just doesn't render (no disabled state to
+                explain, it simply isn't there to click). */}
+            {!previewSaved && checklistItems.length < 10 && (
+              <button
+                onClick={() => addChecklistItem(entryKey, e)}
+                style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 6, border: "none", background: "none", padding: 0, cursor: "pointer", color: "var(--tt-secondary)", fontSize: 12, fontWeight: 500 }}
+              >
+                <Plus size={14} strokeWidth={SW} /> Add item
               </button>
             )}
           </>
@@ -4172,7 +4253,7 @@ function ReportsTab({ demoCase }) {
   // Progress — entries logged this period vs. total on record, gated by
   // the same "Task summary" checkbox the HTML export uses.
   const renderProgressBlock = () => (
-    <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16, background: "var(--tt-grey02)", borderRadius: 4, padding: 8 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16, background: "var(--tt-grey02)", borderRadius: 8, padding: 16 }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 8px" }}>
           {previewData.completed} of {previewData.total} tasks complete
@@ -4363,9 +4444,10 @@ function ReportsTab({ demoCase }) {
             "(Landscape Preferred)" hint is extra, cover-specific info
             LogoUploadBox has no equivalent of. Once a photo IS set, the
             box drops the dashed/grey01 empty styling for the photo's own
-            look, and a corner button (now reading "Change Photo") takes
-            over for swapping it out. */}
-        <div style={{
+            look, and a hover-revealed corner edit button (same pattern as
+            LogoUploadBox's own — see there) takes over for swapping it
+            out, instead of an always-visible "Change Photo" pill. */}
+        <div className={coverImageSrc ? "group" : undefined} style={{
           position: "relative", overflow: "hidden", marginBottom: 32,
           ...(coverImageSrc
             ? { borderRadius: 12 }
@@ -4380,7 +4462,7 @@ function ReportsTab({ demoCase }) {
               style={{ width: "100%", height: 240, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, border: "none", background: "none", padding: 0, cursor: previewSaved ? "default" : "pointer" }}
             >
               {coverImageUploading ? (
-                <Loader size={24} strokeWidth={SW} color="var(--tt-grey05)" style={{ display: "block", animation: "tt-spin 0.75s linear infinite" }} />
+                <Loader size={24} strokeWidth={SW} color="var(--tt-grey05)" style={{ display: "block", animation: "tt-spin 0.75s linear infinite, tt-fade-in 0.15s ease-out" }} />
               ) : (
                 <Upload size={24} strokeWidth={SW} color="var(--tt-grey06)" />
               )}
@@ -4394,17 +4476,19 @@ function ReportsTab({ demoCase }) {
             <button
               onClick={() => !coverImageUploading && coverImageInputRef.current?.click()}
               disabled={coverImageUploading}
-              style={{ position: "absolute", bottom: 12, right: 12, display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 999, border: "none", background: "rgba(10,22,41,0.65)", color: "white", fontSize: 12, fontWeight: 600, cursor: coverImageUploading ? "default" : "pointer" }}
+              className="opacity-0 transition-opacity group-hover:opacity-100"
+              style={{
+                position: "absolute", top: 12, right: 12, width: 28, height: 28, borderRadius: "50%",
+                border: "none", background: "rgba(10,22,41,0.55)",
+                display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+                cursor: coverImageUploading ? "default" : "pointer", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)",
+              }}
             >
               {coverImageUploading ? (
-                <Loader size={13} strokeWidth={2.25} color="white" style={{ display: "block", animation: "tt-spin 0.75s linear infinite" }} />
+                <Loader size={13} strokeWidth={2.25} color="white" style={{ display: "block", animation: "tt-spin 0.75s linear infinite, tt-fade-in 0.15s ease-out" }} />
               ) : (
-                <FileImage size={13} strokeWidth={2.25} />
+                <Pencil size={13} strokeWidth={2.25} color="white" />
               )}
-              {/* "(Landscape Preferred)" is just a hint, not the actual
-                  call to action — kept smaller than "Change Photo"
-                  rather than matching it, since it's secondary. */}
-              Change Photo <span style={{ fontSize: 10, fontWeight: 500 }}>(Landscape Preferred)</span>
             </button>
           )}
           {!previewSaved && (
@@ -4579,7 +4663,7 @@ function ReportsTab({ demoCase }) {
     // grey02 body (see previewPanelRef) reading as one continuous
     // document rather than a stack of individually "lifted" cards.
     const cardStyle = {
-      width: PAGE_W, margin: isFirst ? 0 : "40px 0 0",
+      width: PAGE_W, margin: isFirst ? 0 : "64px 0 0",
       boxSizing: "border-box",
       background: "white",
       display: "flex", flexDirection: "column",
@@ -4630,14 +4714,14 @@ function ReportsTab({ demoCase }) {
       );
     }
     if (section.type === "task") {
-      const showGroupLabel = section.g && previewData.grouping !== "day";
       return (
         <div key={section.key} ref={el => { sectionRefs.current[section.key] = el; }} style={cardStyle}>
           {/* Same PAGE_PAD-on-every-side padding as every other section —
               see the summary section's own comment on why this no longer
-              borrows PAGE_BOTTOM_BUFFER. */}
+              borrows PAGE_BOTTOM_BUFFER. Week/month group label (e.g.
+              "September 2026") no longer shows here — it's in the sidebar
+              now instead (see navGroups). */}
           <div style={{ padding: PAGE_PAD }}>
-            {showGroupLabel && renderGroupLabelBlock(section.g)}
             {renderTaskSection(section)}
           </div>
         </div>
@@ -4653,6 +4737,7 @@ function ReportsTab({ demoCase }) {
       <div key={section.key} ref={el => { sectionRefs.current[section.key] = el; }} style={cardStyle}>
         <div style={{ padding: PAGE_PAD, display: "flex", alignItems: "center", gap: 20 }}>
           <button
+            className="group"
             onClick={() => !contactPhotoUploading && !previewSaved && contactPhotoInputRef.current?.click()}
             disabled={contactPhotoUploading || previewSaved}
             style={{
@@ -4663,7 +4748,7 @@ function ReportsTab({ demoCase }) {
           >
             {contactPhotoUploading ? (
               <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Loader size={20} strokeWidth={SW} color="var(--tt-grey05)" style={{ display: "block", animation: "tt-spin 0.75s linear infinite" }} />
+                <Loader size={20} strokeWidth={SW} color="var(--tt-grey05)" style={{ display: "block", animation: "tt-spin 0.75s linear infinite, tt-fade-in 0.15s ease-out" }} />
               </div>
             ) : contactPhotoSrc ? (
               <img src={contactPhotoSrc} alt="" style={{ display: "block", width: "100%", height: "100%", objectFit: "cover" }} />
@@ -4672,6 +4757,19 @@ function ReportsTab({ demoCase }) {
               // already shows when there's no uploaded photo either.
               <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--tt-pastel-magenta)" }}>
                 <span style={{ fontSize: 18, fontWeight: 700, color: "white" }}>{initialsOf(preview.contactName || "?")}</span>
+              </div>
+            )}
+            {/* Hover-revealed upload affordance, centered over the whole
+                circle rather than a corner badge — the button itself is
+                already the click target (onClick above), this is purely
+                the visible cue. `overflow:hidden` on the button clips it
+                to the circle, same as the photo/initials it sits over. */}
+            {!previewSaved && !contactPhotoUploading && (
+              <div
+                className="opacity-0 transition-opacity group-hover:opacity-100"
+                style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(10,22,41,0.45)" }}
+              >
+                <Upload size={20} color="white" strokeWidth={2} />
               </div>
             )}
           </button>
@@ -4685,17 +4783,20 @@ function ReportsTab({ demoCase }) {
             />
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
-            {/* Same "label only while the input is actually live" rule as
-                the cover header fields — see their own comment for why. */}
+            {/* No label here — unlike the Cover Header fields, Name/Role
+                read clearly enough on their own without one, in edit mode
+                or otherwise. Name→Role gap: 8px once both are committed
+                values, 12px while the live input is showing (textStyle vs
+                inputStyle margin, same "form vs value" split as the Cover
+                Header fields above). */}
             <EditableField
               fieldId="contactName"
               value={preview.contactName}
               placeholder="e.g. Maria Jose"
               disabled={previewSaved}
               alwaysEditing
-              aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Name</p>}
               onSave={v => setPreview(p => ({ ...p, contactName: v }))}
-              textStyle={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 12px" }}
+              textStyle={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 8px" }}
               inputStyle={{ fontSize: 14, height: 40, margin: "0 0 12px" }}
             />
             <EditableField
@@ -4704,7 +4805,6 @@ function ReportsTab({ demoCase }) {
               placeholder="e.g. Project Manager"
               disabled={previewSaved}
               alwaysEditing
-              aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Role</p>}
               onSave={v => setPreview(p => ({ ...p, contactRole: v }))}
               textStyle={{ fontSize: 14, fontWeight: 400, color: "var(--tt-grey05)", margin: 0 }}
               inputStyle={{ fontSize: 14, height: 40 }}
@@ -5340,8 +5440,15 @@ function ReportsTab({ demoCase }) {
                       {group.type === "group" && (
                         <div style={{ marginLeft: 21, paddingLeft: 12, borderLeft: "2px solid var(--tt-grey03)" }}>
                           {group.children.map((child, ci) => (
-                            <div key={child.key} style={{ padding: "6px 10px", marginTop: 2 }}>
-                              <div className="tt-skeleton" style={{ width: ci % 2 === 0 ? 130 : 100, height: 11 }} />
+                            <div key={child.key}>
+                              {child.groupLabel && (
+                                <div style={{ padding: "0 10px", margin: ci === 0 ? "0 0 4px" : "12px 0 4px" }}>
+                                  <div className="tt-skeleton" style={{ width: 90, height: 10 }} />
+                                </div>
+                              )}
+                              <div style={{ padding: "6px 10px", marginTop: 2 }}>
+                                <div className="tt-skeleton" style={{ width: ci % 2 === 0 ? 130 : 100, height: 11 }} />
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -5403,30 +5510,56 @@ function ReportsTab({ demoCase }) {
                           <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.label}</span>
                         </div>
                         <div style={{ marginLeft: 21, paddingLeft: 12, borderLeft: "2px solid var(--tt-grey03)" }}>
-                          {group.children.map(child => {
+                          {group.children.map((child, ci) => {
                             const active = activeSectionKey === child.key;
                             return (
-                              <button
-                                key={child.key}
-                                onClick={() => scrollToSection(child.key)}
-                                onMouseEnter={e => { if (!active) e.currentTarget.style.background = "var(--tt-grey02)"; }}
-                                onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
-                                style={{
-                                  display: "flex", alignItems: "center", width: "100%", textAlign: "left",
-                                  padding: "6px 10px", marginTop: 2, borderRadius: 6, border: "none",
-                                  background: active ? "var(--tt-grey02)" : "transparent",
-                                  color: active ? "var(--tt-text-1)" : "var(--tt-grey06)",
-                                  fontSize: 12, fontWeight: active ? 600 : 400,
-                                  cursor: "pointer", transition: "background 0.15s",
-                                }}
-                              >
-                                {/* minWidth:0 — flex items default to
-                                    min-width:auto, which would otherwise stop
-                                    this from ever actually shrinking/
-                                    truncating below its content's natural
-                                    width. */}
-                                <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{child.label}</span>
-                              </button>
+                              <div key={child.key}>
+                                {/* Week/month divider (e.g. "September
+                                    2026") — the same info that used to
+                                    show as a heading inside the section
+                                    content itself, now living here instead
+                                    (see navGroups' own comment on why). No
+                                    top margin on the very first one — the
+                                    Task List heading above already
+                                    provides that separation. */}
+                                {child.groupLabel && (
+                                  // text-1, not grey05 — grey05 (#828282) is
+                                  // actually LIGHTER than the grey06
+                                  // (#303742) the items below use for their
+                                  // own inactive state, so a grey05 divider
+                                  // read as weaker than the very items it's
+                                  // supposed to head, backwards from what a
+                                  // heading needs. text-1 is darker than
+                                  // both, so it reads as the more
+                                  // authoritative label above them — the
+                                  // uppercase/11px/letter-spacing treatment
+                                  // itself was fine, color was the actual
+                                  // problem.
+                                  <p style={{ margin: ci === 0 ? "0 0 4px" : "12px 0 4px", padding: "0 10px", fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--tt-text-1)" }}>
+                                    {child.groupLabel}
+                                  </p>
+                                )}
+                                <button
+                                  onClick={() => scrollToSection(child.key)}
+                                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = "var(--tt-grey02)"; }}
+                                  onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
+                                  style={{
+                                    display: "flex", alignItems: "center", width: "100%", textAlign: "left",
+                                    padding: "6px 10px", marginTop: 2, borderRadius: 6, border: "none",
+                                    background: active ? "var(--tt-grey02)" : "transparent",
+                                    color: active ? "var(--tt-text-1)" : "var(--tt-grey06)",
+                                    fontSize: 12, fontWeight: active ? 600 : 400,
+                                    cursor: "pointer", transition: "background 0.15s",
+                                  }}
+                                >
+                                  {/* minWidth:0 — flex items default to
+                                      min-width:auto, which would otherwise stop
+                                      this from ever actually shrinking/
+                                      truncating below its content's natural
+                                      width. */}
+                                  <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{child.label}</span>
+                                </button>
+                              </div>
                             );
                           })}
                         </div>
@@ -5465,7 +5598,7 @@ function ReportsTab({ demoCase }) {
                   // gated behind this fake delay, so every skeleton below
                   // is sized off the real data instead of a generic guess.
                   sections.map((section, si) => {
-                    const skeletonCardStyle = { width: PAGE_W, margin: si === 0 ? 0 : "40px 0 0", boxSizing: "border-box", background: "white" };
+                    const skeletonCardStyle = { width: PAGE_W, margin: si === 0 ? 0 : "64px 0 0", boxSizing: "border-box", background: "white" };
                     if (section.type === "coverHeader") {
                       return (
                         <div key={section.key} style={skeletonCardStyle}>
@@ -5502,7 +5635,7 @@ function ReportsTab({ demoCase }) {
                         <div key={section.key} style={skeletonCardStyle}>
                           <div style={{ padding: PAGE_PAD }}>
                             {preview.includeSummary && (
-                              <div style={{ background: "var(--tt-grey02)", borderRadius: 4, padding: 8, marginBottom: 16 }}>
+                              <div style={{ background: "var(--tt-grey02)", borderRadius: 8, padding: 16, marginBottom: 16 }}>
                                 <div className="tt-skeleton" style={{ width: 140, height: 16, marginBottom: 8 }} />
                                 <div className="tt-skeleton" style={{ width: "100%", height: 6, borderRadius: 99 }} />
                               </div>
@@ -5557,7 +5690,7 @@ function ReportsTab({ demoCase }) {
 
                     {/* Infinite scroll: one skeleton item while the next batch "loads" */}
                     {loadingMore && (
-                      <div style={{ width: PAGE_W, margin: "40px 0 0" }}>
+                      <div style={{ width: PAGE_W, margin: "64px 0 0" }}>
                         <div className="tt-skeleton" style={{ width: "85%", height: 16, marginBottom: 10 }} />
                         {nextEntry && nextEntry.photos.length > 0 && (
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8 }}>
