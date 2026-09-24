@@ -4262,7 +4262,7 @@ function ReportsTab({ demoCase }) {
   // Progress — entries logged this period vs. total on record, gated by
   // the same "Task summary" checkbox the HTML export uses.
   const renderProgressBlock = () => (
-    <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16, background: "var(--tt-grey02)", borderRadius: 8, padding: 16 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24, background: "var(--tt-grey02)", borderRadius: 8, padding: 16 }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 8px" }}>
           {previewData.completed} of {previewData.total} tasks complete
@@ -4278,34 +4278,42 @@ function ReportsTab({ demoCase }) {
   );
 
   // Summary — plain content, no box/background/padding of its own (flat,
-  // matching the rest of this flat-card design — see cardStyle). The
-  // "Summary"/"Optional" label row is passed in as `aboveWhenEditing`
-  // rather than rendered directly — EditableField only shows it alongside
-  // the live textarea, hiding it once summary flips to plain text
-  // (confirmed, or the whole report saved/`disabled`). Always present
-  // regardless of the "Task summary" toggle — that only ever gates
-  // renderProgressBlock, shown right above it.
-  const renderSummaryBlock = () => (
-    <div>
-      <EditableField
-        fieldId="summary"
-        value={preview.summary}
-        placeholder="Add a high-level overview of the progress made during this period..."
-        disabled={previewSaved}
-        alwaysEditing
-        multiline
-        aboveWhenEditing={
-          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 8 }}>
-            <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-2)", margin: 0 }}>Summary</p>
+  // matching the rest of this flat-card design — see cardStyle). Unlike
+  // every other alwaysEditing field's label, "Summary" is a permanent
+  // heading here, not passed as aboveWhenEditing — this field's own value
+  // is expected to be long/prose, so it still needs its label once
+  // filled, rather than reading fine on its own the way a short value
+  // (a name, an address, ...) does. "Optional" stays contextual though,
+  // next to it only while the field is actually live (empty, or the
+  // shared activeField) — same "is this field live" check the Cover
+  // Header icons use, just read from the parent instead of internal to
+  // EditableField. Always present regardless of the "Task summary"
+  // toggle — that only ever gates renderProgressBlock, shown right above
+  // it.
+  const renderSummaryBlock = () => {
+    const summaryEditing = !previewSaved && (!preview.summary || activeEditField === "summary");
+    return (
+      <div>
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 8 }}>
+          <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-2)", margin: 0 }}>Summary</p>
+          {summaryEditing && (
             <span style={{ fontSize: 10, fontWeight: 400, color: "var(--tt-grey05)", lineHeight: 1 }}>Optional</span>
-          </div>
-        }
-        onSave={v => setPreview(p => ({ ...p, summary: v }))}
-        textStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, margin: 0 }}
-        inputStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, resize: "vertical" }}
-      />
-    </div>
-  );
+          )}
+        </div>
+        <EditableField
+          fieldId="summary"
+          value={preview.summary}
+          placeholder="Add a high-level overview of the progress made during this period..."
+          disabled={previewSaved}
+          alwaysEditing
+          multiline
+          onSave={v => setPreview(p => ({ ...p, summary: v }))}
+          textStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, margin: 0 }}
+          inputStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, resize: "vertical" }}
+        />
+      </div>
+    );
+  };
 
   // ── Cover Header ──
   // Its own dedicated section (see sections/sectionCards) — a plain
@@ -5652,7 +5660,7 @@ function ReportsTab({ demoCase }) {
                         <div key={section.key} style={skeletonCardStyle}>
                           <div style={{ padding: PAGE_PAD }}>
                             {preview.includeSummary && (
-                              <div style={{ background: "var(--tt-grey02)", borderRadius: 8, padding: 16, marginBottom: 16 }}>
+                              <div style={{ background: "var(--tt-grey02)", borderRadius: 8, padding: 16, marginBottom: 24 }}>
                                 <div className="tt-skeleton" style={{ width: 140, height: 16, marginBottom: 8 }} />
                                 <div className="tt-skeleton" style={{ width: "100%", height: 6, borderRadius: 99 }} />
                               </div>
