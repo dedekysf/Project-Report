@@ -2896,10 +2896,10 @@ const buildReportHTML = async (report) => {
 
   // Comparison path for the previous CSS column-count masonry photo
   // layout — visit the app at /masonry to preview that instead of the
-  // current default (width-grouped rows, see packRowsByWidth below). Read
-  // once per export so a link copied while on /masonry keeps rendering
-  // masonry for whoever opens it too (handleCopy's share URL keeps
-  // whatever pathname was current when it was built).
+  // current default (orientation-grouped rows, see packRowsByOrientation
+  // below). Read once per export so a link copied while on /masonry keeps
+  // rendering masonry for whoever opens it too (handleCopy's share URL
+  // keeps whatever pathname was current when it was built).
   const useMasonry = typeof window !== "undefined" && /\/masonry\/?$/.test(window.location.pathname);
 
   const STATUS_HEX = { completed: "#16a97d", open: "#138eff" };
@@ -2911,16 +2911,20 @@ const buildReportHTML = async (report) => {
   const SANS = "-apple-system,BlinkMacSystemFont,'Inter',sans-serif";
   const SERIF = "'Lora',Georgia,serif";
 
-  // Width-grouped rows — every photo shows here (no "+N more" cap; there's
-  // nothing left to expand into), at its own natural aspect ratio rather
-  // than cropped to a fixed tile like the live draft's grid (see
+  // Orientation-grouped rows — every photo shows here (no "+N more" cap;
+  // there's nothing left to expand into), at its own natural aspect ratio
+  // rather than cropped to a fixed tile like the live draft's grid (see
   // PhotoGrid): there's no interactive lightbox left to see the full
   // frame in once this is a static export, so the export itself has to
-  // show it. Rows are formed by comparing photos' own ORIGINAL pixel
-  // width (see packRowsByWidth) — consecutive photos whose original width
-  // is the same or close enough join the same row — rather than by
-  // picking a target row height and solving for whatever width makes
-  // everything fit (a "justified gallery"). Nothing about an individual
+  // show it. Rows are grouped by ORIENTATION first (landscape, then
+  // square, then portrait — see packRowsByOrientation below), a coarser
+  // and more reliable grouping than comparing raw pixel widths alone (a
+  // landscape and a portrait shot can share a width and still look
+  // mismatched side by side); within each orientation, consecutive photos
+  // whose original width is the same or close enough still join the same
+  // row (see packRowsByWidth) — rather than by picking a target row
+  // height and solving for whatever width makes everything fit (a
+  // "justified gallery"). Nothing about an individual
   // photo is stretched to a height it wasn't shot at or cropped to a
   // width it wasn't shot at: once a row is formed, every photo in it is
   // scaled by the SAME single factor (never up past its own natural
@@ -2951,12 +2955,16 @@ const buildReportHTML = async (report) => {
   // starts there instead, even though the next photo's width still
   // technically qualifies.
   const MIN_ROW_HEIGHT = 90;
-  // Caps how tall any single photo can render without cropping — mainly
-  // guards a narrow-width row (e.g. a lone portrait photo, or a couple of
-  // them) whose combined natural width is already under containerWidth,
-  // so width-based scaling alone would never kick in and the photo would
-  // render at its full natural (potentially very tall) height.
-  const MAX_ROW_HEIGHT = 220;
+  // No max-height cap — every row's scale is now purely width-driven (see
+  // rowScale below): capped at 1 (never upscaled past a photo's own
+  // resolution) and at whatever keeps the row's combined width within
+  // containerWidth, full stop. A row's own height is just however tall
+  // that makes it, uncropped.
+  // Hard cap on how many photos share one row — separate from (and
+  // usually reached before) MIN_ROW_HEIGHT above; a row still closes
+  // early via that same-width/MIN_ROW_HEIGHT check same as before, this
+  // is just an upper bound on top of it.
+  const MAX_ROW_PHOTOS = 3;
 
   // Greedily grows a row for as long as the next photo's original width
   // stays within ROW_WIDTH_TOLERANCE of the row's own RUNNING AVERAGE
@@ -2966,19 +2974,15 @@ const buildReportHTML = async (report) => {
   // further from that first one than from its actual neighbors; the
   // running average moves gradually as the row grows, so it stays
   // representative of the row as a whole instead of being pinned to
-  // whichever photo happened to come first) AND doesn't shrink the row
-  // below MIN_ROW_HEIGHT once scaled — otherwise the current row closes
-  // and a new one starts with that photo. Each row's scale is capped at 1
-  // (never upscaled past a photo's own resolution) and at whatever keeps
-  // its tallest photo within MAX_ROW_HEIGHT — only ever scaled down,
-  // never cropped.
+  // whichever photo happened to come first), doesn't shrink the row below
+  // MIN_ROW_HEIGHT once scaled, and hasn't already hit MAX_ROW_PHOTOS —
+  // otherwise the current row closes and a new one starts with that
+  // photo.
   const packRowsByWidth = (photos, containerWidth, gap) => {
     const rowScale = (candidateRow) => {
       const sumW = candidateRow.reduce((sum, p) => sum + p.width, 0);
       const widthScale = (containerWidth - gap * (candidateRow.length - 1)) / sumW;
-      const maxH = Math.max(...candidateRow.map(p => p.height));
-      const heightScale = MAX_ROW_HEIGHT / maxH;
-      return Math.min(1, widthScale, heightScale);
+      return Math.min(1, widthScale);
     };
     const rows = [];
     let row = [];
@@ -2989,7 +2993,7 @@ const buildReportHTML = async (report) => {
       row = []; widthSum = 0;
     };
     photos.forEach(photo => {
-      if (row.length > 0) {
+      if (row.length > 0 && row.length < MAX_ROW_PHOTOS) {
         const avgWidth = widthSum / row.length;
         const sameWidth = Math.abs(photo.width - avgWidth) / avgWidth <= ROW_WIDTH_TOLERANCE;
         const scale = sameWidth ? rowScale([...row, photo]) : 0;
@@ -3015,6 +3019,45 @@ const buildReportHTML = async (report) => {
       );
     }).join("");
     return h("div", { style: `display:flex;gap:${gap}px;align-items:flex-start;margin-top:${marginTop}px;margin-bottom:${marginBottom}px;` }, cells);
+  };
+
+  // Rows group by orientation, not by raw width — landscape/portrait/
+  // square rarely share a row well even at similar widths (a landscape
+  // and a portrait shot can be the same width and still look mismatched
+  // side by side), and grouping by orientation first keeps every row
+  // visually coherent. Within each orientation bucket, packRowsByWidth
+  // still does the same same-width row-forming it always did — this only
+  // changes what feed it, not how a row itself gets built once grouped.
+  // If there's at least one landscape photo, the very first one (in
+  // original order) gets its own single-photo "hero" row up front, sized
+  // to fill the row width — same "never upscale past its own resolution,
+  // no max-height" rule every other row follows, just alone in its row
+  // instead of sharing it — everything else, including any other
+  // landscape photos, then follows in landscape/square/portrait order
+  // (every non-hero row still capped at MAX_ROW_PHOTOS, see
+  // packRowsByWidth — the hero is the only row that's ever just one). No
+  // hero at all when there's no landscape photo — the set just goes
+  // straight to landscape/square/portrait grouping, unhighlighted.
+  const ORIENTATION_SQUARE_TOLERANCE = 0.05; // within 5% aspect ratio counts as square
+  const photoOrientation = (p) => {
+    const ratio = p.width / p.height;
+    if (Math.abs(ratio - 1) <= ORIENTATION_SQUARE_TOLERANCE) return "square";
+    return ratio > 1 ? "landscape" : "portrait";
+  };
+  const packRowsByOrientation = (photos, containerWidth, gap) => {
+    const landscape = photos.filter(p => photoOrientation(p) === "landscape");
+    const portrait = photos.filter(p => photoOrientation(p) === "portrait");
+    const square = photos.filter(p => photoOrientation(p) === "square");
+    const rows = [];
+    if (landscape.length > 0) {
+      const [hero, ...restLandscape] = landscape;
+      const heroScale = Math.min(1, containerWidth / hero.width);
+      rows.push({ photos: [hero], scale: heroScale });
+      rows.push(...packRowsByWidth(restLandscape, containerWidth, gap));
+    }
+    rows.push(...packRowsByWidth(square, containerWidth, gap));
+    rows.push(...packRowsByWidth(portrait, containerWidth, gap));
+    return rows;
   };
 
   // ── /masonry comparison path — the previous CSS column-count layout ──
@@ -3233,7 +3276,7 @@ const buildReportHTML = async (report) => {
                 const caption = report.photoCaptions && report.photoCaptions[`${e.entryKey}_${originalIndices[i]}`];
                 return { src: toAbsoluteUrl(src), width: dims.width, height: dims.height, caption };
               }).filter(Boolean);
-              const rows = packRowsByWidth(photoMetas, PHOTO_ROW_WIDTH, JUSTIFIED_GAP);
+              const rows = packRowsByOrientation(photoMetas, PHOTO_ROW_WIDTH, JUSTIFIED_GAP);
               rows.forEach((row, idx) => {
                 const isFirst = idx === 0;
                 const isLast = idx === rows.length - 1;
@@ -3272,6 +3315,25 @@ const buildReportHTML = async (report) => {
   const summaryHTML = report.summary
     ? h("p", { style: `font-family:${SANS};font-size:16px;color:#303742;line-height:1.8;margin:0;text-align:left;white-space:pre-wrap;` }, report.summary)
     : "";
+  // Simple length rule, nothing fancier: a short summary folds straight
+  // into the cover (same label+paragraph convention as Additional
+  // Information right below it) instead of spending an entire page on a
+  // couple of sentences; once it runs longer than that it goes back to
+  // being its own dedicated page (see summaryPageHTML below) so it
+  // actually has room to read well, exactly like every summary used to.
+  const SUMMARY_INLINE_MAX_CHARS = 200;
+  const summaryFitsOnCover = !!report.summary && report.summary.length <= SUMMARY_INLINE_MAX_CHARS;
+  const coverSummaryHTML = summaryFitsOnCover
+    ? h("div", { style: "margin-bottom:40px;" },
+        // Divider above it, not below — this only ever sits right after
+        // coverMetaHTML (Prepared For/By), so it's what actually marks
+        // "Summary" as its own distinct block on the cover rather than
+        // reading like a continuation of Prepared For/By right above it.
+        h("div", { style: "height:1px;background:#e8e8e6;margin-bottom:24px;" }, ""),
+        h("p", { style: `font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;margin:0 0 6px;` }, "Summary"),
+        h("p", { style: `font-family:${SANS};font-size:14px;font-weight:400;color:#303742;line-height:1.6;margin:0;white-space:pre-wrap;` }, report.summary)
+      )
+    : "";
 
   // Company name — cover: 22/600 (emphasized — the h2/webHeading22
   // weight), dark. Running header: name only (no address — editing both
@@ -3283,18 +3345,22 @@ const buildReportHTML = async (report) => {
   const runningCompanyNameHTML = report.companyName
     ? h("p", { style: `font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;line-height:1;margin:0;` }, report.companyName)
     : "";
-  // Address/email/phone — 14/400, plain secondary text, cover-only now
-  // (the running header shows company name alone). Email and phone share
-  // one line, separated by a dash, rather than each getting its own —
-  // omitted entirely (not two dangling dashes/lines) when neither is
-  // set, same "omit empty fields" convention as everything else in this
-  // static export.
+  // Address/email/phone — 14/400/SERIF, plain secondary text, cover-only
+  // now (the running header shows company name alone). Same font-size
+  // AND font-family as each other (email/phone used to be SANS, an
+  // inconsistency against address/name right above it) — all three read
+  // as one "company identity" block now, not two different type systems
+  // stacked on top of each other. Email and phone share one line,
+  // separated by a dash, rather than each getting its own — omitted
+  // entirely (not two dangling dashes/lines) when neither is set, same
+  // "omit empty fields" convention as everything else in this static
+  // export.
   const companyAddressHTML = report.companyAddress
     ? h("p", { style: `font-family:${SERIF};font-size:14px;font-weight:400;color:#828282;margin:0 0 12px;` }, report.companyAddress)
     : "";
   const companyContactLine = [report.companyEmail, report.companyPhone].filter(Boolean).join(" - ");
   const companyContactHTML = companyContactLine
-    ? h("p", { style: `font-family:${SANS};font-size:14px;font-weight:400;color:#828282;margin:0;` }, companyContactLine)
+    ? h("p", { style: `font-family:${SERIF};font-size:14px;font-weight:400;color:#828282;margin:0;` }, companyContactLine)
     : "";
 
   // ── Cover (page 1) — its own one-off page: logo (fixed width 180,
@@ -3339,13 +3405,12 @@ const buildReportHTML = async (report) => {
       h("span", { style: `font-family:${SANS};font-size:12px;font-weight:600;text-transform:uppercase;color:#303742;` }, contactName)
     )
   );
-  // Free-text note below Prepared For/By — same label/value convention as
-  // the rest of the cover, pre-wrap so line breaks the user typed survive.
+  // Free-text note below Prepared For/By — no label, just the value
+  // exactly as input; unlike Summary (which needs "Summary" to explain
+  // what it's reading) this one's short/contextual enough to speak for
+  // itself. Pre-wrap so line breaks the user typed survive.
   const additionalInfoHTML = report.additionalInfo
-    ? h("div", {},
-        h("p", { style: `font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;margin:0 0 6px;` }, "Additional Information"),
-        h("p", { style: `font-family:${SANS};font-size:14px;font-weight:400;color:#303742;line-height:1.6;margin:0;white-space:pre-wrap;` }, report.additionalInfo)
-      )
+    ? h("p", { style: `font-family:${SANS};font-size:14px;font-weight:400;color:#303742;line-height:1.6;margin:0;white-space:pre-wrap;` }, report.additionalInfo)
     : "";
   // Resolves either form report.coverImage can hold: an IMG_MAP key (the
   // random initial pick — needs toAbsoluteUrl, same as every other
@@ -3380,6 +3445,7 @@ const buildReportHTML = async (report) => {
           h("h1", { style: `font-family:${SERIF};font-size:40px;font-weight:700;color:#0a1629;line-height:1.1;margin:0 0 8px;` }, projectName),
           h("p", { style: `font-family:${SERIF};font-size:15px;font-weight:400;font-style:italic;color:#828282;line-height:1.3;margin:0 0 32px;` }, address),
           coverMetaHTML,
+          coverSummaryHTML,
           additionalInfoHTML
         )
       )
@@ -3425,10 +3491,11 @@ const buildReportHTML = async (report) => {
   );
 
   // Summary page — its own dedicated page (running header + footer),
-  // right after the cover, only when there's summary text to show; when
-  // there isn't, this contributes nothing and progress/entries simply
-  // become the page right after the cover instead.
-  const summaryPageHTML = summaryHTML
+  // right after the cover, only when there's summary text long enough
+  // that it isn't already folded into the cover instead (see
+  // coverSummaryHTML/summaryFitsOnCover above). When there's no page for
+  // it, progress/entries simply become the page right after the cover.
+  const summaryPageHTML = (summaryHTML && !summaryFitsOnCover)
     ? h("div", { class: "card", style: "box-shadow:0 1px 3px rgba(10,22,41,0.08);" },
         runningHeaderHTML,
         h("div", { class: "card__body" },
@@ -4142,7 +4209,10 @@ function ReportsTab({ demoCase }) {
         </div>
         <div style={{ height: 1, background: "var(--tt-grey03)", marginTop: 16 }} />
         {(checklistItems.length > 0 || !previewSaved) && (
-          <>
+          // data-checklist-list, not a bare Fragment — Add item (below)
+          // needs a real DOM node to scope its post-add focus query to
+          // this task's own checklist, not any other task's.
+          <div data-checklist-list={entryKey}>
             <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "16px 0 8px" }}>
               Checklist items completed as of this update
             </p>
@@ -4274,13 +4344,30 @@ function ReportsTab({ demoCase }) {
                 explain, it simply isn't there to click). */}
             {!previewSaved && checklistItems.length < 10 && (
               <button
-                onClick={() => addChecklistItem(entryKey, e)}
+                onClick={ev => {
+                  const container = ev.currentTarget.closest("[data-checklist-list]");
+                  addChecklistItem(entryKey, e);
+                  // The new item is empty, so EditableField already shows
+                  // it as a live input (not plain text) — but its own
+                  // ref-based autofocus only ever fires for a NON-empty
+                  // field being re-opened (see EditableField's ref
+                  // callback), an empty one is assumed to start
+                  // unfocused. That's wrong specifically for a
+                  // freshly-added item, which the user just asked for by
+                  // clicking Add item — so focus it explicitly here
+                  // instead. One frame later, since the input doesn't
+                  // exist in the DOM until this render actually commits.
+                  requestAnimationFrame(() => {
+                    const inputs = container?.querySelectorAll("input");
+                    inputs?.[inputs.length - 1]?.focus();
+                  });
+                }}
                 style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 6, border: "none", background: "none", padding: 0, cursor: "pointer", color: "var(--tt-secondary)", fontSize: 12, fontWeight: 500 }}
               >
                 <Plus size={14} strokeWidth={SW} /> Add item
               </button>
             )}
-          </>
+          </div>
         )}
         {renderNoteSlot(entryKey)}
         {!isPhotoless && (
