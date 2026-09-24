@@ -8,12 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   ChevronLeft, Search, MoreVertical, Plus, Check, Link, Download,
-  LayoutGrid, MapPin, Hash, FileText, FileImage,
+  LayoutGrid, MapPin, Hash, FileText, FileImage, IdCard,
   Activity, Users, BarChart2, SlidersHorizontal,
   ArrowUpDown, Calendar, AlignJustify, Clock,
   UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, Crown, AlertTriangle,
   RotateCw, ZoomIn, ZoomOut, Folder, ArrowLeft, ArrowRight, Info, StickyNote,
-  ExternalLink, Forward, Loader,
+  ExternalLink, Forward, Loader, Mail, Phone, Upload,
 } from "lucide-react";
 
 import logoImg from "./src/Img/tasktag-logo.13f1babda8fdbb1b7251572a0fe11f9e.png";
@@ -248,6 +248,20 @@ const formatUSPhone = (raw) => {
 const PAGE_W   = 800;
 const PAGE_H   = Math.round(PAGE_W * 11 / 8.5);
 const PAGE_PAD = 40;
+// Draft nav sidebar's fixed width — wide enough that a typical task title
+// doesn't truncate immediately (see the sidebar in the modal body).
+const NAV_W = 280;
+// Extra width budget on top of NAV_W + PAGE_W for the document column's
+// own right-side padding/scrollbar room (see the content wrapper below) —
+// without it, that column would be sized to exactly PAGE_W with nowhere
+// left to fit padding, forcing the fixed-width document card to overflow
+// it and triggering an unwanted horizontal scrollbar on the whole modal.
+// Chrome bar and body share this same total width (and center within it
+// the same way), so their content lines up and any leftover space on a
+// wide screen balances evenly on both sides instead of the whole unit
+// piling up against one edge.
+const CONTENT_BUFFER = 24;
+const ROW_W = NAV_W + PAGE_W + CONTENT_BUFFER;
 // Two jobs: (1) reserved on top of the footer's own measured height when
 // deciding what still fits on a page, so the pagination pass leaves this
 // much slack in its budget; (2) applied as a literal paddingBottom on
@@ -633,9 +647,6 @@ function ReportCheckbox({ active, label, onClick }) {
 // activeField/onActivate/onDeactivate through every call site by hand),
 // with each field identified by its own fieldId string.
 const ActiveEditContext = createContext({ activeField: null, setActiveField: () => {} });
-// A stable (never-changing identity) inert value for the hidden measuring
-// scaffold to pin ActiveEditContext to — see hiddenMeasuringScaffold.
-const INERT_ACTIVE_EDIT = { activeField: null, setActiveField: () => {} };
 
 // A caret popover has to sit right against its trigger to read as
 // "attached" to it — clamping its position to hover below the draft
@@ -720,7 +731,14 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
   const [draft, setDraft] = useState(value || "");
   const [error, setError] = useState(false);
   const alwaysEditingRef = useRef(null);
-  const [alwaysEditingFocused, setAlwaysEditingFocused] = useState(false);
+  // Shares activeField/setActiveField with the click-to-edit `editing`
+  // branch below instead of tracking its own local "am I focused" state —
+  // that's what makes clicking a second alwaysEditing field's committed
+  // text (e.g. another Cover Header field) reliably close whichever one
+  // was open before it, rather than depending on native blur timing across
+  // two entirely separate field instances that don't otherwise know about
+  // each other.
+  const alwaysEditingFocused = activeField === fieldId;
   const editStartValueRef = useRef(value);
   const editing = !disabled && !alwaysEditing && activeField === fieldId;
 
@@ -882,7 +900,16 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
     // Enter, same as the click-to-edit `editing` branch below, never from
     // onChange or blur.
     const draftEmpty = !draft.trim();
-    const commit = () => { onSave(draft.trim()); alwaysEditingRef.current?.blur(); };
+    // Same "never fires against an empty draft" rule the popover/editing
+    // modes use — a field stays freely clearable back to blank regardless
+    // of validate.
+    const commit = () => {
+      const trimmed = draft.trim();
+      if (trimmed && validate && !validate(trimmed)) { setError(true); return; }
+      onSave(trimmed);
+      setError(false);
+      alwaysEditingRef.current?.blur();
+    };
     // Same "nothing to confirm" rule as every other edit mode — disabled
     // until the draft actually differs from what the field held when this
     // edit session started (editStartValueRef, set on the text-tag's
@@ -891,7 +918,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
     // Discards this session's draft and blurs without saving — same
     // "cancel discards this session's changes" contract as the
     // click-to-edit `editing` branch's X button/Escape.
-    const cancelEdit = () => { setDraft(editStartValueRef.current || ""); alwaysEditingRef.current?.blur(); };
+    const cancelEdit = () => { setDraft(editStartValueRef.current || ""); setError(false); alwaysEditingRef.current?.blur(); };
     // The X only makes sense once there's a prior committed value to revert
     // to — i.e. this is a re-edit of existing content (editStartValueRef
     // was seeded from a non-empty value on the text-tag's onClick below),
@@ -932,7 +959,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
     if (!isEmpty && !alwaysEditingFocused) {
       const textTag = (
         <Tag
-          onClick={() => { editStartValueRef.current = value; setDraft(value || ""); setAlwaysEditingFocused(true); }}
+          onClick={() => { editStartValueRef.current = value; setDraft(value || ""); setActiveField(fieldId); }}
           onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey03)"}
           onMouseLeave={ev => ev.currentTarget.style.background = "none"}
           style={{ display: "block", cursor: "pointer", borderRadius: 6, margin: 0, whiteSpace: multiline ? "pre-wrap" : "normal", ...textStyle }}
@@ -961,8 +988,13 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
             ref={el => { alwaysEditingRef.current = el; if (el && !isEmpty && el !== document.activeElement) focusAtEnd(el); }}
             value={draft}
             onChange={ev => setDraft(ev.target.value)}
-            onFocus={() => setAlwaysEditingFocused(true)}
-            onBlur={() => setAlwaysEditingFocused(false)}
+            onFocus={() => setActiveField(fieldId)}
+            // Only clears if this field is still the active one — a plain
+            // unconditional null would risk wiping out whichever OTHER
+            // field's click just claimed activeField, if this blur were
+            // ever to fire after that (native blur-before-click ordering
+            // means it normally won't, but this stays correct either way).
+            onBlur={() => setActiveField(prev => prev === fieldId ? null : prev)}
             onKeyDown={ev => {
               if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); commit(); }
               // Same reasoning as the click-to-edit fields' Escape handler —
@@ -984,22 +1016,34 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
         </div>
       </div>
     ) : (
-      <div style={{ position: "relative" }}>
-        <Input
-          ref={el => { alwaysEditingRef.current = el; if (el && !isEmpty && el !== document.activeElement) focusAtEnd(el); }}
-          type="text"
-          value={draft}
-          onChange={ev => setDraft(ev.target.value)}
-          onFocus={() => setAlwaysEditingFocused(true)}
-          onBlur={() => setAlwaysEditingFocused(false)}
-          onKeyDown={ev => {
-            if (ev.key === "Enter") { ev.preventDefault(); commit(); }
-            if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); cancelEdit(); }
-          }}
-          placeholder={placeholder}
-          style={{ fontFamily: "inherit", padding: `0 ${buttonReserve}px 0 12px`, ...inputStyle }}
-        />
-        <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>{showCancel && cancelButton}{showConfirm && confirmButton}</div>
+      <div>
+        {aboveWhenEditing}
+        <div style={{ position: "relative" }}>
+          <Input
+            ref={el => { alwaysEditingRef.current = el; if (el && !isEmpty && el !== document.activeElement) focusAtEnd(el); }}
+            type="text"
+            value={draft}
+            // filterInput (e.g. companyPhone's auto-formatter) applies as
+            // the user types, same as the popover mode's own onChange.
+            onChange={ev => { setDraft(filterInput ? filterInput(ev.target.value) : ev.target.value); if (error) setError(false); }}
+            onFocus={() => setActiveField(fieldId)}
+            // Same "only clear if still active" guard as the multiline
+            // branch above.
+            onBlur={() => setActiveField(prev => prev === fieldId ? null : prev)}
+            onKeyDown={ev => {
+              if (ev.key === "Enter") { ev.preventDefault(); commit(); }
+              if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); cancelEdit(); }
+            }}
+            placeholder={placeholder}
+            style={{ fontFamily: "inherit", padding: `0 ${buttonReserve}px 0 12px`, ...(error ? { borderColor: "var(--tt-red)" } : {}), ...inputStyle }}
+          />
+          <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>{showCancel && cancelButton}{showConfirm && confirmButton}</div>
+        </div>
+        {error && (
+          <p style={{ color: "var(--tt-red)", fontSize: 10, fontWeight: 500, margin: "2px 0 0", textAlign: "left" }}>
+            {errorMessage || "That doesn't look right."}
+          </p>
+        )}
       </div>
     );
   }
@@ -1206,10 +1250,8 @@ function LogoUploadBox({ src, onChange, disabled, width = 180 }) {
         <img src={src} alt="Company logo" style={{ display: "block", width: "100%", height: "auto" }} />
       ) : (
         <>
-          <FileImage size={24} strokeWidth={SW} color="var(--tt-grey05)" />
-          {/* Matches the underlined-prompt style every other empty field
-              on the cover uses (see EditableField's own placeholder). */}
-          <span style={{ fontSize: 20, fontWeight: 600, color: "var(--tt-grey05)", textDecoration: "underline" }}>Upload Logo</span>
+          <Upload size={24} strokeWidth={SW} color="var(--tt-grey06)" />
+          <span style={{ fontSize: 20, fontWeight: 600, color: "var(--tt-text-2)" }}>Logo</span>
         </>
       )}
       {!disabled && (
@@ -1292,8 +1334,12 @@ function PhotoThumb({ src, onClick }) {
   );
 }
 
-// Shared with ReportsTab's flatBlocks construction, which needs the same
-// chunk size to build continuation blocks for a "+N more" reveal.
+// How many checklist items a task section shows before collapsing the
+// rest behind "Show more" — see ReportsTab's renderTaskSection.
+const CHECKLIST_COLLAPSE_COUNT = 3;
+
+// Shared with ReportsTab's renderTaskSection, which needs the same chunk
+// size to build continuation PhotoGrid calls for a "+N more" reveal.
 const PHOTO_GRID_COLS = 5;
 const PHOTO_GRID_CAP = PHOTO_GRID_COLS; // 1 row before "+N more"
 
@@ -1308,19 +1354,18 @@ const PHOTO_GRID_CAP = PHOTO_GRID_COLS; // 1 row before "+N more"
 // nothing.
 //
 // `windowStart`/`windowEnd` (rather than a simple "expanded" boolean) are
-// what let "+N more" add a fresh, independent block instead of growing
-// this one — see renderPhotoContinuationBlock. A block with an open
-// windowEnd (undefined) shows up to PHOTO_GRID_CAP items starting at
+// what let "+N more" render a fresh, independent PhotoGrid call instead of
+// growing this one — see renderTaskSection's chunkNums. A block with an
+// open windowEnd (undefined) shows up to PHOTO_GRID_CAP items starting at
 // windowStart and, if more remain beyond that, a "+N more" cell — same
 // cap logic the very first (unwindowed) block already used. A block with
 // a closed windowEnd just shows exactly that slice, with no cap cell,
-// because whatever comes after it already exists as the next block.
+// because whatever comes after it already exists as the next call.
 // `onExpand` is called only from an open-ended block's cap cell, and is
-// owned by the caller (ReportsTab) rather than local state — pagination
-// repacks pages from a layoutDepsKey that only reacts to shared/lifted
-// state, and the hidden measuring scaffold renders this same component
-// from that same state, so a purely local "expanded" flag would grow the
-// visible page past the Letter boundary without pagination ever finding out.
+// owned by the caller (ReportsTab) rather than local state — every
+// PhotoGrid call for the same entry reads the same lifted
+// expandedPhotoGroups state, so a purely local "expanded" flag here would
+// leave the other calls for that entry with no way to find out.
 //
 // A second circle in the bottom-left corner (icon centered inside it, both
 // axes) is the caption trigger — hover-only, always, even once a caption
@@ -2665,6 +2710,27 @@ function applyTitleOverrides(groups, titleOverrides) {
   }));
 }
 
+// Checklist items edited/added/deleted in the draft only override this
+// report's own copy — the underlying DUMMY_ENTRIES task is never touched.
+// Unlike titleOverrides (a single string), an override here is the whole
+// replacement checklist array for that entry, since edits/deletes/adds
+// all need to change array contents rather than one scalar value. Keyed
+// and applied the same way as titleOverrides. Blank items (an "Add item"
+// row never filled in) are dropped here — the same point extraNotes
+// filters out blank notes — rather than while the user is still typing,
+// so a freshly-added, still-empty row doesn't vanish out from under them.
+function applyChecklistOverrides(groups, checklistOverrides) {
+  if (!checklistOverrides || Object.keys(checklistOverrides).length === 0) return groups;
+  return groups.map(g => ({
+    ...g,
+    entries: g.entries.map((e, i) => {
+      const entryKey = `${g.key}_${i}`;
+      const override = checklistOverrides[entryKey];
+      return override ? { ...e, checklist: override.filter(item => item.text && item.text.trim()) } : e;
+    }),
+  }));
+}
+
 // A manually-added note is tied to the specific entry (photo list) it was
 // added under, not to a date — so it's kept out of buildReportData entirely
 // and spliced into the finalized groups only when producing real output
@@ -2714,29 +2780,6 @@ const IMG_MAP = {
   img9: img9Src,
 };
 
-// Every photo key across this period's own task entries (duplicates and
-// all — a photo used by more than one entry is just proportionally more
-// likely to be picked, which is fine) — the pool the cover image (see
-// preview.coverImage/report.coverImage) is drawn from.
-const collectPhotoPool = (groups) => {
-  const keys = [];
-  (groups || []).forEach(g => g.entries.forEach(e => {
-    if (e.isNote || e.noPhotos) return;
-    (e.photos || []).forEach(k => keys.push(k));
-  }));
-  return keys;
-};
-// Picks a random photo key from the pool, excluding `exclude` when
-// there's another distinct option — used both for the initial pick (no
-// `exclude`) and the cover's "change photo" control (re-rolling away
-// from the current one). Falls back to `exclude` itself (or null) when
-// there's nothing else to switch to.
-const pickRandomPhoto = (groups, exclude) => {
-  const pool = collectPhotoPool(groups);
-  const choices = exclude ? pool.filter(k => k !== exclude) : pool;
-  if (choices.length === 0) return exclude || (pool[0] ?? null);
-  return choices[Math.floor(Math.random() * choices.length)];
-};
 
 // Resolves an asset path (a Vite-imported URL) against the current page so
 // a downloaded, standalone HTML file still loads its images correctly no
@@ -2781,14 +2824,20 @@ const desanitizePeriodFromUrl = (period) => period.replace(/_/g, " ").replace(/-
 // Builds the same report content (header, meta, schedule status, task
 // rollup, grouped notes + photos) as a standalone HTML string, shared by
 // both the "Download" button and the copy-link shared view.
-// Mirrors the live draft/preview's own visual design (renderCoverPage,
-// renderEntryBlock, renderPageFooter) as static HTML, since the downloaded
-// file and the "Copy link" content are meant to look like the same
-// document, not a separate, simpler layout — the two intentional
-// differences from the live view are: every photo shows (no "+N more" cap,
-// since there's no interaction left to expand it) and nothing here is
-// editable (no placeholder prompts for fields the user left blank; those
-// rows are just omitted instead).
+// Mirrors the live draft/preview's own visual design (renderCoverHeader,
+// renderCoverContent, renderTaskSection) as static HTML, since the
+// downloaded file and the "Copy link" content are meant to look like the
+// same document, not a separate, simpler layout. This export is still a
+// real paginated
+// document though (unlike the live draft, which shows one natural-height
+// section per entry with no repeating header/footer — see
+// ReportsTab's sectionCards) — every page here still gets its own running
+// header/footer (see runningHeaderHTML/footerHTML), since that's what
+// keeps a real multi-page printed/PDF-style document identifiable page to
+// page. The other intentional differences from the live view: every photo
+// shows (no "+N more" cap, since there's no interaction left to expand it)
+// and nothing here is editable (no placeholder prompts for fields the
+// user left blank; those rows are just omitted instead).
 const buildReportHTML = async (report) => {
   const { groups, grouping, completed, total, pct } =
     report.data || buildReportData("custom", report.period, null, report.includeNoPhotoTasks);
@@ -2973,7 +3022,7 @@ const buildReportHTML = async (report) => {
   // not italic, not boxed.
   // A manual note is nested INSIDE its entry's own wrapper div (right
   // after the photos), same as the live view nests renderNoteSlot inside
-  // renderEntryBlock — not appended as a separate sibling block. Sibling
+  // renderTaskSection — not appended as a separate sibling block. Sibling
   // divs' margins collapse to their MAX, not their sum, so a standalone
   // note block with its own marginTop:8 sitting next to the entry's
   // marginBottom:24 rendered as a 24px gap instead of 8px; nesting it
@@ -2995,8 +3044,7 @@ const buildReportHTML = async (report) => {
     // text — "Completed Sep 9" — with no separator dot between them and
     // no uppercase transform, per statusPartHTML below. The section label
     // above only appears for week/month grouping — see entriesHTML below,
-    // which skips it for "day" the same way the live view's flatBlocks
-    // pagination does.
+    // which skips it for "day" the same way the live view's sections do.
     // Meta-line chrome (status/date/photo-count) stays on the sans stack,
     // same reasoning as SANS's own comment above.
     const statusDotHTML = `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${statusColor};vertical-align:middle;margin-right:6px;"></span>`;
@@ -3007,7 +3055,7 @@ const buildReportHTML = async (report) => {
       ? `<span style="font-family:${SANS};font-size:11px;font-weight:500;text-transform:uppercase;color:#828282;">${visiblePhotoCount} photo${visiblePhotoCount === 1 ? "" : "s"}</span>`
       : "";
     const metaLine = [statusPartHTML, photoCountHTML].filter(Boolean).join(dot);
-    // Same divider the live view always shows now (see renderEntryBlock) —
+    // Same divider the live view always shows now (see renderTaskSection) —
     // the checklist (if any) and/or the attached note both sit below it.
     const dividerHTML = h("div", { style: "height:1px;background:#e8e8e6;margin-top:20px;" }, "");
     return h("p", { style: `font-family:${SERIF};font-size:18px;font-weight:600;color:#0a1629;line-height:1.35;margin:0;` }, e.note) +
@@ -3068,8 +3116,10 @@ const buildReportHTML = async (report) => {
 
   // Flat list of page-able blocks — a label block per group (skipped for
   // day grouping, same reasoning as before) followed by one block per
-  // real entry — mirrors the live view's own flatBlocks list, which is
-  // what gets packed onto Letter pages below. A manual note is spliced into
+  // real entry — this export still paginates onto fixed Letter pages
+  // (unlike the live draft, which shows one natural-height section per
+  // entry instead — see ReportsTab's sections/renderTaskSection). A
+  // manual note is spliced into
   // g.entries right after the entry it's attached to (isNote:true
   // pseudo-entry) — it's consumed here into that entry's own block
   // instead of becoming its own block in the list. `isLabel` lets the
@@ -3174,6 +3224,8 @@ const buildReportHTML = async (report) => {
 
   const projectName = report.projectName || PROJECT_NAME;
   const address = report.address || PROJECT_ADDRESS;
+  const contactName = report.contactName || POINT_OF_CONTACT_NAME;
+  const contactRole = report.contactRole || POINT_OF_CONTACT_ROLE;
   const summaryHTML = report.summary
     ? h("p", { style: `font-family:${SANS};font-size:16px;color:#303742;line-height:1.8;margin:0;text-align:left;white-space:pre-wrap;` }, report.summary)
     : "";
@@ -3205,11 +3257,10 @@ const buildReportHTML = async (report) => {
   // ── Cover (page 1) — its own one-off page: logo (fixed width 180,
   // height auto) on the left, company name/address/email-phone stacked
   // on the right, then project name/address, Prepared For + "By <owner>",
-  // and one photo — initially picked at random from this period's own
-  // task photos (see pickRandomPhoto/report.coverImage), or a direct
-  // upload (an IMG_MAP key either way doesn't exist for an upload, so it
-  // falls through to itself — see coverImageSrc). No footer, no "VIA
-  // TASKTAG" mark, no Update No./period line — the cover format is
+  // and one photo — starts empty (an upload prompt) until the user
+  // uploads one (an IMG_MAP key either way doesn't exist for an upload,
+  // so it falls through to itself — see coverImageSrc). No footer, no
+  // "VIA TASKTAG" mark, no Update No./period line — the cover format is
   // distinct from every content page in this document.
   // Wrapped in its own width:180/height:auto div (not just set directly
   // on the <img>) so width:100% on the <img> is 100% of THIS wrapper (a
@@ -3242,9 +3293,17 @@ const buildReportHTML = async (report) => {
       : "",
     h("div", { style: "display:flex;align-items:baseline;gap:4px;" },
       h("span", { style: `font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;` }, "By"),
-      h("span", { style: `font-family:${SANS};font-size:12px;font-weight:600;text-transform:uppercase;color:#303742;` }, POINT_OF_CONTACT_NAME)
+      h("span", { style: `font-family:${SANS};font-size:12px;font-weight:600;text-transform:uppercase;color:#303742;` }, contactName)
     )
   );
+  // Free-text note below Prepared For/By — same label/value convention as
+  // the rest of the cover, pre-wrap so line breaks the user typed survive.
+  const additionalInfoHTML = report.additionalInfo
+    ? h("div", {},
+        h("p", { style: `font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;margin:0 0 6px;` }, "Additional Information"),
+        h("p", { style: `font-family:${SANS};font-size:14px;font-weight:400;color:#303742;line-height:1.6;margin:0;white-space:pre-wrap;` }, report.additionalInfo)
+      )
+    : "";
   // Resolves either form report.coverImage can hold: an IMG_MAP key (the
   // random initial pick — needs toAbsoluteUrl, same as every other
   // bundled asset in this export) or a full data URL (an upload — not in
@@ -3277,7 +3336,8 @@ const buildReportHTML = async (report) => {
           coverUpdateLineHTML,
           h("h1", { style: `font-family:${SERIF};font-size:40px;font-weight:700;color:#0a1629;line-height:1.1;margin:0 0 8px;` }, projectName),
           h("p", { style: `font-family:${SERIF};font-size:15px;font-weight:400;font-style:italic;color:#828282;line-height:1.3;margin:0 0 32px;` }, address),
-          coverMetaHTML
+          coverMetaHTML,
+          additionalInfoHTML
         )
       )
     )
@@ -3296,15 +3356,21 @@ const buildReportHTML = async (report) => {
     h("div", { style: "height:1px;background:#e8e8e6;margin-bottom:24px;" }, "")
   );
 
-  const contactRoleLine = POINT_OF_CONTACT_ROLE + (report.companyName ? ` · ${report.companyName}` : "");
+  const contactRoleLine = contactRole + (report.companyName ? ` · ${report.companyName}` : "");
+  // Real uploaded photo (see contactPhoto/the draft's Footer section) when
+  // there is one, same "photo replaces the initials placeholder" pattern
+  // the cover photo and logo already use — plain initials circle otherwise.
+  const contactAvatarHTML = report.contactPhoto
+    ? selfClose("img", { src: report.contactPhoto, alt: "", style: "display:block;width:36px;height:36px;border-radius:50%;object-fit:cover;" })
+    : h("div", { style: "width:36px;height:36px;border-radius:50%;background:#a85796;display:flex;align-items:center;justify-content:center;flex-shrink:0;" },
+        h("span", { style: `font-family:${SANS};font-size:13px;font-weight:700;color:white;` }, initialsOf(contactName))
+      );
   const footerHTML = h("div", { style: "padding:20px 40px;border-top:1px solid #e8e8e6;" },
     h("div", { style: "display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;" },
       h("div", { style: "display:flex;align-items:center;gap:10px;" },
-        h("div", { style: "width:36px;height:36px;border-radius:50%;background:#a85796;display:flex;align-items:center;justify-content:center;flex-shrink:0;" },
-          h("span", { style: `font-family:${SANS};font-size:13px;font-weight:700;color:white;` }, initialsOf(POINT_OF_CONTACT_NAME))
-        ),
+        contactAvatarHTML,
         h("div", {},
-          h("p", { style: `font-family:${SANS};font-size:11px;font-weight:600;color:#0a1629;line-height:1;margin:0 0 6px;` }, POINT_OF_CONTACT_NAME),
+          h("p", { style: `font-family:${SANS};font-size:11px;font-weight:600;color:#0a1629;line-height:1;margin:0 0 6px;` }, contactName),
           h("p", { style: `font-family:${SANS};font-size:11px;font-weight:400;color:#828282;line-height:1;margin:0;` }, contactRoleLine)
         )
       ),
@@ -3450,13 +3516,19 @@ function ReportsTab({ demoCase }) {
   // update to it retroactively applies everywhere instead of only going
   // forward from the report it was captured on.
   const [companyIdentity, setCompanyIdentity] = useState({ logo: null, companyName: "", companyAddress: "", companyEmail: "", companyPhone: "" });
+  // Same "carries forward across reports" pattern as companyIdentity —
+  // seeded from the point-of-contact constants so a first-ever draft
+  // still starts with a sensible name/role, then updated to whatever was
+  // last saved once a report actually is.
+  const [contactIdentity, setContactIdentity] = useState({ name: POINT_OF_CONTACT_NAME, role: POINT_OF_CONTACT_ROLE, photo: null });
   const [lastSavedId, setLastSavedId] = useState(null); // highlights the most recently saved row in the results table
   const [openPeriod,  setOpenPeriod]  = useState(false);
   const [toast,       setToast]       = useState(null); // { type: "success" | "error", message }
   const [deleteTarget, setDeleteTarget] = useState(null); // report pending delete confirmation
   const [lightbox, setLightbox] = useState(null); // { photos, index, caption } | null — full-screen photo viewer
   const [photoManager, setPhotoManager] = useState(false); // report-wide "manage photos" modal, opened by hovering the Photo Limit indicator
-  const [expandedPhotoGroups, setExpandedPhotoGroups] = useState({}); // { [entryKey]: revealedChunkCount } — how many extra "+N more" chunks are showing per entry; lifted (not local to PhotoGrid) so pagination repacks as each one is revealed
+  const [expandedPhotoGroups, setExpandedPhotoGroups] = useState({}); // { [entryKey]: revealedChunkCount } — how many extra "+N more" chunks are showing per entry; lifted (not local to PhotoGrid) so every PhotoGrid call for that entry (see renderTaskSection's chunkNums) agrees on how many chunks to render
+  const [expandedChecklists, setExpandedChecklists] = useState({}); // { [entryKey]: true } — "Show more" toggled for that entry's checklist (default collapsed to the first 3 items)
   const periodRef     = useRef(null);
   const chipRef       = useRef(null);
   // Fixed positioning so this dropdown isn't clipped by an ancestor's
@@ -3473,6 +3545,7 @@ function ReportsTab({ demoCase }) {
   // extraNotes: { [entryKey]: noteText } — one note per entry/photo-list at most
   const [preview,          setPreview]          = useState(null);
   const [titleOverrides,   setTitleOverrides]    = useState({}); // { [entryKey]: overriddenTitle } — per-entry task name edits, this report only
+  const [checklistOverrides, setChecklistOverrides] = useState({}); // { [entryKey]: overriddenChecklist } — per-entry checklist edits/adds/deletes, this report only
   const [previewLoading,   setPreviewLoading]    = useState(false);
   const [previewSaved,     setPreviewSaved]      = useState(false); // chrome switches from Cancel/Save to back/Download/Copy link once true
   const [previewCopied,    setPreviewCopied]     = useState(false); // Copy link button shows "Link copied" briefly
@@ -3501,6 +3574,21 @@ function ReportsTab({ demoCase }) {
     resizeImageToDataURL(file, 1600, "image/jpeg", 0.85)
       .then(url => { setPreview(p => ({ ...p, coverImage: url })); setCoverImageUploading(false); })
       .catch(() => setCoverImageUploading(false));
+  };
+  // Point of contact's avatar (see the Footer section) — same mechanics as
+  // the cover photo above, just at a much smaller fixed display size (a
+  // circular 64px avatar rather than a full-width photo frame), so a much
+  // smaller resize target is enough for a sharp retina result.
+  const contactPhotoInputRef = useRef(null);
+  const [contactPhotoUploading, setContactPhotoUploading] = useState(false);
+  const handleContactPhotoUpload = (ev) => {
+    const file = ev.target.files?.[0];
+    ev.target.value = "";
+    if (!file) return;
+    setContactPhotoUploading(true);
+    resizeImageToDataURL(file, 128, "image/jpeg", 0.85)
+      .then(url => { setPreview(p => ({ ...p, contactPhoto: url })); setContactPhotoUploading(false); })
+      .catch(() => setContactPhotoUploading(false));
   };
   // Which EditableField (by fieldId) is currently in edit mode — only one
   // at a time across the whole document. Handed down
@@ -3534,7 +3622,7 @@ function ReportsTab({ demoCase }) {
   // Adds a report to the results list (called only once the user confirms
   // via "Save report" in the preview modal — Generate no longer does this
   // directly).
-  const pushReport = ({ includeSummary, includeNoPhotoTasks, dateRange, period, version, data, extraNotes, excludedPhotos, titleOverrides, photoCaptions, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, summary, clientName, coverImage }) => {
+  const pushReport = ({ includeSummary, includeNoPhotoTasks, dateRange, period, version, data, extraNotes, excludedPhotos, titleOverrides, checklistOverrides, photoCaptions, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, contactName, contactRole, contactPhoto, summary, clientName, additionalInfo, coverImage }) => {
     const id = Date.now();
     const newReport = {
       id,
@@ -3549,6 +3637,7 @@ function ReportsTab({ demoCase }) {
       extraNotes,
       excludedPhotos,
       titleOverrides,
+      checklistOverrides,
       photoCaptions,
       projectName,
       address,
@@ -3557,8 +3646,12 @@ function ReportsTab({ demoCase }) {
       companyAddress,
       companyEmail,
       companyPhone,
+      contactName,
+      contactRole,
+      contactPhoto,
       summary,
       clientName,
+      additionalInfo,
       coverImage,
     };
     setReports(prev => [newReport, ...prev]);
@@ -3568,6 +3661,8 @@ function ReportsTab({ demoCase }) {
     // handleCopy, which read companyIdentity instead of their own
     // frozen report.logo/companyName/companyAddress).
     setCompanyIdentity({ logo, companyName, companyAddress, companyEmail, companyPhone });
+    // Same reasoning as companyIdentity — see contactIdentity.
+    setContactIdentity({ name: contactName, role: contactRole, photo: contactPhoto });
     // No auto-clearing timeout here — this row stays highlighted until
     // either the next report is saved (which just reassigns lastSavedId
     // to that one instead) or the page is reloaded (lastSavedId, like
@@ -3643,17 +3738,24 @@ function ReportsTab({ demoCase }) {
         companyAddress: companyIdentity.companyAddress,
         companyEmail: companyIdentity.companyEmail,
         companyPhone: companyIdentity.companyPhone,
+        // Same pre-fill reasoning as company identity above — see
+        // contactIdentity.
+        contactName: contactIdentity.name,
+        contactRole: contactIdentity.role,
+        contactPhoto: contactIdentity.photo,
         summary: "",
         clientName: "",
-        // One random photo from this period's own task photos — picked
-        // once, here, rather than derived at render time, so it stays put
-        // across re-renders; the cover's own "Change" control (see
-        // handleCoverImageUpload) can still replace it with something
-        // else entirely.
-        coverImage: pickRandomPhoto(data.groups),
+        additionalInfo: "",
+        // Starts empty — the cover shows an upload prompt (see
+        // renderCoverContent) rather than auto-picking one of this
+        // period's task photos, so the cover photo is always a deliberate
+        // choice instead of a random one the user has to notice and
+        // swap out.
+        coverImage: null,
       });
       setActiveEditField(null);
       setTitleOverrides({});
+      setChecklistOverrides({});
       setVisibleCount(10);
       setLoadingMore(false);
       setGenerating(false);
@@ -3666,12 +3768,14 @@ function ReportsTab({ demoCase }) {
     setPreview(null);
     setActiveEditField(null);
     setTitleOverrides({});
+    setChecklistOverrides({});
     setPreviewSaved(false);
     setPreviewCopied(false);
     setVisibleCount(10);
     setLoadingMore(false);
     setPhotoManager(false);
     setExpandedPhotoGroups({});
+    setExpandedChecklists({});
   };
 
   useEffect(() => {
@@ -3722,7 +3826,7 @@ function ReportsTab({ demoCase }) {
   // notes spliced in at their entry — what actually gets downloaded /
   // copy-linked / saved.
   const previewFinalGroups = previewData
-    ? applyExtraNotesToGroups(applyTitleOverrides(applyPhotoExclusions(previewData.groups, preview.excludedPhotos), titleOverrides), preview.extraNotes)
+    ? applyExtraNotesToGroups(applyChecklistOverrides(applyTitleOverrides(applyPhotoExclusions(previewData.groups, preview.excludedPhotos), titleOverrides), checklistOverrides), preview.extraNotes)
     : [];
   // Photos actually included (post-exclusion) vs. the account's per-report
   // limit — shown in the modal chrome's Photo Limit indicator. Reuses
@@ -3751,90 +3855,104 @@ function ReportsTab({ demoCase }) {
   // generic guess.
   const nextEntry = previewData ? previewData.groups.flatMap(g => g.entries)[visibleCount] : null;
 
-  // ── Pagination ──
-  // Flatten the visible groups into one ordered list of blocks (an
-  // optional group-label block, then one block per entry) so they can be
-  // measured and packed onto Letter-sized pages, same as a real paginated
-  // report would be laid out.
-  const flatBlocks = [];
+  // ── Sections ──
+  // The draft is organized per section (Cover Header, Cover Content,
+  // Summary, one per task, Footer) rather than simulated Letter pages —
+  // each section is its own card, sized to its natural content height,
+  // and the left-side nav (see the sidebar in the modal body below) jumps
+  // straight to any one of them. The cover used to be a single combined
+  // section (logo/company header + project name/photo together) — split
+  // into two here so each half is independently reachable from the nav.
+  // A task's nav label is its own title (respecting any titleOverrides
+  // edit — same as the section's own heading), truncated with a tooltip
+  // on hover rather than a generic "Task N" — flat across every entry
+  // regardless of date grouping (day/week/month); a group's own label
+  // (see renderGroupLabelBlock) still shows inline above the first task
+  // of a new group, just not as its own nav entry. Footer (point of
+  // contact name/role/photo) is always last — it's a report-wide
+  // signature, not tied to any specific task.
+  const sections = [];
   if (previewData) {
-    // Summary (see renderSummaryBlock) is always present, regardless of
-    // the "Task summary" toggle — that only ever gated progress, right
-    // below it, not the free-text summary. Both are their own pagination
-    // blocks (not part of any header) rather than rendered on the cover,
-    // so page 1 stays the fixed cover (see renderCoverPage/pageLayout
-    // effect below) and page 2 always opens with them instead. The
-    // export gives summary a fully dedicated page of its own instead of
-    // sharing page 2 with progress/entries — see buildReportHTML's
-    // summaryPageHTML.
-    flatBlocks.push({ type: "summary", key: "summary" });
-    if (preview.includeSummary) {
-      flatBlocks.push({ type: "progress", key: "progress" });
-    }
+    sections.push({ key: "coverHeader", type: "coverHeader", navLabel: "Cover Header" });
+    sections.push({ key: "coverContent", type: "coverContent", navLabel: "Cover Content" });
+    sections.push({ key: "summary", type: "summary", navLabel: "Summary" });
     visibleGroups.forEach(g => {
-      if (previewData.grouping !== "day") {
-        flatBlocks.push({ type: "label", key: `label_${g.key}`, g });
-      }
       g.entries.forEach((e, i) => {
         const entryKey = `${g.key}_${i}`;
-        // A checklist-bearing entry splits into a header block plus one
-        // block per item (see renderEntryHeaderBlock/renderChecklistItemBlock)
-        // so a long checklist can flow across a page break and fill
-        // leftover space instead of dragging the whole entry, header
-        // included, to the next page whole. type: "entryHeader" is paired
-        // with its very next block by the pagination pass below, the same
-        // rule already used for section labels — it never strands alone.
-        const checklistItems = (e.checklist || []).slice(-10);
-        if (checklistItems.length === 0) {
-          flatBlocks.push({ type: "entry", key: entryKey, entryKey, e });
-        } else {
-          flatBlocks.push({ type: "entryHeader", key: `${entryKey}_hdr`, entryKey, e });
-          checklistItems.forEach((item, idx) => {
-            flatBlocks.push({
-              type: "checklistItem", key: `${entryKey}_ck${idx}`, entryKey, e, item,
-              isFirst: idx === 0, isLast: idx === checklistItems.length - 1,
-            });
-          });
-        }
-        // "+N more" reveals one row of photos at a time as its own,
-        // independent block (see renderPhotoContinuationBlock) rather than
-        // growing this entry's own block — that's what lets the extra rows
-        // flow onto a fresh page instead of dragging the whole entry down
-        // with them (see layoutDepsKey/expandedPhotoGroups below).
-        if (!e.noPhotos) {
-          const includedCount = (e.photos || []).filter((_, pi) => !(preview.excludedPhotos && preview.excludedPhotos[`${entryKey}_${pi}`])).length;
-          const revealed = expandedPhotoGroups[entryKey] || 0;
-          // `revealed` only tracks how many times "+N more" was clicked —
-          // if photos were later unchecked via the manage-photos modal,
-          // includedCount can shrink enough that fewer chunks are actually
-          // needed than were revealed. Collect the chunks that still exist
-          // first, so `isTip` (which decides which one carries the
-          // trailing 40px gap) lands on the one that's really last, not
-          // whichever one happens to match the stale click count.
-          const chunkNums = [];
-          for (let chunk = 1; chunk <= revealed; chunk++) {
-            if (chunk * PHOTO_GRID_CAP >= includedCount) break;
-            chunkNums.push(chunk);
-          }
-          chunkNums.forEach((chunk, idx) => {
-            flatBlocks.push({ type: "photoContinuation", key: `${entryKey}_cont${chunk}`, entryKey, e, chunk, isTip: idx === chunkNums.length - 1 });
-          });
-        }
+        sections.push({
+          key: entryKey, type: "task", navLabel: titleOverrides[entryKey] ?? e.note,
+          entryKey, e,
+          // Only the first entry of a new group carries that group's own
+          // label — every later entry in the same group leaves it out.
+          g: i === 0 ? g : null,
+        });
       });
     });
+    sections.push({ key: "footer", type: "footer", navLabel: "Footer" });
   }
+
+  // Sidebar nav grouping — derived straight off `sections` (never a second
+  // source of truth), just reshaped into the nested rail the sidebar
+  // actually renders: Cover's two sections collapse under one "Cover"
+  // group ("Header"/"Content" as its children), every task collapses
+  // under one "Task List" group (each task's own title as a child),
+  // and Summary/Footer stay flat, single-row leaves — exactly the shape
+  // in the reference layout the user asked for.
+  const navGroups = [];
+  sections.forEach(s => {
+    if (s.type === "coverHeader") {
+      navGroups.push({ type: "group", label: "Cover", icon: FileText, children: [{ key: s.key, label: "Header" }] });
+    } else if (s.type === "coverContent") {
+      navGroups[navGroups.length - 1].children.push({ key: s.key, label: "Content" });
+    } else if (s.type === "summary") {
+      navGroups.push({ type: "leaf", key: s.key, label: s.navLabel, icon: AlignJustify });
+    } else if (s.type === "task") {
+      const last = navGroups[navGroups.length - 1];
+      if (last && last.type === "group" && last.label === "Task List") {
+        last.children.push({ key: s.key, label: s.navLabel });
+      } else {
+        navGroups.push({ type: "group", label: "Task List", icon: Hash, children: [{ key: s.key, label: s.navLabel }] });
+      }
+    } else if (s.type === "footer") {
+      // IdCard, not Users — this section is one person's own signature
+      // block (name/role/photo), not a list of people.
+      navGroups.push({ type: "leaf", key: s.key, label: s.navLabel, icon: IdCard });
+    }
+  });
+
+  // Checklist edit/delete/add — same "this report only" override pattern
+  // as titleOverrides (see applyChecklistOverrides), just holding the
+  // whole replacement array instead of a single string. getChecklist
+  // reads the override once it exists, falling back to the entry's own
+  // original checklist otherwise — every mutation below always starts
+  // from that same effective list so edits/deletes/adds compose correctly
+  // regardless of which happened first. Declared here (before
+  // renderTaskSection/sections, which call it) rather than further down
+  // near handleDeletePhoto — sections/sectionCards invoke renderTaskSection
+  // synchronously during this same render pass, so a later declaration
+  // would still be in its temporal dead zone at that point.
+  const getChecklist = (entryKey, e) => checklistOverrides[entryKey] ?? (e.checklist || []);
+  const updateChecklistItem = (entryKey, e, idx, text) => {
+    const next = getChecklist(entryKey, e).map((item, i) => (i === idx ? { ...item, text } : item));
+    setChecklistOverrides(p => ({ ...p, [entryKey]: next }));
+  };
+  const deleteChecklistItem = (entryKey, e, idx) => {
+    const next = getChecklist(entryKey, e).filter((_, i) => i !== idx);
+    setChecklistOverrides(p => ({ ...p, [entryKey]: next }));
+  };
+  const addChecklistItem = (entryKey, e) => {
+    const next = [...getChecklist(entryKey, e), { text: "" }];
+    setChecklistOverrides(p => ({ ...p, [entryKey]: next }));
+    // Auto-expand — otherwise a new item added while collapsed to the
+    // first CHECKLIST_COLLAPSE_COUNT would land past that cutoff and
+    // never actually become visible.
+    setExpandedChecklists(p => ({ ...p, [entryKey]: true }));
+  };
 
   // Rendered under every entry's photo list (and once for the empty-period
   // state) as a plain, always-editable input — no separate "Add a note"
   // trigger step. Notes commit into preview.extraNotes on every keystroke,
   // same as typing into any other input.
-  //
-  // Declared before renderEntryBlock/renderBlock (which call it) — those
-  // get invoked synchronously from inside the hiddenMeasuringScaffold
-  // useMemo further down, so if this were declared after that useMemo
-  // statement, calling it here would hit its temporal-dead-zone and throw
-  // "Cannot access 'renderNoteSlot' before initialization" the moment a
-  // report is actually generated.
   const renderNoteSlot = (key) => {
     // Locked once saved — Download/Copy link now act on the saved snapshot.
     if (previewSaved) {
@@ -3881,7 +3999,16 @@ function ReportsTab({ demoCase }) {
     );
   };
 
-  const renderEntryBlock = ({ entryKey, e }) => {
+  // One task section = one entry, shown in full — title, meta, checklist
+  // (if any), note, and every photo — rather than split across
+  // page-fitting blocks the way it used to be: sections aren't paginated
+  // any more, so there's no reason to hold anything back. "+N more"
+  // still works the same as before — PhotoGrid caps itself to
+  // PHOTO_GRID_CAP items per call, so revealing every remaining photo
+  // still means one additional PhotoGrid call per PHOTO_GRID_CAP-sized
+  // chunk, just rendered directly here instead of as separate pagination
+  // blocks.
+  const renderTaskSection = ({ entryKey, e }) => {
     const displayTitle = titleOverrides[entryKey] ?? e.note;
     // e.noPhotos is set once in buildReportData from the true, uncapped
     // photo count — an entry with excluded photos must never be shown as
@@ -3892,16 +4019,27 @@ function ReportsTab({ demoCase }) {
     const visiblePhotoCount = (e.photos || []).filter(
       (_, i) => !(preview.excludedPhotos && preview.excludedPhotos[`${entryKey}_${i}`])
     ).length;
-    // Once any photos have been revealed via "+N more", they exist as
-    // their own continuation block(s) right after this one (see
-    // flatBlocks) — so this block's own trailing gap moves to whichever
-    // one is currently last instead of doubling up here too. Also checks
-    // there's actually enough left to form that first chunk — photos
-    // unchecked afterward via the manage-photos modal can leave a stale
-    // "revealed" count with nothing left for it to reveal.
+    // Editable now (see getChecklist/updateChecklistItem/etc.) — no more
+    // hard 10-item cap from the read-only days, since the user is the one
+    // deciding what belongs on the list. Default collapsed to the first 3
+    // (CHECKLIST_COLLAPSE_COUNT) with a "Show more"/"Show less" toggle,
+    // same idea as PhotoGrid's own "+N more" but simpler (no chunking
+    // needed — a checklist has no page-fitting concern to chunk around).
+    const checklistItems = getChecklist(entryKey, e);
+    const checklistExpanded = !!expandedChecklists[entryKey];
+    const visibleChecklistItems = checklistExpanded ? checklistItems : checklistItems.slice(0, CHECKLIST_COLLAPSE_COUNT);
     const hasRevealedContinuation = (expandedPhotoGroups[entryKey] || 0) > 0 && visiblePhotoCount > PHOTO_GRID_CAP;
+    // Every chunk beyond the first CAP-sized one, once "+N more" has been
+    // clicked — same chunk math the old pagination pass used, just
+    // rendered directly here instead of as separate blocks.
+    const chunkNums = [];
+    if (hasRevealedContinuation) {
+      for (let chunk = 1; chunk * PHOTO_GRID_CAP < visiblePhotoCount; chunk++) chunkNums.push(chunk);
+    }
+    const onOpenPhoto = (photos, idx, originalIndices) => setLightbox({ photos, index: idx, entryDate: e.date, taskName: displayTitle, entryKey, originalIndices });
+    const onExpandPhotos = () => setExpandedPhotoGroups(p => ({ ...p, [entryKey]: Infinity }));
     return (
-      <div style={{ marginBottom: hasRevealedContinuation ? 0 : 40 }}>
+      <div>
         {/* Renaming here only overrides the title for this report — the
             original task/entry text is never modified. No pencil icon —
             hover shows the grey02 affordance, click edits. */}
@@ -3945,173 +4083,96 @@ function ReportsTab({ demoCase }) {
             </>
           )}
         </div>
-        {/* Always shown now — the note (if any) lives below it, so it's no
-            longer conditional on a note existing the way it used to be.
-            No checklist here — an entry with a checklist uses
-            renderEntryHeaderBlock/renderChecklistItemBlock instead (see
-            flatBlocks), split so a long checklist can flow across a page
-            break instead of dragging this whole entry to the next page. */}
         <div style={{ height: 1, background: "var(--tt-grey03)", marginTop: 16 }} />
+        {(checklistItems.length > 0 || !previewSaved) && (
+          <>
+            <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "16px 0 8px" }}>
+              Checklist items completed as of this update
+            </p>
+            {visibleChecklistItems.map((item, idx) => (
+              <div key={idx} className="group" style={{ marginTop: idx === 0 ? 0 : 6, display: "flex", alignItems: "center", gap: 8 }}>
+                <Check size={14} strokeWidth={SW} color="var(--tt-secondary)" style={{ flexShrink: 0 }} />
+                {previewSaved ? (
+                  <span style={{ fontSize: 13, color: "var(--tt-text-2)" }}>{item.text}</span>
+                ) : (
+                  <>
+                    <input
+                      value={item.text}
+                      onChange={ev => updateChecklistItem(entryKey, e, idx, ev.target.value)}
+                      placeholder="Checklist item"
+                      style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "none", padding: 0, fontFamily: "inherit", fontSize: 13, color: "var(--tt-text-2)" }}
+                    />
+                    {/* Hover-revealed, matching PhotoGrid's own per-item
+                        delete affordance — deletes immediately, no
+                        confirmation, same as everywhere else in this
+                        draft (photos, notes). */}
+                    <button
+                      onClick={() => deleteChecklistItem(entryKey, e, idx)}
+                      className="opacity-0 transition-opacity group-hover:opacity-100"
+                      style={{ flexShrink: 0, width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "none", padding: 0, cursor: "pointer", color: "var(--tt-grey05)" }}
+                    >
+                      <X size={14} strokeWidth={SW} />
+                    </button>
+                  </>
+                )}
+              </div>
+            ))}
+            {!previewSaved && (
+              <button
+                onClick={() => addChecklistItem(entryKey, e)}
+                style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 6, border: "none", background: "none", padding: 0, cursor: "pointer", color: "var(--tt-text-2)", fontSize: 12, fontWeight: 500 }}
+              >
+                <Plus size={14} strokeWidth={SW} /> Add item
+              </button>
+            )}
+            {checklistItems.length > CHECKLIST_COLLAPSE_COUNT && (
+              <button
+                onClick={() => setExpandedChecklists(p => ({ ...p, [entryKey]: !checklistExpanded }))}
+                style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 4, border: "none", background: "none", padding: 0, cursor: "pointer", color: "var(--tt-grey05)", fontSize: 12, fontWeight: 500 }}
+              >
+                {checklistExpanded ? "Show less" : `Show ${checklistItems.length - CHECKLIST_COLLAPSE_COUNT} more`}
+                {checklistExpanded ? <ChevronUp size={14} strokeWidth={SW} /> : <ChevronDown size={14} strokeWidth={SW} />}
+              </button>
+            )}
+          </>
+        )}
         {renderNoteSlot(entryKey)}
         {!isPhotoless && (
-          <PhotoGrid
-            photos={e.photos}
-            onOpen={(photos, idx, originalIndices) => setLightbox({ photos, index: idx, entryDate: e.date, taskName: displayTitle, entryKey, originalIndices })}
-            excludedPhotos={preview.excludedPhotos}
-            entryKey={entryKey}
-            onDeletePhoto={previewSaved ? undefined : (idx) => handleDeletePhoto(entryKey, idx)}
-            captions={preview.photoCaptions}
-            windowEnd={hasRevealedContinuation ? PHOTO_GRID_CAP : undefined}
-            // "+N more" reveals every remaining photo at once — the
-            // flatBlocks chunk loop already stops generating chunks once
-            // chunk*PHOTO_GRID_CAP reaches includedCount, so a large
-            // sentinel is safe (it just yields exactly enough chunks).
-            onExpand={() => setExpandedPhotoGroups(p => ({ ...p, [entryKey]: Infinity }))}
-          />
-        )}
-      </div>
-    );
-  };
-
-  // Header-only rendering for a checklist-bearing entry — title/meta/
-  // divider plus the "Completed as of this update" label, with no items,
-  // no note, and no trailing margin of its own (the last checklist item
-  // block owns those — see renderChecklistItemBlock). Used only when
-  // e.checklist is non-empty; renderEntryBlock above still handles the
-  // whole entry in one piece when there's no checklist to split.
-  const renderEntryHeaderBlock = ({ entryKey, e }) => {
-    const displayTitle = titleOverrides[entryKey] ?? e.note;
-    const isPhotoless = e.noPhotos;
-    const { kind } = statusForEntry(e);
-    const statusMeta = STATUS_META[kind];
-    const visiblePhotoCount = (e.photos || []).filter(
-      (_, i) => !(preview.excludedPhotos && preview.excludedPhotos[`${entryKey}_${i}`])
-    ).length;
-    const isTruncatedChecklist = (e.checklist || []).length > 10;
-    return (
-      <div>
-        <EditableField
-          fieldId={`title_${entryKey}`}
-          value={displayTitle}
-          disabled={previewSaved}
-          onSave={v => {
-            setTitleOverrides(prev => {
-              if (v && v.trim()) return { ...prev, [entryKey]: v.trim() };
-              const next = { ...prev }; delete next[entryKey]; return next;
-            });
-          }}
-          textStyle={{ fontSize: 18, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.35", margin: 0 }}
-          inputStyle={{ fontSize: 18, fontWeight: 600 }}
-        />
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: statusMeta.color, flexShrink: 0 }} />
-          {kind === "completed" ? (
-            <span style={{ fontSize: 11, fontWeight: 700, color: statusMeta.color }}>
-              {statusMeta.label} {fmtDate(parseDate(e.date))}
-            </span>
-          ) : (
-            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: statusMeta.color }}>
-              {statusMeta.label}
-            </span>
-          )}
-          {!isPhotoless && visiblePhotoCount > 0 && (
-            <>
-              <span style={{ width: 3, height: 3, borderRadius: "50%", background: "var(--tt-grey04)", flexShrink: 0 }} />
-              <span style={{ fontSize: 11, fontWeight: 500, color: "var(--tt-grey05)" }}>
-                {visiblePhotoCount} photo{visiblePhotoCount === 1 ? "" : "s"}
-              </span>
-            </>
-          )}
-        </div>
-        <div style={{ height: 1, background: "var(--tt-grey03)", marginTop: 16 }} />
-        <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: isTruncatedChecklist ? "16px 0 0" : "16px 0 8px" }}>
-          Checklist items completed as of this update
-        </p>
-        {/* checklistItems below (flatBlocks' own construction) only ever
-            keeps this entry's own last 10 (slice(-10)) — flag it here
-            whenever that actually trims something, rather than silently
-            dropping older items with no indication why. Its own line
-            (not appended inline) so the label above doesn't run long. */}
-        {isTruncatedChecklist && (
-          <p style={{ fontSize: 10, fontWeight: 400, color: "var(--tt-grey05)", margin: "2px 0 8px" }}>
-            Limited to the 10 most recent
-          </p>
-        )}
-      </div>
-    );
-  };
-
-  // One checklist item as its own page-able block — see flatBlocks. Items
-  // other than the first each carry the 6px inter-item gap (matching the
-  // old flex `gap: 6`) via marginTop; the first item's marginTop is 0
-  // since renderEntryHeaderBlock's label already owns that gap via its own
-  // margin-bottom. Only the LAST item carries the note slot, the bounded
-  // photo grid, and the entry's own trailing margin, since it's the
-  // entry's true trailing edge whenever a checklist exists.
-  const renderChecklistItemBlock = ({ entryKey, e, item, isFirst, isLast }) => {
-    const displayTitle = titleOverrides[entryKey] ?? e.note;
-    const isPhotoless = e.noPhotos;
-    const visiblePhotoCount = (e.photos || []).filter(
-      (_, i) => !(preview.excludedPhotos && preview.excludedPhotos[`${entryKey}_${i}`])
-    ).length;
-    const hasRevealedContinuation = (expandedPhotoGroups[entryKey] || 0) > 0 && visiblePhotoCount > PHOTO_GRID_CAP;
-    return (
-      <div style={{ marginTop: isFirst ? 0 : 6, marginBottom: isLast ? (hasRevealedContinuation ? 0 : 40) : 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Check size={14} strokeWidth={SW} color="var(--tt-secondary)" style={{ flexShrink: 0 }} />
-          <span style={{ fontSize: 13, color: "var(--tt-text-2)" }}>
-            {item.text}
-          </span>
-        </div>
-        {isLast && (
           <>
-            {renderNoteSlot(entryKey)}
-            {!isPhotoless && (
+            <PhotoGrid
+              photos={e.photos}
+              onOpen={onOpenPhoto}
+              excludedPhotos={preview.excludedPhotos}
+              entryKey={entryKey}
+              onDeletePhoto={previewSaved ? undefined : (idx) => handleDeletePhoto(entryKey, idx)}
+              captions={preview.photoCaptions}
+              windowEnd={hasRevealedContinuation ? PHOTO_GRID_CAP : undefined}
+              onExpand={onExpandPhotos}
+            />
+            {chunkNums.map((chunk, idx) => (
               <PhotoGrid
+                key={chunk}
                 photos={e.photos}
-                onOpen={(photos, idx, originalIndices) => setLightbox({ photos, index: idx, entryDate: e.date, taskName: displayTitle, entryKey, originalIndices })}
+                onOpen={onOpenPhoto}
                 excludedPhotos={preview.excludedPhotos}
                 entryKey={entryKey}
-                onDeletePhoto={previewSaved ? undefined : (idx) => handleDeletePhoto(entryKey, idx)}
+                onDeletePhoto={previewSaved ? undefined : (idx2) => handleDeletePhoto(entryKey, idx2)}
                 captions={preview.photoCaptions}
-                windowEnd={hasRevealedContinuation ? PHOTO_GRID_CAP : undefined}
-                onExpand={() => setExpandedPhotoGroups(p => ({ ...p, [entryKey]: Infinity }))}
+                windowStart={chunk * PHOTO_GRID_CAP}
+                windowEnd={idx === chunkNums.length - 1 ? undefined : (chunk + 1) * PHOTO_GRID_CAP}
+                onExpand={onExpandPhotos}
               />
-            )}
+            ))}
           </>
         )}
       </div>
     );
   };
 
-  // Renders one revealed "+N more" chunk as its own standalone block — see
-  // flatBlocks (which decides how many of these exist per entry) and
-  // PhotoGrid's own doc comment (which explains bounded vs. open-ended
-  // windows). No title/meta/note here; those only ever live on the
-  // entry's own (first) block.
-  const renderPhotoContinuationBlock = ({ entryKey, e, chunk, isTip }) => (
-    <div style={{ marginBottom: isTip ? 40 : 0 }}>
-      <PhotoGrid
-        photos={e.photos}
-        onOpen={(photos, idx, originalIndices) => setLightbox({ photos, index: idx, entryDate: e.date, taskName: titleOverrides[entryKey] ?? e.note, entryKey, originalIndices })}
-        excludedPhotos={preview.excludedPhotos}
-        entryKey={entryKey}
-        onDeletePhoto={previewSaved ? undefined : (idx) => handleDeletePhoto(entryKey, idx)}
-        captions={preview.photoCaptions}
-        windowStart={chunk * PHOTO_GRID_CAP}
-        windowEnd={isTip ? undefined : (chunk + 1) * PHOTO_GRID_CAP}
-        onExpand={() => setExpandedPhotoGroups(p => ({ ...p, [entryKey]: Infinity }))}
-      />
-    </div>
-  );
-
   // Progress — entries logged this period vs. total on record, gated by
-  // the same "Task summary" checkbox the HTML export uses. Its own
-  // pagination block (see flatBlocks) rather than part of the header, so
-  // it always starts fresh on page 2 together with the rest of the
-  // content instead of sitting on page 1 underneath the intro header.
+  // the same "Task summary" checkbox the HTML export uses.
   const renderProgressBlock = () => (
-    <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 56 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16, background: "var(--tt-grey02)", borderRadius: 4, padding: 8 }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 8px" }}>
           {previewData.completed} of {previewData.total} tasks complete
@@ -4126,19 +4187,16 @@ function ReportsTab({ demoCase }) {
     </div>
   );
 
-  // Summary — set apart in its own grey02 box like a project description,
-  // with its "Summary"/"Optional" label row inside that same box (not
-  // above it). The box is owned here, not by EditableField's `boxed`
-  // (which would nest the label outside the card), so the textarea fills
-  // the card directly underneath the label. The label itself is passed in
-  // as `aboveWhenEditing` rather than rendered here directly —
-  // EditableField only shows it alongside the live textarea, hiding it
-  // once summary flips to plain text (confirmed, or the whole report
-  // saved/`disabled`). Its own pagination block (see flatBlocks), always
-  // present regardless of the "Task summary" toggle — that only ever
-  // gates renderProgressBlock, right below it once both are queued.
+  // Summary — plain content, no box/background/padding of its own (flat,
+  // matching the rest of this flat-card design — see cardStyle). The
+  // "Summary"/"Optional" label row is passed in as `aboveWhenEditing`
+  // rather than rendered directly — EditableField only shows it alongside
+  // the live textarea, hiding it once summary flips to plain text
+  // (confirmed, or the whole report saved/`disabled`). Always present
+  // regardless of the "Task summary" toggle — that only ever gates
+  // renderProgressBlock, shown right above it.
   const renderSummaryBlock = () => (
-    <div style={{ background: "var(--tt-grey02)", borderRadius: 12, padding: 16, marginBottom: 24 }}>
+    <div>
       <EditableField
         fieldId="summary"
         value={preview.summary}
@@ -4147,7 +4205,7 @@ function ReportsTab({ demoCase }) {
         alwaysEditing
         multiline
         aboveWhenEditing={
-          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", padding: "0 4px", marginBottom: 8 }}>
+          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 8 }}>
             <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-2)", margin: 0 }}>Summary</p>
             <span style={{ fontSize: 10, fontWeight: 400, color: "var(--tt-grey05)", lineHeight: 1 }}>Optional</span>
           </div>
@@ -4159,111 +4217,120 @@ function ReportsTab({ demoCase }) {
     </div>
   );
 
-  const renderBlock = (block) => {
-    if (block.type === "label") return renderGroupLabelBlock(block.g);
-    if (block.type === "summary") return renderSummaryBlock();
-    if (block.type === "photoContinuation") return renderPhotoContinuationBlock(block);
-    if (block.type === "entryHeader") return renderEntryHeaderBlock(block);
-    if (block.type === "progress") return renderProgressBlock();
-    if (block.type === "checklistItem") return renderChecklistItemBlock(block);
-    return renderEntryBlock(block);
-  };
-
-  // ── Cover (page 1) ──
-  // A dedicated, one-off page — no footer, never shares space with
-  // flatBlocks' content (summary/progress/entries always start fresh on
-  // page 2 instead — see the pageLayout effect below). Header: logo on
-  // the left (fixed width 180, height auto — see LogoUploadBox; running
-  // header/footer have no logo at all), company name/address/email-phone
-  // stacked on the right. No "VIA TASKTAG" mark here; that only shows on
-  // the running header from page 2 on.
-  //
-  // Typography matches the design system's own web text variants:
-  // company name is 22/600 (emphasized — the h2/webHeading22 weight),
-  // address/email/phone are 14/400 (plain secondary text).
-  //
-  // alignItems:stretch (rather than flex-start) is what lets the empty
-  // logo placeholder's height:100% (see LogoUploadBox) actually match
-  // this row's content column instead of collapsing to 0 — a real,
-  // uploaded logo overrides that with its own explicit height:auto, so
-  // it isn't affected either way.
+  // ── Cover Header ──
+  // Its own dedicated section (see sections/sectionCards) — a plain
+  // labeled form (each field below the logo has its own visible label,
+  // matching the form-field convention used in the new Footer section
+  // too) rather than the previous unlabeled "letterhead" layout. Order
+  // reads top to bottom: Logo first (no label of its own — LogoUploadBox
+  // already reads as "Logo" on its own when empty), then Company
+  // Name, Address, Email/Phone.
+  // Also reused by the Footer section's own Name/Role labels, for the
+  // same "shared form-field convention" reasoning as before.
+  const FIELD_LABEL_STYLE = { fontSize: 12, fontWeight: 600, color: "var(--tt-grey05)", margin: "0 0 6px" };
   const renderCoverHeader = () => (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24 }}>
-      <LogoUploadBox
-        src={preview.logo}
-        onChange={url => setPreview(p => ({ ...p, logo: url }))}
+    // No flex `gap` here on purpose — `gap` and each field's own margin
+    // below would just add together (a 20px gap plus a 4px margin reads
+    // as 24px, not 4px), which is why the 4/8px rhythm below wasn't
+    // actually showing up. Logo→Name spacing is a plain wrapper margin
+    // instead, and Name/Address/Email-Phone now space themselves purely
+    // off their own margins.
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      <div style={{ marginBottom: 24 }}>
+        <LogoUploadBox
+          src={preview.logo}
+          onChange={url => setPreview(p => ({ ...p, logo: url }))}
+          disabled={previewSaved}
+          width={180}
+        />
+      </div>
+      {/* TODO(BE): replace with the firm's actual name from the API */}
+      {/* alwaysEditing — same edit mode as the task note input and
+          project name/address above the fold (see renderNoteSlot):
+          clicking the plain text turns it into a live input right in
+          place, rather than opening a separate popover editor.
+          aboveWhenEditing shows the label only while the input is
+          actually live (empty, or an existing value being re-edited) —
+          a committed value read as plain text needs no label above it. */}
+      {/* Two different rhythms depending on which of textStyle/inputStyle
+          is actually rendering — not a wrapping div's fixed margin, since
+          the right gap here genuinely depends on state: 16px below the
+          live input (the default empty form, label + input, breathing
+          room a form needs), tightening to 4px/8px once it's read back as
+          plain committed text (Name+Address then read as one "who" block,
+          not two separate form rows). */}
+      <EditableField
+        fieldId="companyName"
+        value={preview.companyName}
+        placeholder="e.g. Acme Construction Co."
         disabled={previewSaved}
-        width={180}
+        alwaysEditing
+        aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Company Name</p>}
+        onSave={v => setPreview(p => ({ ...p, companyName: v }))}
+        textStyle={{ fontSize: 22, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 8px" }}
+        inputStyle={{ fontSize: 14, height: 40, margin: "0 0 16px" }}
       />
-      <div style={{ textAlign: "right" }}>
-        {/* TODO(BE): replace with the firm's actual name from the API */}
-        {/* popoverAlign="right" hangs every one of these popovers off the
-            trigger's right edge — matching this column's own
-            right-aligned text — instead of the left edge, which is the
-            default everywhere else (see EditableField's popoverLeftFor).
-            inputPlaceholder is a contextual example shown only in the
-            live input (not this collapsed link text, which stays the
-            plain call-to-action above). */}
-        <EditableField
-          fieldId="companyName"
-          value={preview.companyName}
-          placeholder="Add company name"
-          placeholderStyle={{ color: "var(--tt-text-1)" }}
-          inputPlaceholder="e.g. Acme Construction Co."
-          disabled={previewSaved}
-          popover
-          popoverAlign="right"
-          onSave={v => setPreview(p => ({ ...p, companyName: v }))}
-          textStyle={{ fontSize: 22, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 4px" }}
-        />
-        <EditableField
-          fieldId="companyAddress"
-          value={preview.companyAddress}
-          placeholder="Address"
-          inputPlaceholder="e.g. 123 Main St, Austin, TX"
-          disabled={previewSaved}
-          popover
-          popoverAlign="right"
-          onSave={v => setPreview(p => ({ ...p, companyAddress: v }))}
-          textStyle={{ fontSize: 14, fontWeight: 400, color: "var(--tt-grey05)", margin: "0 0 12px" }}
-        />
-        {/* Email and phone sit on one line, separated by a dash, rather
-            than each stacked on its own — both still independently
-            click-to-edit. `validate` blocks committing (and shows
-            errorMessage) until the draft matches the expected format;
-            it never fires against an empty draft, so either field stays
-            freely clearable back to blank. Phone's `filterInput` strips
-            anything that isn't a digit or ordinary phone punctuation
-            (space/parens/dash) as it's typed, rather than only catching
-            an invalid character on commit. */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>
+      <EditableField
+        fieldId="companyAddress"
+        value={preview.companyAddress}
+        placeholder="e.g. 123 Main St, Austin, TX"
+        disabled={previewSaved}
+        alwaysEditing
+        aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Address</p>}
+        onSave={v => setPreview(p => ({ ...p, companyAddress: v }))}
+        textStyle={{ fontSize: 14, fontWeight: 400, color: "var(--tt-grey05)", margin: "0 0 12px" }}
+        inputStyle={{ fontSize: 14, height: 40, margin: "0 0 16px" }}
+      />
+      {/* Email and phone side by side, no dash between them, a flat 16px
+          gap regardless of state (empty input, actively being edited, or
+          committed value) — unlike the vertical margins above, this
+          horizontal gap doesn't switch per state. Each field keeps its own
+          label/validate/filterInput and is still independently
+          click-to-edit. Explicit pixel `width` on each input (rather than
+          the Input component's own default w-full) — without it, an
+          unconstrained flex item wrapping a 100%-wide input has no real
+          basis to size itself against and collapses down to near nothing. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {/* Icon only in value mode, same "not editing this field" check
+              activeEditField already exposes to this component (it's the
+              same shared state EditableField itself reads via
+              ActiveEditContext) — a live input showing its own label above
+              it doesn't need a redundant icon next to it too. */}
+          {preview.companyEmail && activeEditField !== "companyEmail" && (
+            <Mail size={14} strokeWidth={SW} color="var(--tt-grey05)" style={{ flexShrink: 0 }} />
+          )}
           <EditableField
             fieldId="companyEmail"
             value={preview.companyEmail}
-            placeholder="Email"
-            inputPlaceholder="e.g. hello@acme.com"
+            placeholder="e.g. hello@acme.com"
             disabled={previewSaved}
-            popover
-            popoverAlign="right"
+            alwaysEditing
+            aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Email</p>}
             validate={v => EMAIL_PATTERN.test(v)}
             errorMessage="Enter a valid email address."
             onSave={v => setPreview(p => ({ ...p, companyEmail: v }))}
-            textStyle={{ fontSize: 14, fontWeight: 400, color: "var(--tt-grey05)", margin: 0 }}
+            textStyle={{ fontSize: 14, fontWeight: 400, color: "var(--tt-text-2)", margin: 0 }}
+            inputStyle={{ fontSize: 14, height: 40, width: 220 }}
           />
-          <span style={{ fontSize: 14, fontWeight: 400, color: "var(--tt-grey05)" }}>-</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {preview.companyPhone && activeEditField !== "companyPhone" && (
+            <Phone size={14} strokeWidth={SW} color="var(--tt-grey05)" style={{ flexShrink: 0 }} />
+          )}
           <EditableField
             fieldId="companyPhone"
             value={preview.companyPhone}
-            placeholder="Phone"
-            inputPlaceholder="e.g. (212) 555-0100"
+            placeholder="e.g. (212) 555-0100"
             filterInput={formatUSPhone}
             disabled={previewSaved}
-            popover
-            popoverAlign="right"
+            alwaysEditing
+            aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Phone</p>}
             validate={v => US_PHONE_PATTERN.test(v)}
             errorMessage="Enter a valid US phone number, e.g. (212) 555-0100."
             onSave={v => setPreview(p => ({ ...p, companyPhone: v }))}
-            textStyle={{ fontSize: 14, fontWeight: 400, color: "var(--tt-grey05)", margin: 0 }}
+            textStyle={{ fontSize: 14, fontWeight: 400, color: "var(--tt-text-2)", margin: 0 }}
+            inputStyle={{ fontSize: 14, height: 40, width: 160 }}
           />
         </div>
       </div>
@@ -4271,57 +4338,83 @@ function ReportsTab({ demoCase }) {
   );
 
   // Cover content — project name/address, Prepared For + By <owner>
-  // (POINT_OF_CONTACT_NAME — the same person credited in the footer on
-  // every other page; every project has exactly one owner, so this isn't
-  // a separate editable field, just a plain label/value pair matching
-  // Prepared For's own), and one photo — initially picked at random from
-  // this period's own task photos (see pickRandomPhoto in handleGenerate/
-  // preview.coverImage), replaceable via its own upload control (see
-  // coverImageInputRef/handleCoverImageUpload) rather than re-rolling
-  // another random one.
+  // (preview.contactName — the same person edited in the Footer section;
+  // every project has exactly one owner, so this reads that same value
+  // rather than being its own separate editable field), and one photo —
+  // starts empty (see renderCoverContent's empty-state branch below)
+  // until the user uploads one via coverImageInputRef/handleCoverImageUpload.
   const renderCoverContent = () => {
     // Resolves either form preview.coverImage can hold: an IMG_MAP key
-    // (the random initial pick) or a full data URL (an upload, via
+    // (a bundled/demo photo) or a full data URL (an upload, via
     // handleCoverImageUpload — not in IMG_MAP, so falls through to itself).
     const coverImageSrc = preview.coverImage ? (IMG_MAP[preview.coverImage] || preview.coverImage) : null;
     return (
-      <div style={{ marginTop: 64 }}>
-        {/* Landscape called out explicitly — the frame below crops to a
-            fixed aspect via object-fit:cover, so a portrait photo would
-            lose a lot off its sides. */}
-        <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", background: "var(--tt-grey02)", marginBottom: 32 }}>
+      // No deliberate top gap here — flows directly after the header for
+      // now rather than a fixed/enforced spacing rule.
+      <div>
+        {/* Landscape called out explicitly — the frame crops to a fixed
+            aspect via object-fit:cover once a photo's set, so a portrait
+            photo would lose a lot off its sides. Empty state matches
+            LogoUploadBox's own empty state exactly — same dashed
+            border/grey01 background/8px radius box, same 24px grey05 icon,
+            same 20/600/grey05/underlined prompt text — just in a column
+            (icon above text) rather than a row, since this box is a much
+            bigger photo-sized area rather than a small inline control; the
+            "(Landscape Preferred)" hint is extra, cover-specific info
+            LogoUploadBox has no equivalent of. Once a photo IS set, the
+            box drops the dashed/grey01 empty styling for the photo's own
+            look, and a corner button (now reading "Change Photo") takes
+            over for swapping it out. */}
+        <div style={{
+          position: "relative", overflow: "hidden", marginBottom: 32,
+          ...(coverImageSrc
+            ? { borderRadius: 12 }
+            : { borderRadius: 8, border: "1px dashed var(--tt-grey04)", background: "var(--tt-grey01)" }),
+        }}>
           {coverImageSrc ? (
             <img src={coverImageSrc} alt="" style={{ display: "block", width: "100%", maxHeight: 360, objectFit: "cover" }} />
           ) : (
-            <div style={{ height: 240, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <FileImage size={28} strokeWidth={SW} color="var(--tt-grey05)" />
-            </div>
+            <button
+              onClick={() => !coverImageUploading && !previewSaved && coverImageInputRef.current?.click()}
+              disabled={coverImageUploading || previewSaved}
+              style={{ width: "100%", height: 240, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, border: "none", background: "none", padding: 0, cursor: previewSaved ? "default" : "pointer" }}
+            >
+              {coverImageUploading ? (
+                <Loader size={24} strokeWidth={SW} color="var(--tt-grey05)" style={{ display: "block", animation: "tt-spin 0.75s linear infinite" }} />
+              ) : (
+                <Upload size={24} strokeWidth={SW} color="var(--tt-grey06)" />
+              )}
+              {!previewSaved && (
+                <span style={{ fontSize: 20, fontWeight: 600, color: "var(--tt-text-2)" }}>Highlight Photo</span>
+              )}
+              <span style={{ fontSize: 10, fontWeight: 500, color: "var(--tt-grey05)" }}>(Landscape Preferred)</span>
+            </button>
+          )}
+          {coverImageSrc && !previewSaved && (
+            <button
+              onClick={() => !coverImageUploading && coverImageInputRef.current?.click()}
+              disabled={coverImageUploading}
+              style={{ position: "absolute", bottom: 12, right: 12, display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 999, border: "none", background: "rgba(10,22,41,0.65)", color: "white", fontSize: 12, fontWeight: 600, cursor: coverImageUploading ? "default" : "pointer" }}
+            >
+              {coverImageUploading ? (
+                <Loader size={13} strokeWidth={2.25} color="white" style={{ display: "block", animation: "tt-spin 0.75s linear infinite" }} />
+              ) : (
+                <FileImage size={13} strokeWidth={2.25} />
+              )}
+              {/* "(Landscape Preferred)" is just a hint, not the actual
+                  call to action — kept smaller than "Change Photo"
+                  rather than matching it, since it's secondary. */}
+              Change Photo <span style={{ fontSize: 10, fontWeight: 500 }}>(Landscape Preferred)</span>
+            </button>
           )}
           {!previewSaved && (
-            <>
-              <button
-                onClick={() => !coverImageUploading && coverImageInputRef.current?.click()}
-                disabled={coverImageUploading}
-                style={{ position: "absolute", bottom: 12, right: 12, display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 999, border: "none", background: "rgba(10,22,41,0.65)", color: "white", fontSize: 12, fontWeight: 600, cursor: coverImageUploading ? "default" : "pointer" }}
-              >
-                {coverImageUploading ? (
-                  <Loader size={13} strokeWidth={2.25} color="white" style={{ display: "block", animation: "tt-spin 0.75s linear infinite" }} />
-                ) : (
-                  <FileImage size={13} strokeWidth={2.25} />
-                )}
-                {/* "(Landscape Preferred)" is just a hint, not the actual
-                    call to action — kept smaller than "Change Photo"
-                    rather than matching it, since it's secondary. */}
-                Change Photo <span style={{ fontSize: 10, fontWeight: 500 }}>(Landscape Preferred)</span>
-              </button>
-              <input
-                ref={coverImageInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleCoverImageUpload}
-                style={{ display: "none" }}
-              />
-            </>
+            <input
+              ref={coverImageInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleCoverImageUpload}
+              style={{ display: "none" }}
+            />
           )}
         </div>
         {/* X is this draft's position in the project's save history
@@ -4378,266 +4471,252 @@ function ReportsTab({ demoCase }) {
             alignItems:baseline (not center) is what actually keeps label
             and value reading as one line — center aligns the two
             elements' margin boxes, which isn't reliable once one of them
-            (the value, via EditableField's popover-mode wrapper div) has
-            slightly different box metrics than a plain <p>; baseline
-            aligns by the text itself, which is what "aligned" actually
-            means here regardless of any such wrapper differences. */}
+            (the value, via EditableField's own wrapper div) has slightly
+            different box metrics than a plain <p>; baseline aligns by the
+            text itself, which is what "aligned" actually means here
+            regardless of any such wrapper differences. */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 24, alignItems: "baseline", marginBottom: 40 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
             <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", lineHeight: 1, margin: 0, flexShrink: 0 }}>Prepared For</p>
+            {/* alwaysEditing — same edit mode as the task note input,
+                rather than a popover editor. */}
             <EditableField
               fieldId="clientName"
               value={preview.clientName}
               placeholder="Add client name"
-              placeholderStyle={{ color: "var(--tt-text-2)", lineHeight: 1 }}
               disabled={previewSaved}
-              popover
+              alwaysEditing
               onSave={v => setPreview(p => ({ ...p, clientName: v }))}
               // Label (grey05) vs value (text-secondary) — the value is
               // the actual content and reads a touch more prominent than
               // its own label, same as everywhere else values/labels
               // pair up on this page.
               textStyle={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "var(--tt-text-2)", lineHeight: 1, margin: 0 }}
+              // Same size as the task note's own input (see renderNoteSlot)
+              // — 12px/40px-tall — rather than a bespoke smaller size of
+              // its own, just capped to 160px wide since this sits inline
+              // next to its label instead of spanning a full-width card.
+              inputStyle={{ fontSize: 12, height: 40, width: 160 }}
             />
           </div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
             <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", lineHeight: 1, margin: 0, flexShrink: 0 }}>By</p>
-            <p style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "var(--tt-text-2)", lineHeight: 1, margin: 0 }}>{POINT_OF_CONTACT_NAME}</p>
+            <p style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "var(--tt-text-2)", lineHeight: 1, margin: 0 }}>{preview.contactName || POINT_OF_CONTACT_NAME}</p>
           </div>
         </div>
+        {/* Same free-text pattern as renderSummaryBlock — multiline,
+            alwaysEditing, its label/"Optional" row passed as
+            aboveWhenEditing so it only shows alongside the live textarea. */}
+        <EditableField
+          fieldId="additionalInfo"
+          value={preview.additionalInfo}
+          placeholder="Add any extra context for this cover..."
+          disabled={previewSaved}
+          alwaysEditing
+          multiline
+          aboveWhenEditing={
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 8 }}>
+              <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-2)", margin: 0 }}>Additional Information</p>
+              <span style={{ fontSize: 10, fontWeight: 400, color: "var(--tt-grey05)", lineHeight: 1 }}>Optional</span>
+            </div>
+          }
+          onSave={v => setPreview(p => ({ ...p, additionalInfo: v }))}
+          textStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, margin: 0 }}
+          inputStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, resize: "vertical" }}
+        />
       </div>
     );
   };
 
-  // Header stays pinned to the top; the content block below it (project
-  // name through the photo) is vertically centered in whatever page
-  // height is left over, rather than just stacking directly under the
-  // header and leaving the rest of the page blank underneath it.
-  const renderCoverPage = () => (
-    <div style={{ padding: PAGE_PAD, display: "flex", flexDirection: "column", flex: 1 }}>
-      {renderCoverHeader()}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-        {renderCoverContent()}
-      </div>
-    </div>
-  );
+  // ── Section navigation ──
+  // A ref per section (keyed by section.key) so the left sidebar can jump
+  // straight to any one of them, plus which section is currently nearest
+  // the top of the scroll container, so the sidebar can highlight it.
+  const sectionRefs = useRef({});
+  const mainScrollRef = useRef(null);
+  const [activeSectionKey, setActiveSectionKey] = useState(null);
 
-  // Running header — every page after the cover: company name only (no
-  // address — editing both lives on the cover; see renderCoverHeader),
-  // colored to match the "VIA TASKTAG" mark right beside it, and no logo
-  // (that only ever shows on the cover).
-  const renderRunningHeader = () => (
-    <div style={{ padding: `${PAGE_PAD}px ${PAGE_PAD}px 0` }}>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
-        <div>
-          {preview.companyName && <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", lineHeight: 1, margin: 0 }}>{preview.companyName}</p>}
-        </div>
-        <div style={{ whiteSpace: "nowrap" }}>
-          <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", lineHeight: 1 }}>
-            VIA TASKTAG
-          </span>
-        </div>
-      </div>
-      <div style={{ height: 1, background: "var(--tt-grey03)", marginBottom: 24 }} />
-    </div>
-  );
+  const scrollToSection = (key) => {
+    sectionRefs.current[key]?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
-  // Footer — the same Point of Contact card (avatar, name, role/company
-  // on the left; generation metadata on the right) repeats on every page.
-  const renderPageFooter = () => (
-    <div style={{ padding: `20px ${PAGE_PAD}px`, borderTop: "1px solid var(--tt-grey03)" }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--tt-pastel-magenta)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "white" }}>{initialsOf(POINT_OF_CONTACT_NAME)}</span>
-          </div>
-          <div>
-            <p style={{ fontSize: 11, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: 1, margin: "0 0 6px" }}>{POINT_OF_CONTACT_NAME}</p>
-            {/* TODO(BE): replace with the contact's actual role/company from the API */}
-            <p style={{ fontSize: 11, fontWeight: 400, color: "var(--tt-grey05)", lineHeight: 1, margin: 0 }}>
-              {POINT_OF_CONTACT_ROLE}{preview.companyName ? ` · ${preview.companyName}` : ""}
-            </p>
-          </div>
-        </div>
-        <div style={{ textAlign: "right" }}>
-          <p style={{ fontSize: 11, color: "var(--tt-grey05)", lineHeight: 1, margin: "0 0 6px" }}>Generated via TaskTag</p>
-          {/* TODO(BE): replace with the actual report ID from the API */}
-          <p style={{ fontSize: 11, color: "var(--tt-grey05)", lineHeight: 1, margin: 0 }}>Report ID: {REPORT_ID}</p>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Measure the running header/footer and every block once (off-screen,
-  // at the real page content width) and greedily pack them onto Letter
-  // pages — the same technique a real paginated document layout engine
-  // uses, just done in JS against actual rendered heights instead of a
-  // print engine's own reflow. Page 1 is always the fixed cover (see
-  // renderCoverPage) and never takes any of this — every packed page
-  // reserves runningHeaderH.
-  const runningHeaderMeasureRef = useRef(null);
-  const footerMeasureRef = useRef(null);
-  const blockMeasureRefs = useRef({});
-  const [pageLayout, setPageLayout] = useState(null); // { pages: [[block,...],...] } | null while (re)measuring
-
-  // Recomputing pagination forces a synchronous layout read (offsetHeight)
-  // per block — cheap once, but expensive if it reran on every render (it
-  // used to, with no dependency array at all, which is what made scrolling
-  // feel sluggish: any unrelated state update anywhere in this component
-  // re-triggered a full remeasure). This key changes only when something
-  // that actually affects rendered heights changes, so the effect below
-  // skips everything else. preview.logo is a data URL and can be large, so
-  // it's swapped for its length instead of being fully re-stringified.
-  const layoutDepsKey = preview
-    ? JSON.stringify({ ...preview, logo: preview.logo ? preview.logo.length : 0 })
-      + "|" + JSON.stringify(titleOverrides)
-      + "|" + JSON.stringify(expandedPhotoGroups)
-      + "|" + previewSaved
-      + "|" + flatBlocks.map(b => b.key).join(",")
-    : "";
-
-  useLayoutEffect(() => {
-    if (!preview || !previewData) {
-      if (pageLayout !== null) setPageLayout(null);
-      return;
+  // Walks the sections top-to-bottom and keeps the last one whose top has
+  // scrolled at or above a small offset from the container's own top —
+  // i.e. the section currently "in focus" at the top of the visible area,
+  // not just whichever one happens to be tallest on screen.
+  // containerTop is already exactly the header's own bottom edge — the
+  // scroll container sits directly beneath the chrome bar, nothing else
+  // in between — so a section only counts as "active" once its own top
+  // has actually reached that line (a tiny 1px tolerance for sub-pixel
+  // rounding, not an arbitrary buffer), matching what clicking a nav item
+  // itself scrolls to (scrollIntoView's block:"start" lines a section's
+  // top up with this exact same edge).
+  const updateActiveSection = () => {
+    const container = mainScrollRef.current;
+    if (!container || sections.length === 0) return;
+    const containerTop = container.getBoundingClientRect().top;
+    let current = sections[0].key;
+    for (const s of sections) {
+      const el = sectionRefs.current[s.key];
+      if (!el) continue;
+      if (el.getBoundingClientRect().top - containerTop <= 1) current = s.key;
+      else break;
     }
-    const runningHeaderH = runningHeaderMeasureRef.current?.offsetHeight || 0;
-    const footerH = footerMeasureRef.current?.offsetHeight || 0;
+    setActiveSectionKey(prev => (prev === current ? prev : current));
+  };
 
-    // Page 1 is always the fixed cover (see renderCoverPage) — pushed
-    // here as an empty placeholder since it never carries any of
-    // flatBlocks' content (flatBlocks itself is never actually empty:
-    // renderSummaryBlock is always queued). Packing starts fresh on page
-    // 2, measured against runningHeaderH from the very first block.
-    const pages = [[]];
-    let current = [];
-    let used = 0;
-    const available = PAGE_H - PAGE_PAD * 2 - runningHeaderH - footerH - PAGE_BOTTOM_BUFFER;
-    flatBlocks.forEach((block, i) => {
-      const h = blockMeasureRefs.current[block.key]?.offsetHeight || 0;
-      // A section label (or a checklist-bearing entry's header — see
-      // "entryHeader" in flatBlocks) must never be stranded alone at the
-      // bottom of a page with its first piece of content starting on the
-      // next — check it together with its very next block against the
-      // remaining space, not just the label/header alone.
-      const next = flatBlocks[i + 1];
-      const fitsCheckH = (block.type === "label" || block.type === "entryHeader") && next
-        ? h + (blockMeasureRefs.current[next.key]?.offsetHeight || 0)
-        : h;
-      if (current.length > 0 && used + fitsCheckH > available) {
-        pages.push(current);
-        current = [];
-        used = 0;
-      }
-      current.push(block);
-      used += h;
-    });
-    pages.push(current);
+  // Only re-checked when the section LIST itself changes (e.g. infinite
+  // scroll revealing more tasks), not on every render — getBoundingClientRect
+  // forces a synchronous layout read per section, and this component
+  // already got bitten once by an unbounded effect like that making typing
+  // feel sluggish (see the old pagination pass this replaced). Scrolling
+  // itself is covered separately by handleModalScroll.
+  useEffect(() => { updateActiveSection(); }, [sections.length]);
 
-    const nextKey = pages.map(p => p.map(b => b.key).join(",")).join("|");
-    setPageLayout(prev => {
-      const prevKey = prev?.pages?.map(p => p.map(b => b.key).join(",")).join("|");
-      return prevKey === nextKey ? prev : { pages };
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layoutDepsKey]);
-
-  // The hidden scaffold and the visible pages both call renderRunningHeader/
-  // renderBlock/etc. for potentially dozens of entries and their photos —
-  // memoized on the same signature as the layout effect above, so an
-  // unrelated re-render of this tab reuses the same React elements instead
-  // of rebuilding (and having React reconcile) this whole subtree again.
-  const hiddenMeasuringScaffold = useMemo(() => {
-    // renderRunningHeader/etc. read straight from `preview` with no
-    // null-check (they're only ever meant to be called while the preview
-    // modal is open) — this hook still runs on every render regardless,
-    // including before "Generate" is ever clicked, so it must bail out
-    // itself instead of assuming the caller already gated it.
-    if (!preview) return null;
-    return (
-      <div aria-hidden="true" style={{ visibility: "hidden", height: 0, overflow: "hidden" }}>
-        {/* Pinned to a static, always-null activeField — this scaffold
-            exists purely to measure static rendered heights, but it
-            renders the SAME EditableField instances (with the same
-            fieldId strings) as the visible page, which by default read
-            the real, shared ActiveEditContext. Without this override,
-            opening a field on the visible page would also "open" this
-            hidden copy's own invisible instance, whose own document-level
-            outside-click listener has no idea the real one's DOM exists —
-            it would treat every click on the real (visible) field as an
-            outside click and force-close it. */}
-        <ActiveEditContext.Provider value={INERT_ACTIVE_EDIT}>
-          <div style={{ width: PAGE_W }}>
-            <div ref={runningHeaderMeasureRef}>{renderRunningHeader()}</div>
-            <div ref={footerMeasureRef}>{renderPageFooter()}</div>
-            {flatBlocks.map(block => (
-              <div key={block.key} ref={el => { blockMeasureRefs.current[block.key] = el; }} style={{ width: PAGE_W - PAGE_PAD * 2 }}>
-                {renderBlock(block)}
-              </div>
-            ))}
-          </div>
-        </ActiveEditContext.Provider>
-      </div>
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layoutDepsKey]);
-
-  const visiblePages = useMemo(() => {
-    // pageLayout is cleared by a useLayoutEffect that only runs AFTER this
-    // render commits — so on the very render where `preview` first becomes
-    // null (e.g. pressing Escape to close), this memo can still see the
-    // OLD, non-null pageLayout from before, and would go on to call
-    // renderCoverPage/renderRunningHeader (which read preview.* directly)
-    // with preview already null. Guard on both.
-    if (!pageLayout || !preview) return null;
-    return pageLayout.pages.map((pageBlocks, pi) => {
-      const isFirst = pi === 0;
+  const sectionCards = (!preview || !previewData) ? null : sections.map((section, si) => {
+    const isFirst = si === 0;
+    // No border, no radius, no shadow — flat white blocks against the
+    // grey02 body (see previewPanelRef) reading as one continuous
+    // document rather than a stack of individually "lifted" cards.
+    const cardStyle = {
+      width: PAGE_W, margin: isFirst ? 0 : "40px 0 0",
+      boxSizing: "border-box",
+      background: "white",
+      display: "flex", flexDirection: "column",
+    };
+    // Natural height on every section — no fixed Letter-page minHeight
+    // forcing any of them taller than their own content. No running
+    // header/footer repeated per section either — that was a print-page
+    // convention (company name/"VIA TASKTAG" repeated at the top, Point
+    // of Contact repeated at the bottom of every physical page), which no
+    // longer applies once each section is its own natural-height card
+    // rather than a simulated Letter page; Point of Contact now gets its
+    // own dedicated Footer section instead (see below), shown once.
+    if (section.type === "coverHeader") {
       return (
-        <div
-          key={pi}
-          style={{
-            width: PAGE_W, minHeight: PAGE_H, margin: isFirst ? 0 : "24px 0 0",
-            boxSizing: "border-box",
-            background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 12,
-            boxShadow: "0 1px 3px rgba(10,22,41,0.08)",
-            display: "flex", flexDirection: "column",
-            // No content-visibility on ANY page (not just page 1) — it's
-            // been known to leave stale paints on a descendant after a
-            // state-only update in some Chrome versions (page 1 was
-            // already exempted for this; the checklist item-level
-            // splitting made every page's content depend on far more
-            // fine-grained state, which made this show up on later pages
-            // too — e.g. a checklist row visually overlapping the block
-            // after it following an unrelated state update elsewhere on
-            // the page).
-          }}
-        >
-          {isFirst ? renderCoverPage() : (
-            <>
-              {renderRunningHeader()}
-              {/* paddingBottom guarantees the gap to the footer directly
-                  via the box model — flex:1 filling leftover space only
-                  creates a gap when the pagination math's measured
-                  heights exactly match what actually renders, which
-                  isn't reliable enough on its own (see
-                  PAGE_BOTTOM_BUFFER's own comment). */}
-              <div style={{ padding: `0 ${PAGE_PAD}px ${PAGE_BOTTOM_BUFFER}px`, flex: 1 }}>
-                {/* Page 1 is always the cover, so the empty-period note
-                    always belongs on page 2 — the first (and, in that
-                    case, only) page flatBlocks ever packs onto. */}
-                {pi === 1 && previewData.groups.length === 0 && renderNoteSlot("empty")}
-                {pageBlocks.map(block => <div key={block.key}>{renderBlock(block)}</div>)}
-              </div>
-              {renderPageFooter()}
-            </>
-          )}
+        <div key={section.key} ref={el => { sectionRefs.current[section.key] = el; }} style={cardStyle}>
+          <div style={{ padding: PAGE_PAD }}>
+            {renderCoverHeader()}
+          </div>
         </div>
       );
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageLayout, layoutDepsKey]);
+    }
+    if (section.type === "coverContent") {
+      return (
+        <div key={section.key} ref={el => { sectionRefs.current[section.key] = el; }} style={cardStyle}>
+          <div style={{ padding: PAGE_PAD }}>
+            {renderCoverContent()}
+          </div>
+        </div>
+      );
+    }
+    if (section.type === "summary") {
+      return (
+        <div key={section.key} ref={el => { sectionRefs.current[section.key] = el; }} style={cardStyle}>
+          {/* PAGE_PAD on every side, same as the cover's own padding — not
+              PAGE_BOTTOM_BUFFER (that one's specifically the export's own
+              pagination buffer; it happens to also be 40 today, but
+              borrowing it here made this padding only accidentally equal
+              to the cover's, not guaranteed to stay that way). */}
+          <div style={{ padding: PAGE_PAD }}>
+            {preview.includeSummary && renderProgressBlock()}
+            {renderSummaryBlock()}
+            {/* Only reachable when there's no activity at all for the
+                period — every real task otherwise gets its own Task N
+                section below this one. */}
+            {previewData.groups.length === 0 && renderNoteSlot("empty")}
+          </div>
+        </div>
+      );
+    }
+    if (section.type === "task") {
+      const showGroupLabel = section.g && previewData.grouping !== "day";
+      return (
+        <div key={section.key} ref={el => { sectionRefs.current[section.key] = el; }} style={cardStyle}>
+          {/* Same PAGE_PAD-on-every-side padding as every other section —
+              see the summary section's own comment on why this no longer
+              borrows PAGE_BOTTOM_BUFFER. */}
+          <div style={{ padding: PAGE_PAD }}>
+            {showGroupLabel && renderGroupLabelBlock(section.g)}
+            {renderTaskSection(section)}
+          </div>
+        </div>
+      );
+    }
+    // type === "footer" — the report-wide Point of Contact signature
+    // (name, role, avatar), always last. Editable here rather than a
+    // plain static credit repeated on every page the way it used to be —
+    // see contactIdentity for how these carry forward into future drafts
+    // the same way company logo/name/address/email/phone already do.
+    const contactPhotoSrc = preview.contactPhoto;
+    return (
+      <div key={section.key} ref={el => { sectionRefs.current[section.key] = el; }} style={cardStyle}>
+        <div style={{ padding: PAGE_PAD, display: "flex", alignItems: "center", gap: 20 }}>
+          <button
+            onClick={() => !contactPhotoUploading && !previewSaved && contactPhotoInputRef.current?.click()}
+            disabled={contactPhotoUploading || previewSaved}
+            style={{
+              position: "relative", flexShrink: 0, width: 64, height: 64, borderRadius: "50%", overflow: "hidden",
+              border: "none", padding: 0, cursor: previewSaved ? "default" : "pointer",
+              ...(contactPhotoSrc ? {} : { border: "1px dashed var(--tt-grey04)", background: "var(--tt-grey01)" }),
+            }}
+          >
+            {contactPhotoUploading ? (
+              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Loader size={20} strokeWidth={SW} color="var(--tt-grey05)" style={{ display: "block", animation: "tt-spin 0.75s linear infinite" }} />
+              </div>
+            ) : contactPhotoSrc ? (
+              <img src={contactPhotoSrc} alt="" style={{ display: "block", width: "100%", height: "100%", objectFit: "cover" }} />
+            ) : (
+              // Same initials-circle fallback the export's own footer
+              // already shows when there's no uploaded photo either.
+              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--tt-pastel-magenta)" }}>
+                <span style={{ fontSize: 18, fontWeight: 700, color: "white" }}>{initialsOf(preview.contactName || "?")}</span>
+              </div>
+            )}
+          </button>
+          {!previewSaved && (
+            <input
+              ref={contactPhotoInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleContactPhotoUpload}
+              style={{ display: "none" }}
+            />
+          )}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {/* Same "label only while the input is actually live" rule as
+                the cover header fields — see their own comment for why. */}
+            <EditableField
+              fieldId="contactName"
+              value={preview.contactName}
+              placeholder="e.g. Maria Jose"
+              disabled={previewSaved}
+              alwaysEditing
+              aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Name</p>}
+              onSave={v => setPreview(p => ({ ...p, contactName: v }))}
+              textStyle={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 12px" }}
+              inputStyle={{ fontSize: 14, height: 40, margin: "0 0 12px" }}
+            />
+            <EditableField
+              fieldId="contactRole"
+              value={preview.contactRole}
+              placeholder="e.g. Project Manager"
+              disabled={previewSaved}
+              alwaysEditing
+              aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Role</p>}
+              onSave={v => setPreview(p => ({ ...p, contactRole: v }))}
+              textStyle={{ fontSize: 14, fontWeight: 400, color: "var(--tt-grey05)", margin: 0 }}
+              inputStyle={{ fontSize: 14, height: 40 }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  });
 
   const handleModalScroll = (e) => {
+    updateActiveSection();
     if (previewLoading || loadingMore || !hasMoreEntries) return;
     const el = e.currentTarget;
     if (el.scrollHeight - el.scrollTop - el.clientHeight < 150) {
@@ -4669,6 +4748,7 @@ function ReportsTab({ demoCase }) {
     });
   };
 
+
   const handlePreviewDownload = async () => {
     if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to export"); return; }
     await handleDownload({ includeSummary: preview.includeSummary, period: preview.period, version: preview.version, data: { ...previewData, groups: previewFinalGroups }, photoCaptions: preview.photoCaptions });
@@ -4676,7 +4756,7 @@ function ReportsTab({ demoCase }) {
 
   const handlePreviewCopy = async () => {
     if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to export"); return; }
-    await handleCopy({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, version: preview.version, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides, photoCaptions: preview.photoCaptions });
+    await handleCopy({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, version: preview.version, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides, checklistOverrides, photoCaptions: preview.photoCaptions });
     setPreviewCopied(true);
     setTimeout(() => setPreviewCopied(false), 2000);
   };
@@ -4689,7 +4769,7 @@ function ReportsTab({ demoCase }) {
     // Notes already live in preview.extraNotes — every EditableField note
     // commits there the moment its check icon is clicked, so there's no
     // draft state left to fold in here.
-    const finalGroups = applyExtraNotesToGroups(applyTitleOverrides(applyPhotoExclusions(previewData.groups, preview.excludedPhotos), titleOverrides), preview.extraNotes);
+    const finalGroups = applyExtraNotesToGroups(applyChecklistOverrides(applyTitleOverrides(applyPhotoExclusions(previewData.groups, preview.excludedPhotos), titleOverrides), checklistOverrides), preview.extraNotes);
     if (!hasGroupData(finalGroups)) { showToast("error", "No data to save"); return; }
     setSaving(true);
     setTimeout(() => {
@@ -4700,7 +4780,7 @@ function ReportsTab({ demoCase }) {
         showToast("error", "Save failed. Try again.");
         return;
       }
-      pushReport({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, version: preview.version, data: { ...previewData, groups: finalGroups }, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides, photoCaptions: preview.photoCaptions, projectName: preview.projectName, address: preview.address, logo: preview.logo, companyName: preview.companyName, companyAddress: preview.companyAddress, companyEmail: preview.companyEmail, companyPhone: preview.companyPhone, summary: preview.summary, clientName: preview.clientName, coverImage: preview.coverImage });
+      pushReport({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, version: preview.version, data: { ...previewData, groups: finalGroups }, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides, checklistOverrides, photoCaptions: preview.photoCaptions, projectName: preview.projectName, address: preview.address, logo: preview.logo, companyName: preview.companyName, companyAddress: preview.companyAddress, companyEmail: preview.companyEmail, companyPhone: preview.companyPhone, contactName: preview.contactName, contactRole: preview.contactRole, contactPhoto: preview.contactPhoto, summary: preview.summary, clientName: preview.clientName, additionalInfo: preview.additionalInfo, coverImage: preview.coverImage });
       setDateRange("since_last");
       setSaving(false);
       showToast("success", "Report saved");
@@ -4721,9 +4801,10 @@ function ReportsTab({ demoCase }) {
   }, []);
 
   const handleDownload = async (report) => {
-    // Company identity always reflects the latest save, not this report's
-    // own (possibly older) snapshot — see companyIdentity.
-    const html = await buildReportHTML({ ...report, logo: companyIdentity.logo, companyName: companyIdentity.companyName, companyAddress: companyIdentity.companyAddress, companyEmail: companyIdentity.companyEmail, companyPhone: companyIdentity.companyPhone });
+    // Company/contact identity always reflect the latest save, not this
+    // report's own (possibly older) snapshot — see companyIdentity/
+    // contactIdentity.
+    const html = await buildReportHTML({ ...report, logo: companyIdentity.logo, companyName: companyIdentity.companyName, companyAddress: companyIdentity.companyAddress, companyEmail: companyIdentity.companyEmail, companyPhone: companyIdentity.companyPhone, contactName: contactIdentity.name, contactRole: contactIdentity.role, contactPhoto: contactIdentity.photo });
     const fileName = "report_" + sanitizePeriodForUrl(report.period) + ".html";
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -4766,6 +4847,13 @@ function ReportsTab({ demoCase }) {
     if (report.titleOverrides && Object.keys(report.titleOverrides).some(k => report.titleOverrides[k]?.trim())) {
       params.set("titles", JSON.stringify(report.titleOverrides));
     }
+    // Same reasoning again — edited/added/deleted checklist items only
+    // live in this report's draft state, not in DUMMY_ENTRIES, so without
+    // this the shared link would revert to the original checklist even
+    // where the downloaded HTML shows the edited one.
+    if (report.checklistOverrides && Object.keys(report.checklistOverrides).length > 0) {
+      params.set("checklists", JSON.stringify(report.checklistOverrides));
+    }
     // Same reasoning again — photo captions live only in this report's
     // draft/saved state, not in DUMMY_ENTRIES, so without this the shared
     // link would render every photo caption-less even where the
@@ -4789,10 +4877,16 @@ function ReportsTab({ demoCase }) {
     if (companyIdentity.companyAddress) params.set("companyAddress", companyIdentity.companyAddress);
     if (companyIdentity.companyEmail) params.set("companyEmail", companyIdentity.companyEmail);
     if (companyIdentity.companyPhone) params.set("companyPhone", companyIdentity.companyPhone);
+    // Same "latest identity, not this report's frozen snapshot" reasoning.
+    // contactPhoto is left out for the same reason the logo is — a data
+    // URL, the single largest thing that would otherwise be in this link.
+    if (contactIdentity.name) params.set("contactName", contactIdentity.name);
+    if (contactIdentity.role) params.set("contactRole", contactIdentity.role);
     // "summary" is already taken (the includeSummary toggle above) — the
     // summary text content gets its own key.
     if (report.summary) params.set("summaryText", report.summary);
     if (report.clientName) params.set("clientName", report.clientName);
+    if (report.additionalInfo) params.set("additionalInfo", report.additionalInfo);
     // Only when it's still an IMG_MAP key (e.g. "img3") — cheap to carry
     // in the link, same as clientName above. An uploaded cover photo (see
     // handleCoverImageUpload) is a full data URL instead, excluded here
@@ -5059,7 +5153,12 @@ function ReportsTab({ demoCase }) {
             ref={previewPanelRef}
             style={{
               position: "fixed", inset: 0, zIndex: 2000,
-              background: "var(--tt-grey01)",
+              // grey02 — the sidebar, chrome bar, and every section card
+              // each set their own explicit white background, so against
+              // this slightly-off-white body they still stand apart via
+              // that contrast (plus their own shadow, for the section
+              // cards) rather than blending into an identically-white page.
+              background: "var(--tt-grey02)",
               display: "flex", flexDirection: "column",
             }}
           >
@@ -5070,18 +5169,26 @@ function ReportsTab({ demoCase }) {
                 back button or period control here, and closing is explicit
                 via Cancel. Once saved: back button + the locked period on
                 the left, Download/Copy link on the right — closing is then
-                left to the user. Its content is capped to the same reading
-                width as the document below, so the two line up instead of
-                the bar stretching edge-to-edge across the full screen. */}
+                left to the user. Capped to ROW_W and centered — the exact
+                same width and centering the body row below uses — so this
+                bar's own left/right edges land precisely on the sidebar's
+                left edge and the document column's right edge, and any
+                leftover space on a wide screen balances evenly on both
+                sides instead of the whole unit piling up against one edge.
+                No scrollbarGutter reservation here (this bar's content
+                never actually scrolls) — it was reserving space on only
+                one side of this box and not the body row below, shifting
+                this box's own centered content slightly off from the
+                body's, which is exactly what broke the alignment between
+                the two. */}
             <div
               id="draft-chrome"
               style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px",
                 borderBottom: "1px solid var(--tt-grey03)", flexShrink: 0, background: "white",
-                overflowY: "auto", scrollbarGutter: "stable",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: 800, width: "100%", margin: "0 auto" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: ROW_W, width: "100%", margin: "0 auto" }}>
               {previewSaved ? (
                 <div style={{ display: "flex", alignItems: "center" }}>
                   <button
@@ -5199,100 +5306,258 @@ function ReportsTab({ demoCase }) {
             </div>
 
             {/* Body — flows with the page (no fixed height/own scrollbar).
-                This is now a real full-screen overlay with its own scroll
+                This is a real full-screen overlay with its own scroll
                 container, so infinite scroll is driven off this
                 container's own scrollTop (handleModalScroll) instead of
-                window scroll. The document itself is capped to a
-                comfortable reading width and centered, rather than
-                stretching edge-to-edge across the full screen. Horizontal
-                padding lives on the outer wrapper (matching the chrome's
-                own padding) rather than on the maxWidth:800 box itself, so
-                the document's left/right edges line up exactly with the
-                chrome's Photo Limit indicator and Cancel/Save buttons above. */}
-            <div style={{ overflowY: "auto", scrollbarGutter: "stable", flex: 1 }} onScroll={handleModalScroll}>
-              <div style={{ padding: "24px 20px" }}>
-              <div style={{ maxWidth: 800, margin: "0 auto" }}>
-                {previewLoading ? (
-                  // Mirrors the real Letter page below it — same width/padding/
-                  // footer structure — so the loading state doesn't jump to
-                  // a different layout once the real draft appears. Entry
-                  // rows still mirror the real data (group/photo counts),
-                  // same as before.
-                  <div style={{ width: PAGE_W, minHeight: PAGE_H, boxSizing: "border-box", border: "1px solid var(--tt-grey03)", borderRadius: 12, overflow: "hidden", background: "white", boxShadow: "0 1px 3px rgba(10,22,41,0.08)" }}>
-                    <div style={{ padding: PAGE_PAD }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-                        <div className="tt-skeleton" style={{ width: 80, height: 20 }} />
-                        <div className="tt-skeleton" style={{ width: 100, height: 14 }} />
+                window scroll. Capped to ROW_W and centered — same width
+                and centering as the chrome bar above, so the two stay
+                aligned and the whole unit balances on a wide screen (see
+                ROW_W's own comment). The sidebar still butts directly
+                against the document with no gap of its own (see the
+                content wrapper's own padding below). */}
+            <div style={{ display: "flex", flex: 1, minHeight: 0, maxWidth: ROW_W, margin: "0 auto" }}>
+              {/* Nav sidebar — a real, always-present column spanning the
+                  full height of the body (a plain flex sibling, not
+                  floated/absolute), so it naturally stays in view as the
+                  document scrolls in its own container next to it —
+                  the same structural layout a typical section-based
+                  report editor uses (fixed-width nav rail + document pane),
+                  just with this app's own section list/content. */}
+              {/* Loading — same NAV_W column/border/padding as the real
+                  sidebar below, walking the same navGroups shape (already
+                  known synchronously off `preview`/`previewData`, not
+                  actually gated behind this fake delay) so the row count,
+                  grouping and indentation match the real nav exactly —
+                  just skeleton bars instead of real labels. */}
+              {isWide && previewLoading && navGroups.length > 0 && (
+                <div style={{ width: NAV_W, flexShrink: 0, borderRight: "1px solid var(--tt-grey03)", background: "white", overflowY: "auto", padding: 16 }}>
+                  {navGroups.map((group, gi) => (
+                    <div key={group.key || group.label} style={{ marginTop: gi === 0 ? 0 : 14 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px" }}>
+                        <div className="tt-skeleton" style={{ width: 16, height: 16, borderRadius: 4, flexShrink: 0 }} />
+                        <div className="tt-skeleton" style={{ width: 70, height: 12 }} />
                       </div>
-                      <div style={{ height: 1, background: "var(--tt-grey03)", marginBottom: 20 }} />
-                      <div className="tt-skeleton" style={{ width: 100, height: 11, marginBottom: 8 }} />
-                      <div className="tt-skeleton" style={{ width: "70%", height: 26, marginBottom: 8 }} />
-                      <div className="tt-skeleton" style={{ width: "50%", height: 16, marginBottom: 20 }} />
-                      <div className="tt-skeleton" style={{ width: "100%", height: 70, borderRadius: 8, marginBottom: 24 }} />
-                      <div className="tt-skeleton" style={{ width: "100%", height: 6, borderRadius: 99, marginBottom: 20 }} />
-                      <div style={{ height: 1, background: "var(--tt-grey03)", margin: "20px 0" }} />
-                      <div style={{ display: "flex", gap: 32 }}>
-                        <div className="tt-skeleton" style={{ width: 120, height: 16 }} />
-                        <div className="tt-skeleton" style={{ width: 120, height: 16 }} />
-                      </div>
-                    </div>
-                    <div style={{ padding: `0 ${PAGE_PAD}px` }}>
-                      {visibleGroups.map(g => (
-                        <div key={g.key} style={{ marginBottom: 20 }}>
-                          {g.entries.map((e, i) => (
-                            <div key={i} style={{ marginBottom: 20 }}>
-                              <div className="tt-skeleton" style={{ width: "60%", height: 18, marginBottom: 8 }} />
-                              <div className="tt-skeleton" style={{ width: 160, height: 11, marginBottom: 10 }} />
-                              {e.photos.length > 0 && (
-                                <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8 }}>
-                                  {[0, 1, 2, 3, 4].map(pi => (
-                                    <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "16/9", borderRadius: 4 }} />
-                                  ))}
-                                </div>
-                              )}
+                      {group.type === "group" && (
+                        <div style={{ marginLeft: 21, paddingLeft: 12, borderLeft: "2px solid var(--tt-grey03)" }}>
+                          {group.children.map((child, ci) => (
+                            <div key={child.key} style={{ padding: "6px 10px", marginTop: 2 }}>
+                              <div className="tt-skeleton" style={{ width: ci % 2 === 0 ? 130 : 100, height: 11 }} />
                             </div>
                           ))}
                         </div>
-                      ))}
+                      )}
                     </div>
-                    <div style={{ padding: `20px ${PAGE_PAD}px`, borderTop: "1px solid var(--tt-grey03)" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <div className="tt-skeleton" style={{ width: 36, height: 36, borderRadius: "50%" }} />
-                        <div>
-                          <div className="tt-skeleton" style={{ width: 100, height: 14, marginBottom: 4 }} />
-                          <div className="tt-skeleton" style={{ width: 140, height: 12 }} />
+                  ))}
+                </div>
+              )}
+              {isWide && !previewLoading && sections.length > 0 && (
+                <div style={{ width: NAV_W, flexShrink: 0, borderRight: "1px solid var(--tt-grey03)", background: "white", overflowY: "auto", padding: 16 }}>
+                  {navGroups.map((group, gi) => {
+                    // Top-level row shared by both a leaf (Summary, Footer —
+                    // itself a nav target) and a group heading (Cover, Task
+                    // List — not a nav target, just labels what's nested
+                    // below it): bold, text-1, with its own icon — the
+                    // "peer" level of the hierarchy. `marginTop` (skipped on
+                    // the very first row) is what actually separates one
+                    // group from the next; a leaf and a group otherwise look
+                    // identical at this level, which is the point — a user
+                    // shouldn't have to guess Summary/Footer are "different"
+                    // from Cover/Task List just because one happens to have
+                    // children.
+                    const topStyle = active => ({
+                      display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left",
+                      padding: "8px 12px", marginTop: gi === 0 ? 0 : 14, borderRadius: 8, border: "none",
+                      background: active ? "var(--tt-grey02)" : "transparent",
+                      color: "var(--tt-text-1)", fontSize: 13, fontWeight: 700,
+                      cursor: "pointer", transition: "background 0.15s",
+                    });
+                    if (group.type === "leaf") {
+                      const active = activeSectionKey === group.key;
+                      const Icon = group.icon;
+                      return (
+                        <button
+                          key={group.key}
+                          onClick={() => scrollToSection(group.key)}
+                          onMouseEnter={e => { if (!active) e.currentTarget.style.background = "var(--tt-grey02)"; }}
+                          onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
+                          style={topStyle(active)}
+                        >
+                          <Icon size={16} strokeWidth={SW} color="var(--tt-text-1)" style={{ flexShrink: 0 }} />
+                          <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.label}</span>
+                        </button>
+                      );
+                    }
+                    // Group (Cover, Task List) — the heading itself is
+                    // plain text, not a button (it isn't one of
+                    // sectionRefs' own keys, so there's nothing to scroll
+                    // to). Its children sit inside a left-bordered rail
+                    // (a visible connector line, not just whitespace) —
+                    // smaller, lighter-weight and grey by default, so they
+                    // read as clearly subordinate to the heading above them
+                    // rather than as more items at the same level.
+                    const GroupIcon = group.icon;
+                    return (
+                      <div key={group.label}>
+                        <div style={topStyle(false)}>
+                          <GroupIcon size={16} strokeWidth={SW} color="var(--tt-text-1)" style={{ flexShrink: 0 }} />
+                          <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.label}</span>
+                        </div>
+                        <div style={{ marginLeft: 21, paddingLeft: 12, borderLeft: "2px solid var(--tt-grey03)" }}>
+                          {group.children.map(child => {
+                            const active = activeSectionKey === child.key;
+                            return (
+                              <button
+                                key={child.key}
+                                onClick={() => scrollToSection(child.key)}
+                                onMouseEnter={e => { if (!active) e.currentTarget.style.background = "var(--tt-grey02)"; }}
+                                onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
+                                style={{
+                                  display: "flex", alignItems: "center", width: "100%", textAlign: "left",
+                                  padding: "6px 10px", marginTop: 2, borderRadius: 6, border: "none",
+                                  background: active ? "var(--tt-grey02)" : "transparent",
+                                  color: active ? "var(--tt-text-1)" : "var(--tt-grey06)",
+                                  fontSize: 12, fontWeight: active ? 600 : 400,
+                                  cursor: "pointer", transition: "background 0.15s",
+                                }}
+                              >
+                                {/* minWidth:0 — flex items default to
+                                    min-width:auto, which would otherwise stop
+                                    this from ever actually shrinking/
+                                    truncating below its content's natural
+                                    width. */}
+                                <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{child.label}</span>
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
-                    </div>
-                  </div>
+                    );
+                  })}
+                </div>
+              )}
+              {/* No scrollbarGutter reservation here (unlike elsewhere in
+                  this modal) — this column is flex:1 with no width cap of
+                  its own, but the document card inside has a genuinely
+                  fixed width:PAGE_W (see cardStyle); reserving gutter space
+                  in addition to that fixed width was shrinking the actual
+                  available space below PAGE_W, which pushed the card past
+                  this container's right edge and forced an unwanted
+                  horizontal scrollbar on the whole modal. Its own 24px
+                  right padding below is what actually reserves room for a
+                  real scrollbar (when content is tall enough for one)
+                  instead. */}
+              <div ref={mainScrollRef} style={{ overflowY: "auto", flex: 1 }} onScroll={handleModalScroll}>
+              {/* No left padding (touches the sidebar directly) or top
+                  padding (touches the chrome bar directly — see the "no
+                  space before the first section" requirement); right/
+                  bottom keep their own breathing room. */}
+              <div style={{ padding: "0 24px 24px 0" }}>
+              <div style={{ maxWidth: PAGE_W }}>
+                {previewLoading ? (
+                  // One skeleton card per real section — same cardStyle
+                  // (width/margin/background) as sectionCards below, in the
+                  // same Cover Header/Cover Content/Summary/Task N/Footer
+                  // order, so the loading state doesn't jump to a
+                  // different structure once the real draft appears.
+                  // `sections` (and every count it carries — task photos,
+                  // whether the progress block shows) is already known
+                  // synchronously off `preview`/`previewData`, not actually
+                  // gated behind this fake delay, so every skeleton below
+                  // is sized off the real data instead of a generic guess.
+                  sections.map((section, si) => {
+                    const skeletonCardStyle = { width: PAGE_W, margin: si === 0 ? 0 : "40px 0 0", boxSizing: "border-box", background: "white" };
+                    if (section.type === "coverHeader") {
+                      return (
+                        <div key={section.key} style={skeletonCardStyle}>
+                          <div style={{ padding: PAGE_PAD }}>
+                            <div className="tt-skeleton" style={{ width: 180, height: 90, borderRadius: 8, marginBottom: 24 }} />
+                            <div className="tt-skeleton" style={{ width: "50%", height: 22, marginBottom: 4 }} />
+                            <div className="tt-skeleton" style={{ width: "35%", height: 14, marginBottom: 16 }} />
+                            <div style={{ display: "flex", gap: 8 }}>
+                              <div className="tt-skeleton" style={{ width: 160, height: 14 }} />
+                              <div className="tt-skeleton" style={{ width: 120, height: 14 }} />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    if (section.type === "coverContent") {
+                      return (
+                        <div key={section.key} style={skeletonCardStyle}>
+                          <div style={{ padding: PAGE_PAD }}>
+                            <div className="tt-skeleton" style={{ width: "100%", height: 240, borderRadius: 12, marginBottom: 32 }} />
+                            <div className="tt-skeleton" style={{ width: 100, height: 11, marginBottom: 8 }} />
+                            <div className="tt-skeleton" style={{ width: "70%", height: 26, marginBottom: 8 }} />
+                            <div className="tt-skeleton" style={{ width: "50%", height: 16, marginBottom: 20 }} />
+                            <div style={{ display: "flex", gap: 32 }}>
+                              <div className="tt-skeleton" style={{ width: 120, height: 16 }} />
+                              <div className="tt-skeleton" style={{ width: 120, height: 16 }} />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    if (section.type === "summary") {
+                      return (
+                        <div key={section.key} style={skeletonCardStyle}>
+                          <div style={{ padding: PAGE_PAD }}>
+                            {preview.includeSummary && (
+                              <div style={{ background: "var(--tt-grey02)", borderRadius: 4, padding: 8, marginBottom: 16 }}>
+                                <div className="tt-skeleton" style={{ width: 140, height: 16, marginBottom: 8 }} />
+                                <div className="tt-skeleton" style={{ width: "100%", height: 6, borderRadius: 99 }} />
+                              </div>
+                            )}
+                            <div className="tt-skeleton" style={{ width: 90, height: 14, marginBottom: 8 }} />
+                            <div className="tt-skeleton" style={{ width: "100%", height: 70, borderRadius: 8 }} />
+                          </div>
+                        </div>
+                      );
+                    }
+                    if (section.type === "task") {
+                      const e = section.e;
+                      const photoCount = Math.min(e?.photos?.length || 0, 5);
+                      return (
+                        <div key={section.key} style={skeletonCardStyle}>
+                          <div style={{ padding: PAGE_PAD }}>
+                            <div className="tt-skeleton" style={{ width: "60%", height: 18, marginBottom: 8 }} />
+                            <div className="tt-skeleton" style={{ width: 160, height: 11, marginBottom: 10 }} />
+                            {photoCount > 0 && (
+                              <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8 }}>
+                                {Array.from({ length: photoCount }, (_, pi) => (
+                                  <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "16/9", borderRadius: 4 }} />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+                    // type === "footer"
+                    return (
+                      <div key={section.key} style={skeletonCardStyle}>
+                        <div style={{ padding: PAGE_PAD, display: "flex", alignItems: "center", gap: 20 }}>
+                          <div className="tt-skeleton" style={{ width: 64, height: 64, borderRadius: "50%", flexShrink: 0 }} />
+                          <div>
+                            <div className="tt-skeleton" style={{ width: 100, height: 16, marginBottom: 8 }} />
+                            <div className="tt-skeleton" style={{ width: 140, height: 14 }} />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
                 ) : (
                   <>
-                    {/* Hidden measuring scaffold — off-screen copies of the
-                        header/footer and every content block, at the real
-                        page content width, so their rendered heights can be
-                        read via ref and packed into pages (see the
-                        useLayoutEffect above). height:0 + overflow hidden on
-                        the outer wrapper keeps it from affecting
-                        scroll/layout while its children still get a normal,
-                        measurable layout pass underneath. Memoized above
-                        (hiddenMeasuringScaffold) alongside the layout
-                        effect it feeds. */}
-                    {hiddenMeasuringScaffold}
-
-                    {/* Real, visible pages — stacked Letter sheets, each with
-                        its own header/footer, so the preview reads like a
-                        real paginated report instead of one long scroll.
-                        No content-visibility here (see the page card's own
-                        style comment) — it traded scroll perf for
-                        occasional stale-paint glitches, which got worse
-                        once checklist items split into many small,
-                        state-dependent blocks per page. Memoized above
-                        (visiblePages). */}
-                    {visiblePages}
+                    {/* Real, visible sections — Cover/Summary/Task N cards,
+                        each sized to its own natural content height (see
+                        sectionCards) rather than simulated Letter pages,
+                        so the preview reads like a real document organized
+                        by section instead of one long scroll or a stack of
+                        fixed-height sheets. */}
+                    {sectionCards}
 
                     {/* Infinite scroll: one skeleton item while the next batch "loads" */}
                     {loadingMore && (
-                      <div style={{ width: PAGE_W, margin: "24px 0 0" }}>
+                      <div style={{ width: PAGE_W, margin: "40px 0 0" }}>
                         <div className="tt-skeleton" style={{ width: "85%", height: 16, marginBottom: 10 }} />
                         {nextEntry && nextEntry.photos.length > 0 && (
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8 }}>
@@ -5306,6 +5571,7 @@ function ReportsTab({ demoCase }) {
                   </>
                 )}
 
+              </div>
               </div>
               </div>
             </div>
@@ -5478,7 +5744,7 @@ function ReportPaywall() {
 // period, included sections, excluded photos, and any manually-added
 // notes) — rebuilt on the fly rather than fetched from storage, so a
 // shared link works on any device/browser and can never 404.
-function ReportPage({ dateRange, period, version, includeSummary, includeNoPhotoTasks, notesParam, excludedParam, titlesParam, captionsParam, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, summaryText, clientName, coverImage }) {
+function ReportPage({ dateRange, period, version, includeSummary, includeNoPhotoTasks, notesParam, excludedParam, titlesParam, checklistsParam, captionsParam, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, contactName, contactRole, summaryText, clientName, additionalInfo, coverImage }) {
   let data = buildReportData(dateRange, period, null, includeNoPhotoTasks);
   let groups = data.groups;
   // Always runs (even with nothing excluded) — this is what embeds each
@@ -5495,6 +5761,12 @@ function ReportPage({ dateRange, period, version, includeSummary, includeNoPhoto
     try {
       const titleOverrides = JSON.parse(titlesParam);
       groups = applyTitleOverrides(groups, titleOverrides);
+    } catch { /* malformed/tampered param — ignore */ }
+  }
+  if (checklistsParam) {
+    try {
+      const checklistOverrides = JSON.parse(checklistsParam);
+      groups = applyChecklistOverrides(groups, checklistOverrides);
     } catch { /* malformed/tampered param — ignore */ }
   }
   if (notesParam) {
@@ -5517,7 +5789,7 @@ function ReportPage({ dateRange, period, version, includeSummary, includeNoPhoto
   const [html, setHtml] = useState(null);
   useEffect(() => {
     let cancelled = false;
-    buildReportHTML({ includeSummary, period, version, data, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, summary: summaryText, clientName, coverImage, photoCaptions }).then(result => {
+    buildReportHTML({ includeSummary, period, version, data, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, contactName, contactRole, summary: summaryText, clientName, additionalInfo, coverImage, photoCaptions }).then(result => {
       if (!cancelled) setHtml(result);
     });
     return () => { cancelled = true; };
@@ -5556,6 +5828,7 @@ export default function ProjectDetail() {
       notesParam={params.get("notes")}
       excludedParam={params.get("excluded")}
       titlesParam={params.get("titles")}
+      checklistsParam={params.get("checklists")}
       captionsParam={params.get("captions")}
       projectName={params.get("projectName")}
       address={params.get("address")}
@@ -5564,8 +5837,11 @@ export default function ProjectDetail() {
       companyAddress={params.get("companyAddress")}
       companyEmail={params.get("companyEmail")}
       companyPhone={params.get("companyPhone")}
+      contactName={params.get("contactName")}
+      contactRole={params.get("contactRole")}
       summaryText={params.get("summaryText")}
       clientName={params.get("clientName")}
+      additionalInfo={params.get("additionalInfo")}
       coverImage={params.get("coverImage")}
     />
   );
