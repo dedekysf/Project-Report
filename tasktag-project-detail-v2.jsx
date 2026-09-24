@@ -13,7 +13,7 @@ import {
   ArrowUpDown, Calendar, AlignJustify, Clock,
   UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, Crown, AlertTriangle,
   RotateCw, ZoomIn, ZoomOut, Folder, ArrowLeft, ArrowRight, Info, StickyNote,
-  ExternalLink, Forward,
+  ExternalLink, Forward, Loader,
 } from "lucide-react";
 
 import logoImg from "./src/Img/tasktag-logo.13f1babda8fdbb1b7251572a0fe11f9e.png";
@@ -125,6 +125,18 @@ style.textContent = `
     to   { transform: rotate(360deg); }
   }
 
+  /* For a spinner that's ALSO centered via transform:translate(-50%,-50%)
+     (Generate/Save Report's absolutely-positioned icon) — an animated
+     "transform" fully replaces the property for the animation's duration,
+     it doesn't compose with a separate inline transform, so plain tt-spin
+     here would silently drop the centering translate and leave the icon
+     offset by half its own size the moment it started spinning. Baking
+     the same translate into every keyframe step keeps both at once. */
+  @keyframes tt-spin-centered {
+    from { transform: translate(-50%, -50%) rotate(0deg); }
+    to   { transform: translate(-50%, -50%) rotate(360deg); }
+  }
+
   @keyframes tt-pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.45; }
@@ -133,6 +145,21 @@ style.textContent = `
     background: var(--tt-grey03);
     border-radius: 6px;
     animation: tt-pulse 1.2s ease-in-out infinite;
+  }
+
+  /* Scrollable content with no visible scrollbar chrome (see Summary's
+     own textarea in EditableField) — overflow:auto/scroll alone still
+     scrolls fine with this applied, it's purely cosmetic. Needs all
+     three: the first two are plain properties (Firefox/legacy Edge),
+     the third is a pseudo-element only WebKit/Blink (Chrome/Safari)
+     understand, which is why this has to be a real class instead of an
+     inline style — inline styles can't target ::-webkit-scrollbar at all. */
+  .tt-no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .tt-no-scrollbar::-webkit-scrollbar {
+    display: none;
   }
 
   @keyframes tt-toast-progress {
@@ -187,6 +214,30 @@ const POINT_OF_CONTACT_ROLE = "Project Manager";
 const initialsOf = (name) => name.split(" ").map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
 // TODO(BE): replace with the actual report ID from the API
 const REPORT_ID = `TX-1520-${APP_TODAY.getFullYear()}-${String(APP_TODAY.getMonth() + 1).padStart(2, "0")}`;
+
+// Cover header's companyEmail/companyPhone (see EditableField's `validate`
+// prop) — companyPhone is specifically a US office number: optional
+// +1/1 country code, area code with or without parens, any of
+// space/dash/dot as the separator, optional extension ("ext 123"/"x123").
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const US_PHONE_PATTERN = /^(\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}(\s?(ext\.?|x)\.?\s?\d{1,5})?$/i;
+// Auto-formats as the user types (see companyPhone's `filterInput`) —
+// pulls out only the digits (ignoring whatever punctuation was actually
+// typed, so pasting "2234222342" or "(223) 422-2342" both land the same
+// way), drops a leading "1" country code once there are 11+ digits, and
+// caps at 10 (a plain US number, no extension support here). Builds up
+// progressively as digits arrive rather than waiting for all 10 — e.g.
+// "223" -> "(223", "223422" -> "(223) 422" — so the format is visible
+// from the very first digit instead of only once the number is complete.
+const formatUSPhone = (raw) => {
+  let digits = raw.replace(/\D/g, "");
+  if (digits.length > 10 && digits[0] === "1") digits = digits.slice(1);
+  digits = digits.slice(0, 10);
+  if (digits.length === 0) return "";
+  if (digits.length < 4) return `(${digits}`;
+  if (digits.length < 7) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+};
 
 // ── Paginated document sizing ──
 // The live preview lays out its document as stacked Letter sheets (each
@@ -664,7 +715,7 @@ function focusAtEnd(el) {
 // non-boxed field's own wrapper carries that as marginBottom, multiline's
 // check/cancel row sits 8px under the textarea, and the error message (if
 // any) sits 8px under that.
-function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, onCancel, multiline, disabled, boxed, required, errorMessage, textStyle, inputStyle, as: Tag = "p", alwaysEditing, popover, aboveWhenEditing }) {
+function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPlaceholder, filterInput, onSave, onCancel, multiline, disabled, boxed, required, validate, errorMessage, textStyle, inputStyle, as: Tag = "p", alwaysEditing, popover, popoverAlign = "left", aboveWhenEditing }) {
   const { activeField, setActiveField } = useContext(ActiveEditContext);
   const [draft, setDraft] = useState(value || "");
   const [error, setError] = useState(false);
@@ -694,13 +745,21 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
   // modal's own scroll container, not just window-level scroll. Once the
   // trigger scrolls fully behind the chrome bar, close instead of relocating
   // — see isHiddenByChrome.
+  // popoverAlign:"right" (companyName/companyAddress/companyEmail/
+  // companyPhone, all inside the cover's right-aligned column) hangs the
+  // popover from the trigger's right edge instead of its left — matching
+  // where the right-aligned text itself actually sits, rather than
+  // opening away from it toward the left every time. 240 is the
+  // popover's own fixed width (see its `width:240` below).
+  const popoverLeftFor = (r) => popoverAlign === "right" ? r.right - 240 : r.left;
+
   useEffect(() => {
     if (!popoverOpen) return;
     const reposition = () => {
       if (!triggerRef.current) return;
       const r = triggerRef.current.getBoundingClientRect();
       if (isHiddenByChrome(r)) { setPopoverOpen(false); return; }
-      setPopoverPos({ top: r.bottom + 8, left: r.left });
+      setPopoverPos({ top: r.bottom + 8, left: popoverLeftFor(r) });
     };
     window.addEventListener("scroll", reposition, true);
     window.addEventListener("resize", reposition);
@@ -708,6 +767,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
       window.removeEventListener("scroll", reposition, true);
       window.removeEventListener("resize", reposition);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [popoverOpen]);
 
   const boxStyle = boxed ? { position: "relative", background: "var(--tt-grey02)", borderRadius: 8, padding: 8 } : {};
@@ -720,13 +780,23 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
   if (popover) {
     const openPopover = () => {
       setDraft(value || "");
+      setError(false);
       if (triggerRef.current) {
         const r = triggerRef.current.getBoundingClientRect();
-        setPopoverPos({ top: r.bottom + 8, left: r.left });
+        setPopoverPos({ top: r.bottom + 8, left: popoverLeftFor(r) });
       }
       setPopoverOpen(true);
     };
-    const commit = () => { onSave(draft.trim()); setPopoverOpen(false); };
+    // `validate` only ever runs against a non-empty draft — an optional
+    // field (companyEmail/companyPhone) can still be cleared back to blank
+    // without tripping format validation.
+    const commit = () => {
+      const trimmed = draft.trim();
+      if (validate && trimmed && !validate(trimmed)) { setError(true); return; }
+      onSave(trimmed);
+      setPopoverOpen(false);
+      setError(false);
+    };
     const popoverEmpty = !draft.trim();
     // Same "nothing to confirm" rule as every other edit mode — disabled
     // until the draft actually differs from the value this popover opened
@@ -745,13 +815,27 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
         </Tag>
         {popoverOpen && (
           <div ref={popoverRef} style={{ position: "fixed", top: popoverPos.top, left: popoverPos.left, zIndex: 300, width: 240 }}>
-            <div style={{ position: "absolute", top: -5, left: 12, width: 10, height: 10, background: "white", border: "1px solid var(--tt-grey03)", borderRight: "none", borderBottom: "none", transform: "rotate(45deg)" }} />
-            <div style={{ position: "relative", background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, padding: 8, boxShadow: "0 8px 24px rgba(10,22,41,0.16)" }}>
+            {/* The caret sits under wherever the trigger actually is —
+                near the panel's left edge for popoverAlign:"left" (the
+                trigger's own left edge, per popoverLeftFor), near its
+                right edge for "right" (the trigger's right edge). */}
+            <div style={{ position: "absolute", top: -5, left: popoverAlign === "right" ? "auto" : 12, right: popoverAlign === "right" ? 12 : "auto", width: 10, height: 10, background: "white", border: "1px solid var(--tt-grey03)", borderRight: "none", borderBottom: "none", transform: "rotate(45deg)" }} />
+            {/* textAlign:"left" overrides whatever the trigger's own
+                container has it set to (the cover header's right-aligned
+                column, for companyName/companyAddress/companyEmail/
+                companyPhone) — this panel is a fixed-position overlay,
+                not part of that text flow, so it always reads left to
+                right regardless. */}
+            <div style={{ position: "relative", background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, padding: 8, boxShadow: "0 8px 24px rgba(10,22,41,0.16)", textAlign: "left" }}>
               <div style={{ position: "relative" }}>
                 <Input
                   ref={focusAtEnd}
                   value={draft}
-                  onChange={ev => setDraft(ev.target.value)}
+                  onChange={ev => {
+                    const raw = ev.target.value;
+                    setDraft(filterInput ? filterInput(raw) : raw);
+                    if (error) setError(false);
+                  }}
                   onKeyDown={ev => {
                     if (ev.key === "Enter") { ev.preventDefault(); commit(); }
                     // stopPropagation so this only closes the popover, not
@@ -759,8 +843,8 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
                     // click-to-edit fields' Escape handler.
                     if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); setPopoverOpen(false); }
                   }}
-                  placeholder={placeholder}
-                  style={{ fontSize: 12, height: 32, padding: "0 36px 0 10px" }}
+                  placeholder={inputPlaceholder || placeholder}
+                  style={{ fontSize: 12, height: 32, padding: "0 36px 0 10px", borderColor: error ? "var(--tt-red)" : undefined }}
                 />
                 <button
                   disabled={confirmDisabled}
@@ -777,6 +861,11 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
                   <Check size={13} strokeWidth={SW} color="white" />
                 </button>
               </div>
+              {error && (
+                <p style={{ color: "var(--tt-red)", fontSize: 10, fontWeight: 500, margin: "2px 0 0", textAlign: "left" }}>
+                  {errorMessage || "That doesn't look right."}
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -883,7 +972,13 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
             }}
             placeholder={placeholder}
             rows={2}
-            style={{ fontFamily: "inherit", paddingRight: buttonReserve, overflowY: "hidden", ...inputStyle }}
+            // overflowY:"auto" (not "hidden") — content past this
+            // fixed-rows box's own height needs to actually be
+            // reachable by scrolling, not just clipped away.
+            // .tt-no-scrollbar keeps that scrolling from showing any
+            // scrollbar chrome, purely cosmetic (see its own definition).
+            className="tt-no-scrollbar"
+            style={{ fontFamily: "inherit", paddingRight: buttonReserve, overflowY: "auto", ...inputStyle }}
           />
           <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>{showCancel && cancelButton}{showConfirm && confirmButton}</div>
         </div>
@@ -1016,17 +1111,24 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, onSave, 
   );
 }
 
-// Downscales an uploaded image to a small PNG data URL (longest side
-// capped at maxDim) instead of keeping the original file's full
-// resolution. The logo only ever displays at max-width:100px (in the
-// export) or 80px (live), so this loses nothing visible — but it's also
-// what keeps the resulting data URL small enough to embed in a "Copy
-// link" URL. A 160px cap still produced a ~43KB data URL for a
-// photographic test image, and a ~46,000-character URL built from it
-// failed to even navigate in Chrome (chrome-error://chromewebdata) — well
-// short of the ~2MB limits often quoted for data: URLs in isolation.
-// 64px keeps the same test image's data URL under 10KB.
-const resizeImageToDataURL = (file, maxDim = 64) => new Promise((resolve, reject) => {
+// Downscales an uploaded image to a data URL (longest side capped at
+// maxDim) instead of keeping the original file's full resolution — no
+// upload endpoint, so this has to travel as a data URL wherever it's
+// used. maxDim only needs to comfortably cover the largest size the
+// image actually renders at (the logo's own fixed display width, or the
+// cover photo's full page-content width) — capping well past that would
+// just bloat the data URL for no visible gain, and capping short of it
+// (the old flat 64px default, tuned for a since-grown ~80px display)
+// shows up as visible blur once upscaled to fill a bigger box. Neither
+// the logo nor an uploaded cover photo ever ride along in the "Copy
+// link" URL (see handleCopy) — only the download, which has no such
+// size constraint — so there's no reason to cap either one tighter than
+// what actually keeps them looking sharp. mimeType/quality default to
+// lossless PNG (right for a logo, which may have transparency); the
+// cover photo instead asks for JPEG at quality, since it's ordinary
+// photographic content where PNG would cost several times the file size
+// for no visible difference.
+const resizeImageToDataURL = (file, maxDim = 64, mimeType = "image/png", quality) => new Promise((resolve, reject) => {
   const reader = new FileReader();
   reader.onload = () => {
     const img = new Image();
@@ -1038,7 +1140,7 @@ const resizeImageToDataURL = (file, maxDim = 64) => new Promise((resolve, reject
       canvas.width = w;
       canvas.height = h;
       canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-      resolve(canvas.toDataURL("image/png"));
+      resolve(canvas.toDataURL(mimeType, quality));
     };
     img.onerror = reject;
     img.src = reader.result;
@@ -1059,7 +1161,7 @@ const resizeImageToDataURL = (file, maxDim = 64) => new Promise((resolve, reject
 // image itself (max-width 80px, height auto) so a wide logo isn't
 // squeezed into a small square. While the file is being read, a small
 // spinner replaces the placeholder/image.
-function LogoUploadBox({ src, onChange, disabled, maxWidth = 80 }) {
+function LogoUploadBox({ src, onChange, disabled, width = 180 }) {
   const inputRef = useRef(null);
   const [loading, setLoading] = useState(false);
 
@@ -1068,7 +1170,10 @@ function LogoUploadBox({ src, onChange, disabled, maxWidth = 80 }) {
     ev.target.value = "";
     if (!file) return;
     setLoading(true);
-    resizeImageToDataURL(file)
+    // 2x `width` — comfortably sharp even on a retina display at this
+    // box's own fixed display size, without the flat 64px default (tuned
+    // for a since-grown ~80px display) showing up as visible blur.
+    resizeImageToDataURL(file, width * 2)
       .then(url => { onChange(url); setLoading(false); })
       .catch(() => setLoading(false));
   };
@@ -1078,19 +1183,34 @@ function LogoUploadBox({ src, onChange, disabled, maxWidth = 80 }) {
       className="tt-editable-wrap"
       onClick={() => !disabled && !loading && inputRef.current?.click()}
       style={{
-        position: "relative", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+        position: "relative", flexShrink: 0, display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
         cursor: disabled || loading ? "default" : "pointer",
+        // A fixed width (not max-width) — as a flex item, a max-width-only
+        // box's actual rendered width depends on how its flex-basis
+        // resolves, which isn't reliably "as wide as the cap allows" (it
+        // rendered far narrower than 180 in practice). An explicit width
+        // sidesteps that entirely: this box is always exactly `width`
+        // wide, full stop. Height stays auto either way — empty, it fills
+        // to match the content column beside it (via the parent row's
+        // alignItems:stretch, see renderCoverHeader); with a real logo,
+        // it follows the image's own natural aspect ratio instead.
+        width,
         ...(src
-          ? { maxWidth, height: "auto" }
-          : { width: 48, height: 48, borderRadius: 8, overflow: "hidden", border: "1px dashed var(--tt-grey04)", background: "var(--tt-grey01)" }),
+          ? { height: "auto" }
+          : { minHeight: 64, borderRadius: 8, overflow: "hidden", border: "1px dashed var(--tt-grey04)", background: "var(--tt-grey01)" }),
       }}
     >
       {loading ? (
-        <span style={{ width: 18, height: 18, borderRadius: "50%", border: "2px solid var(--tt-grey03)", borderTopColor: "var(--tt-text-2)", display: "inline-block", animation: "tt-spin 0.75s linear infinite" }} />
+        <Loader size={18} strokeWidth={SW} color="var(--tt-text-2)" style={{ display: "block", animation: "tt-spin 0.75s linear infinite" }} />
       ) : src ? (
-        <img src={src} alt="Company logo" style={{ display: "block", maxWidth, width: "100%", height: "auto" }} />
+        <img src={src} alt="Company logo" style={{ display: "block", width: "100%", height: "auto" }} />
       ) : (
-        <FileImage size={18} strokeWidth={SW} color="var(--tt-grey05)" />
+        <>
+          <FileImage size={24} strokeWidth={SW} color="var(--tt-grey05)" />
+          {/* Matches the underlined-prompt style every other empty field
+              on the cover uses (see EditableField's own placeholder). */}
+          <span style={{ fontSize: 20, fontWeight: 600, color: "var(--tt-grey05)", textDecoration: "underline" }}>Upload Logo</span>
+        </>
       )}
       {!disabled && (
         <input
@@ -2020,8 +2140,9 @@ const DUMMY_ENTRIES = [
   // through.
   {
     date: "2026-09-10", note: "Flooring installation started on the ground floor.",
-    // Deliberately 10 items — right at the cap the UI shows, to demo a
-    // full checklist section on the first (most visible) entry.
+    // Deliberately 12 items — over the 10-item cap, to demo the "(limited
+    // to the 10 most recent)" truncation note on the first (most visible)
+    // entry's checklist.
     checklist: [
       { text: "Remove old flooring throughout the ground floor" },
       { text: "Level and inspect subfloor for damage" },
@@ -2031,7 +2152,9 @@ const DUMMY_ENTRIES = [
       { text: "Install hardwood in dining room" },
       { text: "Install underlayment in hallway" },
       { text: "Fit transition strips between rooms" },
+      { text: "Sand and prep subfloor seams" },
       { text: "Apply protective finish coat" },
+      { text: "Let finish coat cure fully" },
       { text: "Clean and inspect finished flooring" },
     ],
     photos: ["img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3", "img4", "img5", "img6", "img7", "img8", "img9", "img1", "img2", "img3"],
@@ -2622,6 +2745,26 @@ const toAbsoluteUrl = (src) => {
   try { return new URL(src, window.location.href).href; } catch (e) { return src; }
 };
 
+// Natural pixel dimensions of a loaded image, cached by src — module-level
+// (not per-export-call) since the same bundled photo (img1..img9) gets
+// reused across many reports/downloads and is a static asset that never
+// changes size. Used by buildReportHTML's justified photo rows, which need
+// each photo's real aspect ratio up front rather than discovering it after
+// the fact via CSS. A broken/unreachable src resolves to a neutral 4:3
+// placeholder instead of hanging the whole export on one bad image.
+const imageDimsCache = new Map();
+const loadImageDims = (src) => {
+  if (imageDimsCache.has(src)) return imageDimsCache.get(src);
+  const promise = new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => resolve({ width: img.naturalWidth || 4, height: img.naturalHeight || 3 });
+    img.onerror = () => resolve({ width: 4, height: 3 });
+    img.src = src;
+  });
+  imageDimsCache.set(src, promise);
+  return promise;
+};
+
 // Same transform the download filename already applies (see handleDownload)
 // — spaces to underscores, the en dash to a plain hyphen — so a copied
 // share link reads as cleanly as "Sep_4_-_Sep_10" instead of URL-encoding
@@ -2646,7 +2789,7 @@ const desanitizePeriodFromUrl = (period) => period.replace(/_/g, " ").replace(/-
 // since there's no interaction left to expand it) and nothing here is
 // editable (no placeholder prompts for fields the user left blank; those
 // rows are just omitted instead).
-const buildReportHTML = (report) => {
+const buildReportHTML = async (report) => {
   const { groups, grouping, completed, total, pct } =
     report.data || buildReportData("custom", report.period, null, report.includeNoPhotoTasks);
 
@@ -2659,6 +2802,14 @@ const buildReportHTML = (report) => {
     return `<${tag}${attrStr}/>`;
   };
 
+  // Comparison path for the previous CSS column-count masonry photo
+  // layout — visit the app at /masonry to preview that instead of the
+  // current default (width-grouped rows, see packRowsByWidth below). Read
+  // once per export so a link copied while on /masonry keeps rendering
+  // masonry for whoever opens it too (handleCopy's share URL keeps
+  // whatever pathname was current when it was built).
+  const useMasonry = typeof window !== "undefined" && /\/masonry\/?$/.test(window.location.pathname);
+
   const STATUS_HEX = { completed: "#16a97d", open: "#138eff" };
   // Editorial serif for headline/body content (title, address, summary,
   // task headings, descriptions, captions); small uppercase UI labels
@@ -2668,55 +2819,158 @@ const buildReportHTML = (report) => {
   const SANS = "-apple-system,BlinkMacSystemFont,'Inter',sans-serif";
   const SERIF = "'Lora',Georgia,serif";
 
-  // Masonry, 2-column — every photo shows here (no "+N more" cap; there's
-  // nothing left to expand into), at its own natural size rather than
-  // cropped to a fixed tile like the live draft's grid (see PhotoGrid):
-  // there's no interactive lightbox left to see the full frame in once
-  // this is a static export, so the export itself has to show it.
-  // A CSS column-count layout (not CSS grid) is what actually produces
-  // masonry — each photo keeps its own height and the two columns
-  // interleave to stay balanced, rather than every row being pinned to
-  // its tallest cell's height the way a grid would. Rendered per CHUNK
-  // (see PHOTO_CHUNK below) rather than all of an entry's photos in one
-  // block, so the pagination pass below can place each chunk on
-  // whichever page it fits — the entry's header and its photos flow
-  // across a page break the same way the live draft's "+N more"
-  // continuation blocks do, instead of one oversized entry either
-  // overflowing a page or getting pushed as a whole to the next one.
-  // originalIndices is always a real per-photo array (built by the
-  // caller, identity-mapped when nothing was excluded) — never derived
-  // from the chunk's own 0-based position, which would drift for every
-  // chunk after the first.
+  // Width-grouped rows — every photo shows here (no "+N more" cap; there's
+  // nothing left to expand into), at its own natural aspect ratio rather
+  // than cropped to a fixed tile like the live draft's grid (see
+  // PhotoGrid): there's no interactive lightbox left to see the full
+  // frame in once this is a static export, so the export itself has to
+  // show it. Rows are formed by comparing photos' own ORIGINAL pixel
+  // width (see packRowsByWidth) — consecutive photos whose original width
+  // is the same or close enough join the same row — rather than by
+  // picking a target row height and solving for whatever width makes
+  // everything fit (a "justified gallery"). Nothing about an individual
+  // photo is stretched to a height it wasn't shot at or cropped to a
+  // width it wasn't shot at: once a row is formed, every photo in it is
+  // scaled by the SAME single factor (never up past its own natural
+  // size, only down when the row's combined natural width is wider than
+  // the page), so each photo's own aspect ratio — and its size relative
+  // to its row-mates — comes through exactly as shot. This is also
+  // deliberately NOT a CSS column-count masonry: a column layout balances
+  // its columns by their TOTAL height, so the same photos render at a
+  // different height depending on how many end up sharing one
+  // column-count container — which made two chunks landing on the same
+  // page look like a disconnected seam, and made a chunk's pre-measured
+  // height (see blockHeights below) drift from its actual rendered height
+  // once adjacent chunks changed what it was grouped with. A row's
+  // scale here only ever depends on the photos actually IN that row, so
+  // it renders identically — and measures accurately — no matter what's
+  // above or below it. Each row is its own pagination block (like the old
+  // fixed-size photo chunks were), so a long photo set can still flow
+  // across a page break instead of dragging the whole entry to the next
+  // page as one piece.
+  const JUSTIFIED_GAP = 8;
+  const PHOTO_ROW_WIDTH = PAGE_W - PAGE_PAD * 2;
+  // How far apart two consecutive photos' original widths can be (as a
+  // fraction of the row's own first photo) and still count as "the same
+  // row" — 0.15 = within 15%.
+  const ROW_WIDTH_TOLERANCE = 0.15;
+  // Stops a row from growing indefinitely once one more same-width photo
+  // would shrink everything past a reasonably viewable size — a new row
+  // starts there instead, even though the next photo's width still
+  // technically qualifies.
+  const MIN_ROW_HEIGHT = 90;
+  // Caps how tall any single photo can render without cropping — mainly
+  // guards a narrow-width row (e.g. a lone portrait photo, or a couple of
+  // them) whose combined natural width is already under containerWidth,
+  // so width-based scaling alone would never kick in and the photo would
+  // render at its full natural (potentially very tall) height.
+  const MAX_ROW_HEIGHT = 220;
+
+  // Greedily grows a row for as long as the next photo's original width
+  // stays within ROW_WIDTH_TOLERANCE of the row's own RUNNING AVERAGE
+  // width so far (not just its first photo — anchoring to the first
+  // photo alone let two genuinely similar-width photos end up split
+  // across rows whenever a photo in between happened to drift slightly
+  // further from that first one than from its actual neighbors; the
+  // running average moves gradually as the row grows, so it stays
+  // representative of the row as a whole instead of being pinned to
+  // whichever photo happened to come first) AND doesn't shrink the row
+  // below MIN_ROW_HEIGHT once scaled — otherwise the current row closes
+  // and a new one starts with that photo. Each row's scale is capped at 1
+  // (never upscaled past a photo's own resolution) and at whatever keeps
+  // its tallest photo within MAX_ROW_HEIGHT — only ever scaled down,
+  // never cropped.
+  const packRowsByWidth = (photos, containerWidth, gap) => {
+    const rowScale = (candidateRow) => {
+      const sumW = candidateRow.reduce((sum, p) => sum + p.width, 0);
+      const widthScale = (containerWidth - gap * (candidateRow.length - 1)) / sumW;
+      const maxH = Math.max(...candidateRow.map(p => p.height));
+      const heightScale = MAX_ROW_HEIGHT / maxH;
+      return Math.min(1, widthScale, heightScale);
+    };
+    const rows = [];
+    let row = [];
+    let widthSum = 0;
+    const flush = () => {
+      if (row.length === 0) return;
+      rows.push({ photos: row, scale: rowScale(row) });
+      row = []; widthSum = 0;
+    };
+    photos.forEach(photo => {
+      if (row.length > 0) {
+        const avgWidth = widthSum / row.length;
+        const sameWidth = Math.abs(photo.width - avgWidth) / avgWidth <= ROW_WIDTH_TOLERANCE;
+        const scale = sameWidth ? rowScale([...row, photo]) : 0;
+        const fits = scale > 0 && [...row, photo].every(p => p.height * scale >= MIN_ROW_HEIGHT);
+        if (sameWidth && fits) { row.push(photo); widthSum += photo.width; return; }
+      }
+      flush();
+      row.push(photo);
+      widthSum = photo.width;
+    });
+    flush();
+    return rows;
+  };
+
+  const widthGroupedRowHTML = (row, marginTop, marginBottom) => {
+    const gap = JUSTIFIED_GAP;
+    const cells = row.photos.map(p => {
+      const w = Math.round(p.width * row.scale);
+      const cellH = Math.round(p.height * row.scale);
+      return h("div", { style: `flex-shrink:0;width:${w}px;` },
+        selfClose("img", { src: p.src, style: `display:block;width:${w}px;height:${cellH}px;border-radius:4px;` }),
+        p.caption ? h("p", { style: `font-size:12px;font-style:italic;color:#828282;font-family:${SERIF};text-align:center;margin:6px 0 0;` }, p.caption) : ""
+      );
+    }).join("");
+    return h("div", { style: `display:flex;gap:${gap}px;align-items:flex-start;margin-top:${marginTop}px;margin-bottom:${marginBottom}px;` }, cells);
+  };
+
+  // ── /masonry comparison path — the previous CSS column-count layout ──
+  // Kept only for side-by-side preview against the justified-row default
+  // above; not used unless useMasonry is true. Every photo shows here (no
+  // "+N more" cap), at its own natural size, in fixed-size chunks (see
+  // PHOTO_CHUNK) so the pagination pass can still place each chunk on
+  // whichever page it fits.
   const renderPhotoChunk = (photos, entryKey, captions, originalIndices, marginTop, isLast) => {
     const cells = photos.map((k, i) => {
       const src = IMG_MAP[k];
       if (!src) return "";
       const caption = captions && captions[`${entryKey}_${originalIndices[i]}`];
-      // break-inside:avoid keeps a photo (and its caption) from splitting
-      // across the two CSS columns; margin-bottom is what stands in for
-      // row-gap, which column-count layouts don't support.
       return h("div", { style: "break-inside:avoid;margin-bottom:8px;" },
         selfClose("img", { src: toAbsoluteUrl(src), style: "width:100%;height:auto;border-radius:4px;display:block;" }),
         caption ? h("p", { style: `font-size:12px;font-style:italic;color:#828282;font-family:${SERIF};text-align:center;margin:6px 0 0;` }, caption) : ""
       );
     }).filter(Boolean);
     if (cells.length === 0) return "";
-    // marginTop keeps consecutive chunks at the same 8px rhythm as the
-    // columns' own column-gap (so two chunks landing on the same page
-    // read as one continuous masonry, not two butted together) — only
-    // the very first chunk uses the larger 16px gap down from the
-    // note/checklist above it. isLast carries the entry's own trailing
-    // gap (see PHOTO_CHUNK/entryHeaderHTML).
     return h("div", { style: `column-count:2;column-gap:8px;margin-top:${marginTop}px;margin-bottom:${isLast ? 80 : 0}px;` }, ...cells);
   };
-  // Two rows of the 2-column grid per continuation block.
   const PHOTO_CHUNK = 4;
+
+  // Every unique photo src used anywhere in this report, deduped so a
+  // bundled photo reused across several entries only ever loads once —
+  // row packing needs each photo's real aspect ratio up front (not
+  // discovered after the fact via CSS/reflow the way the old masonry's
+  // height:auto could), so this has to resolve before blocks below are
+  // built at all. Skipped entirely on the /masonry comparison path, which
+  // never reads photoDims.
+  const allPhotoSrcs = new Set();
+  if (!useMasonry) {
+    groups.forEach(g => g.entries.forEach(e => {
+      if (e.isNote || e.noPhotos) return;
+      (e.photos || []).forEach(k => { const src = IMG_MAP[k]; if (src) allPhotoSrcs.add(src); });
+    }));
+  }
+  const photoDims = new Map();
+  await Promise.all([...allPhotoSrcs].map(async src => {
+    photoDims.set(src, await loadImageDims(src));
+  }));
 
   const groupLabel = (g) => formatGroupLabel(g, grouping);
 
   // Manual notes are spliced into groups as {isNote:true} pseudo-entries
   // (see applyExtraNotesToGroups) right after the entry they're attached
-  // to — same as the live view, styled the same italic, padded way.
+  // to — plain text, same size as a checklist item's own text (13px),
+  // not italic, not boxed.
   // A manual note is nested INSIDE its entry's own wrapper div (right
   // after the photos), same as the live view nests renderNoteSlot inside
   // renderEntryBlock — not appended as a separate sibling block. Sibling
@@ -2725,9 +2979,7 @@ const buildReportHTML = (report) => {
   // marginBottom:24 rendered as a 24px gap instead of 8px; nesting it
   // avoids that collapse entirely and gives each gap its exact value.
   const noteHTML = (note) =>
-    h("div", { style: "margin-top:16px;" },
-      h("p", { style: `font-family:${SERIF};font-size:12px;color:#303742;line-height:1.8;margin:0;` }, note.note)
-    );
+    h("p", { style: `font-family:${SANS};font-size:13px;color:#303742;line-height:1.5;margin:16px 0 0;` }, note.note);
 
   // Title + meta line + divider — shared by both the no-checklist single
   // block (entryHeaderHTML) and the checklist-item-split path
@@ -2758,19 +3010,31 @@ const buildReportHTML = (report) => {
     // Same divider the live view always shows now (see renderEntryBlock) —
     // the checklist (if any) and/or the attached note both sit below it.
     const dividerHTML = h("div", { style: "height:1px;background:#e8e8e6;margin-top:20px;" }, "");
-    return h("p", { style: `font-family:${SERIF};font-size:20px;font-weight:700;color:#0a1629;line-height:1.35;margin:0;` }, e.note) +
+    return h("p", { style: `font-family:${SERIF};font-size:18px;font-weight:600;color:#0a1629;line-height:1.35;margin:0;` }, e.note) +
       h("div", { style: "margin-top:6px;" }, metaLine) +
       dividerHTML;
   };
 
-  const checklistLabelHTML = h("div", { style: "margin-top:20px;" },
-    h("p", { style: `font-family:${SANS};font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;margin:0 0 12px;` }, "Checklist items completed as of this update")
-  );
+  // Per-entry (not a shared constant) since whether the "limited to the
+  // 10 most recent" caveat applies depends on this specific entry's own
+  // checklist length — see checklistItems' own slice(-10) below, which is
+  // what this label is describing.
+  const checklistLabelHTML = (e) => {
+    const isTruncated = (e.checklist || []).length > 10;
+    return h("div", { style: "margin-top:20px;" },
+      h("p", { style: `font-family:${SANS};font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;margin:${isTruncated ? "0" : "0 0 12px"};` },
+        "Checklist items completed as of this update"
+      ),
+      isTruncated
+        ? h("p", { style: `font-family:${SANS};font-size:10px;font-weight:400;color:#828282;margin:2px 0 12px;` }, "Limited to the 10 most recent")
+        : ""
+    );
+  };
 
   const checklistItemRowHTML = (item) =>
     h("div", { style: "display:flex;align-items:center;gap:8px;" },
       h("span", { style: "flex-shrink:0;color:#16a97d;font-size:12px;font-weight:700;" }, "✓"),
-      h("span", { style: `font-family:${SERIF};font-size:12px;color:#303742;` }, item.text)
+      h("span", { style: `font-family:${SANS};font-size:13px;color:#303742;` }, item.text)
     );
 
   // Whole-entry block — used only when the entry has no checklist, so
@@ -2788,7 +3052,7 @@ const buildReportHTML = (report) => {
   // the same "must fit with next block" rule the pagination pass already
   // uses for section labels (see isEntryHeader below), so the header never
   // strands alone without at least one item under it.
-  const entryHeaderOnlyHTML = (e) => entryHeaderCoreHTML(e) + checklistLabelHTML;
+  const entryHeaderOnlyHTML = (e) => entryHeaderCoreHTML(e) + checklistLabelHTML(e);
 
   // One checklist item as its own page-able block — items other than the
   // first each carry the 12px inter-item gap (matching the live view's
@@ -2849,22 +3113,41 @@ const buildReportHTML = (report) => {
           }
           if (photos.length > 0) {
             // Identity-mapped fallback when nothing's been excluded (see
-            // applyPhotoExclusions) — never the chunk's own 0-based index,
-            // which would only be correct for the first chunk.
+            // applyPhotoExclusions) — never a chunk's own 0-based index,
+            // which would only be correct for the first row/chunk.
             const originalIndices = e.photoOriginalIndices || photos.map((_, idx) => idx);
-            for (let start = 0; start < photos.length; start += PHOTO_CHUNK) {
-              const isFirst = start === 0;
-              const isLast = start + PHOTO_CHUNK >= photos.length;
-              groupBlocks.push({
-                html: renderPhotoChunk(
-                  photos.slice(start, start + PHOTO_CHUNK),
-                  e.entryKey,
-                  report.photoCaptions,
-                  originalIndices.slice(start, start + PHOTO_CHUNK),
-                  isFirst ? 16 : 8,
-                  isLast
-                ),
-                isLabel: false,
+            if (useMasonry) {
+              for (let start = 0; start < photos.length; start += PHOTO_CHUNK) {
+                const isFirst = start === 0;
+                const isLast = start + PHOTO_CHUNK >= photos.length;
+                groupBlocks.push({
+                  html: renderPhotoChunk(
+                    photos.slice(start, start + PHOTO_CHUNK),
+                    e.entryKey,
+                    report.photoCaptions,
+                    originalIndices.slice(start, start + PHOTO_CHUNK),
+                    isFirst ? 16 : 8,
+                    isLast
+                  ),
+                  isLabel: false,
+                });
+              }
+            } else {
+              const photoMetas = photos.map((k, i) => {
+                const src = IMG_MAP[k];
+                if (!src) return null;
+                const dims = photoDims.get(src) || { width: 4, height: 3 };
+                const caption = report.photoCaptions && report.photoCaptions[`${e.entryKey}_${originalIndices[i]}`];
+                return { src: toAbsoluteUrl(src), width: dims.width, height: dims.height, caption };
+              }).filter(Boolean);
+              const rows = packRowsByWidth(photoMetas, PHOTO_ROW_WIDTH, JUSTIFIED_GAP);
+              rows.forEach((row, idx) => {
+                const isFirst = idx === 0;
+                const isLast = idx === rows.length - 1;
+                groupBlocks.push({
+                  html: widthGroupedRowHTML(row, isFirst ? 16 : 8, isLast ? 80 : 0),
+                  isLabel: false,
+                });
               });
             }
           }
@@ -2892,76 +3175,121 @@ const buildReportHTML = (report) => {
   const projectName = report.projectName || PROJECT_NAME;
   const address = report.address || PROJECT_ADDRESS;
   const summaryHTML = report.summary
-    ? h("p", { style: `font-family:${SERIF};font-size:14px;color:#303742;line-height:1.8;margin:0;` }, report.summary)
+    ? h("p", { style: `font-family:${SANS};font-size:16px;color:#303742;line-height:1.8;margin:0;text-align:left;white-space:pre-wrap;` }, report.summary)
     : "";
 
-  // Company name/address — shared between the cover header (right-aligned,
-  // alongside email/phone) and the running header (left-aligned, on its
-  // own, no logo — see runningHeaderHTML). companyAddressHTML's own
-  // trailing margin assumes another line (email or phone) might follow it
-  // on the cover; harmless on the running header, where it's always last.
+  // Company name — cover: 22/600 (emphasized — the h2/webHeading22
+  // weight), dark. Running header: name only (no address — editing both
+  // lives on the cover), colored to match the "VIA TASKTAG" mark beside
+  // it — see runningCompanyNameHTML/runningHeaderHTML.
   const companyNameHTML = report.companyName
-    ? h("p", { style: `font-family:${SANS};font-size:14px;font-weight:700;color:#0a1629;margin:0 0 2px;` }, report.companyName)
+    ? h("p", { style: `font-family:${SERIF};font-size:22px;font-weight:600;color:#0a1629;margin:0 0 4px;` }, report.companyName)
     : "";
+  const runningCompanyNameHTML = report.companyName
+    ? h("p", { style: `font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;line-height:1;margin:0;` }, report.companyName)
+    : "";
+  // Address/email/phone — 14/400, plain secondary text, cover-only now
+  // (the running header shows company name alone). Email and phone share
+  // one line, separated by a dash, rather than each getting its own —
+  // omitted entirely (not two dangling dashes/lines) when neither is
+  // set, same "omit empty fields" convention as everything else in this
+  // static export.
   const companyAddressHTML = report.companyAddress
-    ? h("p", { style: `font-family:${SANS};font-size:11px;font-weight:400;color:#828282;margin:0 0 2px;` }, report.companyAddress)
+    ? h("p", { style: `font-family:${SERIF};font-size:14px;font-weight:400;color:#828282;margin:0 0 12px;` }, report.companyAddress)
     : "";
-  const companyEmailHTML = report.companyEmail
-    ? h("p", { style: `font-family:${SANS};font-size:11px;font-weight:400;color:#828282;margin:0 0 2px;` }, report.companyEmail)
-    : "";
-  const companyPhoneHTML = report.companyPhone
-    ? h("p", { style: `font-family:${SANS};font-size:11px;font-weight:400;color:#828282;margin:0;` }, report.companyPhone)
+  const companyContactLine = [report.companyEmail, report.companyPhone].filter(Boolean).join(" - ");
+  const companyContactHTML = companyContactLine
+    ? h("p", { style: `font-family:${SANS};font-size:14px;font-weight:400;color:#828282;margin:0;` }, companyContactLine)
     : "";
 
-  // ── Cover (page 1) — its own one-off page: logo (capped 200px) on the
-  // left, company name/address/email/phone stacked on the right, then
-  // project name/address, Prepared For + "By <owner>", and one photo
-  // pulled at random from this period's own task photos (see
-  // pickRandomPhoto/report.coverImage — chosen once, when the report was
-  // generated, not re-rolled on every export). No footer, no "VIA
+  // ── Cover (page 1) — its own one-off page: logo (fixed width 180,
+  // height auto) on the left, company name/address/email-phone stacked
+  // on the right, then project name/address, Prepared For + "By <owner>",
+  // and one photo — initially picked at random from this period's own
+  // task photos (see pickRandomPhoto/report.coverImage), or a direct
+  // upload (an IMG_MAP key either way doesn't exist for an upload, so it
+  // falls through to itself — see coverImageSrc). No footer, no "VIA
   // TASKTAG" mark, no Update No./period line — the cover format is
   // distinct from every content page in this document.
+  // Wrapped in its own width:180/height:auto div (not just set directly
+  // on the <img>) so width:100% on the <img> is 100% of THIS wrapper (a
+  // fixed 180px), not of the whole flex header. A fixed width rather
+  // than a max-width — as a flex item, a max-width-only box's actual
+  // rendered width depends on how its flex-basis resolves, which isn't
+  // reliably "as wide as the cap allows" (it rendered far narrower than
+  // 180 in practice); an explicit width sidesteps that, making this box
+  // always exactly 180px wide, full stop.
   const coverLogoHTML = report.logo
-    ? selfClose("img", { src: report.logo, alt: "Company logo", style: "display:block;max-width:200px;height:auto;" })
-    : "";
-  const coverHeaderHTML = h("div", { style: "display:flex;align-items:flex-start;justify-content:space-between;gap:24px;" },
-    coverLogoHTML || h("div", {}, ""),
-    h("div", { style: "text-align:right;" }, companyNameHTML, companyAddressHTML, companyEmailHTML, companyPhoneHTML)
-  );
-  const coverMetaHTML = h("div", { style: "display:flex;flex-wrap:wrap;gap:24px;align-items:center;margin-bottom:40px;" },
-    report.clientName
-      ? h("div", { style: "display:flex;align-items:center;gap:8px;" },
-          h("span", { style: `font-family:${SERIF};font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;` }, "Prepared For"),
-          h("span", { style: `font-family:${SERIF};font-size:12px;font-weight:600;text-transform:uppercase;color:#0a1629;` }, report.clientName)
-        )
-      : "",
-    h("span", { style: `font-family:${SERIF};font-size:12px;font-weight:600;text-transform:uppercase;color:#828282;` }, `By ${POINT_OF_CONTACT_NAME}`)
-  );
-  const coverImageSrc = report.coverImage && IMG_MAP[report.coverImage];
-  const coverImageHTML = coverImageSrc
-    ? h("div", { style: "border-radius:12px;overflow:hidden;" },
-        selfClose("img", { src: toAbsoluteUrl(coverImageSrc), alt: "", style: "display:block;width:100%;max-height:360px;object-fit:cover;" })
+    ? h("div", { style: "width:180px;height:auto;flex-shrink:0;" },
+        selfClose("img", { src: report.logo, alt: "Company logo", style: "display:block;width:100%;height:auto;" })
       )
     : "";
+  const coverHeaderHTML = h("div", { style: "display:flex;align-items:center;justify-content:space-between;gap:24px;" },
+    coverLogoHTML || h("div", {}, ""),
+    h("div", { style: "text-align:right;" }, companyNameHTML, companyAddressHTML, companyContactHTML)
+  );
+  // Prepared For and By are the same kind of pair — uppercase label
+  // (grey05/#828282) + value (text-secondary/#303742, a touch more
+  // prominent than its own label, same as every other label/value pair
+  // on this page) — with the same 4px label/value gap, aligned by
+  // baseline rather than center so they read as one line.
+  const coverMetaHTML = h("div", { style: "display:flex;flex-wrap:wrap;gap:24px;align-items:baseline;margin-bottom:40px;" },
+    report.clientName
+      ? h("div", { style: "display:flex;align-items:baseline;gap:4px;" },
+          h("span", { style: `font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;` }, "Prepared For"),
+          h("span", { style: `font-family:${SANS};font-size:12px;font-weight:600;text-transform:uppercase;color:#303742;` }, report.clientName)
+        )
+      : "",
+    h("div", { style: "display:flex;align-items:baseline;gap:4px;" },
+      h("span", { style: `font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;` }, "By"),
+      h("span", { style: `font-family:${SANS};font-size:12px;font-weight:600;text-transform:uppercase;color:#303742;` }, POINT_OF_CONTACT_NAME)
+    )
+  );
+  // Resolves either form report.coverImage can hold: an IMG_MAP key (the
+  // random initial pick — needs toAbsoluteUrl, same as every other
+  // bundled asset in this export) or a full data URL (an upload — not in
+  // IMG_MAP, so used as-is).
+  const coverImageKeySrc = report.coverImage && IMG_MAP[report.coverImage];
+  const coverImageSrc = coverImageKeySrc ? toAbsoluteUrl(coverImageKeySrc) : (report.coverImage || "");
+  const coverImageHTML = coverImageSrc
+    ? h("div", { style: "border-radius:12px;overflow:hidden;margin-bottom:32px;" },
+        selfClose("img", { src: coverImageSrc, alt: "", style: "display:block;width:100%;max-height:360px;object-fit:cover;" })
+      )
+    : "";
+  // X is this report's position in the project's save history (matches
+  // the same "Update No." shown in the live draft/the results table),
+  // not tied to the period itself — the same period can be regenerated
+  // and saved more than once, so the period alone can't tell two saves
+  // apart.
+  const coverUpdateLineHTML = h("p", { style: `font-family:${SANS};font-size:12px;font-weight:600;text-transform:uppercase;color:#828282;margin:0 0 12px;` }, `Update No. ${report.version} \xB7 ${report.period}`);
+  // Header stays pinned to the top; the content block below it (project
+  // name through the photo) is vertically centered in whatever page
+  // height is left over — flex:1 on both the outer div (so it actually
+  // fills the .card's full min-height, not just its own content's
+  // height) and the inner one (so justify-content:center has real free
+  // space to center the content block within).
   const coverHTML = h("div", { class: "card", style: "box-shadow:0 1px 3px rgba(10,22,41,0.08);" },
-    h("div", { style: `padding:${PAGE_PAD}px;display:flex;flex-direction:column;` },
+    h("div", { style: `padding:${PAGE_PAD}px;display:flex;flex-direction:column;flex:1;` },
       coverHeaderHTML,
-      h("div", { style: "margin-top:64px;" },
-        h("h1", { style: `font-family:${SERIF};font-size:40px;font-weight:700;color:#0a1629;line-height:1.1;margin:0 0 8px;` }, projectName),
-        h("p", { style: `font-family:${SERIF};font-size:15px;font-weight:400;font-style:italic;color:#828282;line-height:1.3;margin:0 0 32px;` }, address),
-        coverMetaHTML,
-        coverImageHTML
+      h("div", { style: "flex:1;display:flex;flex-direction:column;justify-content:center;" },
+        h("div", { style: "margin-top:64px;" },
+          coverImageHTML,
+          coverUpdateLineHTML,
+          h("h1", { style: `font-family:${SERIF};font-size:40px;font-weight:700;color:#0a1629;line-height:1.1;margin:0 0 8px;` }, projectName),
+          h("p", { style: `font-family:${SERIF};font-size:15px;font-weight:400;font-style:italic;color:#828282;line-height:1.3;margin:0 0 32px;` }, address),
+          coverMetaHTML
+        )
       )
     )
   );
 
-  // Running header (every page after the cover) — company name/address
-  // as plain text and the "VIA TASKTAG" mark, deliberately without the
-  // logo (that only ever shows on the cover).
+  // Running header (every page after the cover) — company name only (no
+  // address) and the "VIA TASKTAG" mark, deliberately without the logo
+  // (that only ever shows on the cover).
   const runningHeaderHTML = h("div", { style: `padding:${PAGE_PAD}px ${PAGE_PAD}px 0;` },
-    h("div", { style: "display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;" },
-      h("div", {}, companyNameHTML, companyAddressHTML),
-      h("div", { style: "white-space:nowrap;margin-top:10px;" },
+    h("div", { style: "display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px;" },
+      h("div", {}, runningCompanyNameHTML),
+      h("div", { style: "white-space:nowrap;" },
         h("span", { style: `font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;line-height:1;` }, "VIA TASKTAG")
       )
     ) +
@@ -2995,7 +3323,7 @@ const buildReportHTML = (report) => {
     ? h("div", { class: "card", style: "box-shadow:0 1px 3px rgba(10,22,41,0.08);" },
         runningHeaderHTML,
         h("div", { class: "card__body" },
-          h("p", { style: `font-family:${SANS};font-size:14px;font-weight:600;color:#0a1629;margin:0 0 12px;` }, "Summary"),
+          h("p", { style: `font-family:${SANS};font-size:22px;font-weight:600;color:#0a1629;text-align:center;margin:0 0 12px;` }, "Summary"),
           summaryHTML
         ),
         footerHTML
@@ -3153,6 +3481,27 @@ function ReportsTab({ demoCase }) {
   const [generating,       setGenerating]        = useState(false); // Generate button's own disabled/spinner state, before the inline view appears
   const [saving,           setSaving]             = useState(false); // Save report button's own disabled/spinner state, before the toast appears
   const previewPanelRef = useRef(null);
+  // Cover image upload (see renderCoverContent) — mirrors LogoUploadBox's
+  // own hidden-input + resizeImageToDataURL + loading-spinner mechanics,
+  // just inlined here since it isn't reused anywhere else.
+  const coverImageInputRef = useRef(null);
+  const [coverImageUploading, setCoverImageUploading] = useState(false);
+  const handleCoverImageUpload = (ev) => {
+    const file = ev.target.files?.[0];
+    ev.target.value = "";
+    if (!file) return;
+    setCoverImageUploading(true);
+    // 1600 comfortably covers the cover's own full page-content width
+    // (720px) with retina headroom to spare — well past the flat 64px
+    // default (tuned for the logo's own much smaller display size), which
+    // showed up as visible blur once upscaled to fill this much bigger
+    // frame. JPEG (not the default PNG) since this is ordinary
+    // photographic content, where PNG would cost several times the file
+    // size for no visible difference.
+    resizeImageToDataURL(file, 1600, "image/jpeg", 0.85)
+      .then(url => { setPreview(p => ({ ...p, coverImage: url })); setCoverImageUploading(false); })
+      .catch(() => setCoverImageUploading(false));
+  };
   // Which EditableField (by fieldId) is currently in edit mode — only one
   // at a time across the whole document. Handed down
   // via ActiveEditContext instead of threading it through every render
@@ -3219,13 +3568,14 @@ function ReportsTab({ demoCase }) {
     // handleCopy, which read companyIdentity instead of their own
     // frozen report.logo/companyName/companyAddress).
     setCompanyIdentity({ logo, companyName, companyAddress, companyEmail, companyPhone });
+    // No auto-clearing timeout here — this row stays highlighted until
+    // either the next report is saved (which just reassigns lastSavedId
+    // to that one instead) or the page is reloaded (lastSavedId, like
+    // every other piece of this demo's state, isn't persisted).
     setLastSavedId(id);
     setTimeout(() => {
       setReports(prev => prev.map(r => r.id === id ? { ...r, status: "done" } : r));
     }, 3000);
-    setTimeout(() => {
-      setLastSavedId(current => (current === id ? null : current));
-    }, 8000);
   };
 
   const handleDeleteReport = () => {
@@ -3297,8 +3647,9 @@ function ReportsTab({ demoCase }) {
         clientName: "",
         // One random photo from this period's own task photos — picked
         // once, here, rather than derived at render time, so it stays put
-        // across re-renders; the cover's own "Change photo" control
-        // re-rolls it (see pickRandomPhoto).
+        // across re-renders; the cover's own "Change" control (see
+        // handleCoverImageUpload) can still replace it with something
+        // else entirely.
         coverImage: pickRandomPhoto(data.groups),
       });
       setActiveEditField(null);
@@ -3636,6 +3987,7 @@ function ReportsTab({ demoCase }) {
     const visiblePhotoCount = (e.photos || []).filter(
       (_, i) => !(preview.excludedPhotos && preview.excludedPhotos[`${entryKey}_${i}`])
     ).length;
+    const isTruncatedChecklist = (e.checklist || []).length > 10;
     return (
       <div>
         <EditableField
@@ -3672,9 +4024,19 @@ function ReportsTab({ demoCase }) {
           )}
         </div>
         <div style={{ height: 1, background: "var(--tt-grey03)", marginTop: 16 }} />
-        <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "16px 0 8px" }}>
+        <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: isTruncatedChecklist ? "16px 0 0" : "16px 0 8px" }}>
           Checklist items completed as of this update
         </p>
+        {/* checklistItems below (flatBlocks' own construction) only ever
+            keeps this entry's own last 10 (slice(-10)) — flag it here
+            whenever that actually trims something, rather than silently
+            dropping older items with no indication why. Its own line
+            (not appended inline) so the label above doesn't run long. */}
+        {isTruncatedChecklist && (
+          <p style={{ fontSize: 10, fontWeight: 400, color: "var(--tt-grey05)", margin: "2px 0 8px" }}>
+            Limited to the 10 most recent
+          </p>
+        )}
       </div>
     );
   };
@@ -3792,7 +4154,7 @@ function ReportsTab({ demoCase }) {
         }
         onSave={v => setPreview(p => ({ ...p, summary: v }))}
         textStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, margin: 0 }}
-        inputStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6 }}
+        inputStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, resize: "vertical" }}
       />
     </div>
   );
@@ -3811,144 +4173,266 @@ function ReportsTab({ demoCase }) {
   // A dedicated, one-off page — no footer, never shares space with
   // flatBlocks' content (summary/progress/entries always start fresh on
   // page 2 instead — see the pageLayout effect below). Header: logo on
-  // the left, capped wider than the small mark used everywhere else (see
-  // LogoUploadBox's maxWidth — running header/footer have none at all),
-  // company name/address/email/phone stacked on the right. No "VIA
-  // TASKTAG" mark here; that only shows on the running header from page 2
-  // on.
+  // the left (fixed width 180, height auto — see LogoUploadBox; running
+  // header/footer have no logo at all), company name/address/email-phone
+  // stacked on the right. No "VIA TASKTAG" mark here; that only shows on
+  // the running header from page 2 on.
+  //
+  // Typography matches the design system's own web text variants:
+  // company name is 22/600 (emphasized — the h2/webHeading22 weight),
+  // address/email/phone are 14/400 (plain secondary text).
+  //
+  // alignItems:stretch (rather than flex-start) is what lets the empty
+  // logo placeholder's height:100% (see LogoUploadBox) actually match
+  // this row's content column instead of collapsing to 0 — a real,
+  // uploaded logo overrides that with its own explicit height:auto, so
+  // it isn't affected either way.
   const renderCoverHeader = () => (
-    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24 }}>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24 }}>
       <LogoUploadBox
         src={preview.logo}
         onChange={url => setPreview(p => ({ ...p, logo: url }))}
         disabled={previewSaved}
-        maxWidth={200}
+        width={180}
       />
       <div style={{ textAlign: "right" }}>
         {/* TODO(BE): replace with the firm's actual name from the API */}
+        {/* popoverAlign="right" hangs every one of these popovers off the
+            trigger's right edge — matching this column's own
+            right-aligned text — instead of the left edge, which is the
+            default everywhere else (see EditableField's popoverLeftFor).
+            inputPlaceholder is a contextual example shown only in the
+            live input (not this collapsed link text, which stays the
+            plain call-to-action above). */}
         <EditableField
           fieldId="companyName"
           value={preview.companyName}
           placeholder="Add company name"
           placeholderStyle={{ color: "var(--tt-text-1)" }}
+          inputPlaceholder="e.g. Acme Construction Co."
           disabled={previewSaved}
           popover
+          popoverAlign="right"
           onSave={v => setPreview(p => ({ ...p, companyName: v }))}
-          textStyle={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 2px" }}
+          textStyle={{ fontSize: 22, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 4px" }}
         />
         <EditableField
           fieldId="companyAddress"
           value={preview.companyAddress}
-          placeholder="Add company address"
+          placeholder="Address"
+          inputPlaceholder="e.g. 123 Main St, Austin, TX"
           disabled={previewSaved}
           popover
+          popoverAlign="right"
           onSave={v => setPreview(p => ({ ...p, companyAddress: v }))}
-          textStyle={{ fontSize: 11, fontWeight: 400, color: "var(--tt-grey05)", margin: "0 0 2px" }}
+          textStyle={{ fontSize: 14, fontWeight: 400, color: "var(--tt-grey05)", margin: "0 0 12px" }}
         />
-        <EditableField
-          fieldId="companyEmail"
-          value={preview.companyEmail}
-          placeholder="Add company email"
-          disabled={previewSaved}
-          popover
-          onSave={v => setPreview(p => ({ ...p, companyEmail: v }))}
-          textStyle={{ fontSize: 11, fontWeight: 400, color: "var(--tt-grey05)", margin: "0 0 2px" }}
-        />
-        <EditableField
-          fieldId="companyPhone"
-          value={preview.companyPhone}
-          placeholder="Add company phone"
-          disabled={previewSaved}
-          popover
-          onSave={v => setPreview(p => ({ ...p, companyPhone: v }))}
-          textStyle={{ fontSize: 11, fontWeight: 400, color: "var(--tt-grey05)", margin: 0 }}
-        />
-      </div>
-    </div>
-  );
-
-  // Cover content — project name/address, Prepared For, the owning PM
-  // ("By ..." — always POINT_OF_CONTACT_NAME, the same person credited in
-  // the footer on every other page; every project has exactly one owner,
-  // so this isn't a separate editable field), and one photo pulled at
-  // random from this period's own task photos (see pickRandomPhoto/
-  // preview.coverImage — chosen once, when the report was generated, not
-  // re-rolled on every render), swappable via its own "Change photo"
-  // control.
-  const renderCoverContent = () => (
-    <div style={{ marginTop: 64 }}>
-      <EditableField
-        fieldId="projectName"
-        value={preview.projectName}
-        placeholder={PROJECT_NAME}
-        disabled={previewSaved}
-        onSave={v => setPreview(p => ({ ...p, projectName: v }))}
-        textStyle={{ fontSize: 40, fontWeight: 700, color: "var(--tt-text-1)", lineHeight: 1.1, margin: "0 0 8px" }}
-        inputStyle={{ fontSize: 40, fontWeight: 700, lineHeight: 1.1, color: "var(--tt-text-1)" }}
-      />
-      <EditableField
-        fieldId="address"
-        value={preview.address}
-        placeholder={PROJECT_ADDRESS}
-        disabled={previewSaved}
-        onSave={v => setPreview(p => ({ ...p, address: v }))}
-        textStyle={{ fontSize: 15, fontWeight: 400, fontStyle: "italic", color: "var(--tt-grey05)", lineHeight: 1.3, margin: "0 0 32px" }}
-        inputStyle={{ fontSize: 15, fontWeight: 400, fontStyle: "italic", color: "var(--tt-grey05)" }}
-      />
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 24, alignItems: "center", marginBottom: 40 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: 0, flexShrink: 0 }}>Prepared For</p>
+        {/* Email and phone sit on one line, separated by a dash, rather
+            than each stacked on its own — both still independently
+            click-to-edit. `validate` blocks committing (and shows
+            errorMessage) until the draft matches the expected format;
+            it never fires against an empty draft, so either field stays
+            freely clearable back to blank. Phone's `filterInput` strips
+            anything that isn't a digit or ordinary phone punctuation
+            (space/parens/dash) as it's typed, rather than only catching
+            an invalid character on commit. */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>
           <EditableField
-            fieldId="clientName"
-            value={preview.clientName}
-            placeholder="Add client name"
-            placeholderStyle={{ color: "var(--tt-text-1)" }}
+            fieldId="companyEmail"
+            value={preview.companyEmail}
+            placeholder="Email"
+            inputPlaceholder="e.g. hello@acme.com"
             disabled={previewSaved}
             popover
-            onSave={v => setPreview(p => ({ ...p, clientName: v }))}
-            textStyle={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: preview.clientName ? "var(--tt-text-1)" : "var(--tt-grey05)", margin: 0 }}
+            popoverAlign="right"
+            validate={v => EMAIL_PATTERN.test(v)}
+            errorMessage="Enter a valid email address."
+            onSave={v => setPreview(p => ({ ...p, companyEmail: v }))}
+            textStyle={{ fontSize: 14, fontWeight: 400, color: "var(--tt-grey05)", margin: 0 }}
+          />
+          <span style={{ fontSize: 14, fontWeight: 400, color: "var(--tt-grey05)" }}>-</span>
+          <EditableField
+            fieldId="companyPhone"
+            value={preview.companyPhone}
+            placeholder="Phone"
+            inputPlaceholder="e.g. (212) 555-0100"
+            filterInput={formatUSPhone}
+            disabled={previewSaved}
+            popover
+            popoverAlign="right"
+            validate={v => US_PHONE_PATTERN.test(v)}
+            errorMessage="Enter a valid US phone number, e.g. (212) 555-0100."
+            onSave={v => setPreview(p => ({ ...p, companyPhone: v }))}
+            textStyle={{ fontSize: 14, fontWeight: 400, color: "var(--tt-grey05)", margin: 0 }}
           />
         </div>
-        <p style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "var(--tt-grey05)", margin: 0 }}>
-          By {POINT_OF_CONTACT_NAME}
-        </p>
       </div>
-      {preview.coverImage && IMG_MAP[preview.coverImage] && (
-        <div style={{ position: "relative", borderRadius: 12, overflow: "hidden" }}>
-          <img src={IMG_MAP[preview.coverImage]} alt="" style={{ display: "block", width: "100%", maxHeight: 360, objectFit: "cover" }} />
-          {!previewSaved && (
-            <button
-              onClick={() => setPreview(p => ({ ...p, coverImage: pickRandomPhoto(previewData.groups, p.coverImage) }))}
-              style={{ position: "absolute", bottom: 12, right: 12, display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 999, border: "none", background: "rgba(10,22,41,0.65)", color: "white", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
-            >
-              <RotateCw size={13} strokeWidth={2.25} />
-              Change photo
-            </button>
-          )}
-        </div>
-      )}
     </div>
   );
 
+  // Cover content — project name/address, Prepared For + By <owner>
+  // (POINT_OF_CONTACT_NAME — the same person credited in the footer on
+  // every other page; every project has exactly one owner, so this isn't
+  // a separate editable field, just a plain label/value pair matching
+  // Prepared For's own), and one photo — initially picked at random from
+  // this period's own task photos (see pickRandomPhoto in handleGenerate/
+  // preview.coverImage), replaceable via its own upload control (see
+  // coverImageInputRef/handleCoverImageUpload) rather than re-rolling
+  // another random one.
+  const renderCoverContent = () => {
+    // Resolves either form preview.coverImage can hold: an IMG_MAP key
+    // (the random initial pick) or a full data URL (an upload, via
+    // handleCoverImageUpload — not in IMG_MAP, so falls through to itself).
+    const coverImageSrc = preview.coverImage ? (IMG_MAP[preview.coverImage] || preview.coverImage) : null;
+    return (
+      <div style={{ marginTop: 64 }}>
+        {/* Landscape called out explicitly — the frame below crops to a
+            fixed aspect via object-fit:cover, so a portrait photo would
+            lose a lot off its sides. */}
+        <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", background: "var(--tt-grey02)", marginBottom: 32 }}>
+          {coverImageSrc ? (
+            <img src={coverImageSrc} alt="" style={{ display: "block", width: "100%", maxHeight: 360, objectFit: "cover" }} />
+          ) : (
+            <div style={{ height: 240, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <FileImage size={28} strokeWidth={SW} color="var(--tt-grey05)" />
+            </div>
+          )}
+          {!previewSaved && (
+            <>
+              <button
+                onClick={() => !coverImageUploading && coverImageInputRef.current?.click()}
+                disabled={coverImageUploading}
+                style={{ position: "absolute", bottom: 12, right: 12, display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 999, border: "none", background: "rgba(10,22,41,0.65)", color: "white", fontSize: 12, fontWeight: 600, cursor: coverImageUploading ? "default" : "pointer" }}
+              >
+                {coverImageUploading ? (
+                  <Loader size={13} strokeWidth={2.25} color="white" style={{ display: "block", animation: "tt-spin 0.75s linear infinite" }} />
+                ) : (
+                  <FileImage size={13} strokeWidth={2.25} />
+                )}
+                {/* "(Landscape Preferred)" is just a hint, not the actual
+                    call to action — kept smaller than "Change Photo"
+                    rather than matching it, since it's secondary. */}
+                Change Photo <span style={{ fontSize: 10, fontWeight: 500 }}>(Landscape Preferred)</span>
+              </button>
+              <input
+                ref={coverImageInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleCoverImageUpload}
+                style={{ display: "none" }}
+              />
+            </>
+          )}
+        </div>
+        {/* X is this draft's position in the project's save history
+            (reports.length + 1, so the very first save reads "Update No.
+            1"), not tied to the period itself — the same period can be
+            regenerated and saved more than once, so the period alone
+            can't tell two saves apart (see the results table, which
+            shows this same pairing for that reason). */}
+        <p style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "var(--tt-grey05)", margin: "0 0 12px" }}>
+          Update No. {preview.version} · {preview.period}
+        </p>
+        {/* alwaysEditing — same edit mode as the task note input (see
+            renderNoteSlot): a live, ready-to-type field while empty,
+            rather than a click-to-edit prompt that only reveals the
+            actual input once clicked. Once it holds a value and isn't
+            focused, it settles back to plain clickable text, same as
+            everywhere else. */}
+        <EditableField
+          fieldId="projectName"
+          value={preview.projectName}
+          placeholder={PROJECT_NAME}
+          disabled={previewSaved}
+          alwaysEditing
+          onSave={v => setPreview(p => ({ ...p, projectName: v }))}
+          textStyle={{ fontSize: 40, fontWeight: 700, color: "var(--tt-text-1)", lineHeight: 1.1, margin: "0 0 8px" }}
+          // Only the committed display text (textStyle) is the big 40px
+          // heading — while actually typing, the input reads as plain,
+          // normal-sized text, same as the task note's own edit mode
+          // (see renderNoteSlot's inputStyle). margin matches textStyle's
+          // own — without it, the gap to address below collapses while
+          // this field is actively being edited, since inputStyle isn't
+          // otherwise related to textStyle at all.
+          inputStyle={{ fontSize: 14, height: 40, margin: "0 0 8px" }}
+        />
+        <EditableField
+          fieldId="address"
+          value={preview.address}
+          placeholder={PROJECT_ADDRESS}
+          disabled={previewSaved}
+          alwaysEditing
+          onSave={v => setPreview(p => ({ ...p, address: v }))}
+          textStyle={{ fontSize: 15, fontWeight: 400, fontStyle: "italic", color: "var(--tt-grey05)", lineHeight: 1.3, margin: "0 0 32px" }}
+          // Same reasoning as projectName above — plain, normal-sized
+          // input text while editing, not the italic display style.
+          // margin matches textStyle's own — without it, the 32px gap
+          // to Prepared For below collapses while this field is actively
+          // being edited, the same issue projectName's own margin fixes.
+          inputStyle={{ fontSize: 14, height: 40, margin: "0 0 32px" }}
+        />
+        {/* Prepared For and By are the same kind of pair (uppercase label
+            + value), both text-secondary throughout — label and value
+            alike, on both sides — with the same 4px label/value gap so
+            neither group reads any tighter or looser than the other.
+            alignItems:baseline (not center) is what actually keeps label
+            and value reading as one line — center aligns the two
+            elements' margin boxes, which isn't reliable once one of them
+            (the value, via EditableField's popover-mode wrapper div) has
+            slightly different box metrics than a plain <p>; baseline
+            aligns by the text itself, which is what "aligned" actually
+            means here regardless of any such wrapper differences. */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 24, alignItems: "baseline", marginBottom: 40 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+            <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", lineHeight: 1, margin: 0, flexShrink: 0 }}>Prepared For</p>
+            <EditableField
+              fieldId="clientName"
+              value={preview.clientName}
+              placeholder="Add client name"
+              placeholderStyle={{ color: "var(--tt-text-2)", lineHeight: 1 }}
+              disabled={previewSaved}
+              popover
+              onSave={v => setPreview(p => ({ ...p, clientName: v }))}
+              // Label (grey05) vs value (text-secondary) — the value is
+              // the actual content and reads a touch more prominent than
+              // its own label, same as everywhere else values/labels
+              // pair up on this page.
+              textStyle={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "var(--tt-text-2)", lineHeight: 1, margin: 0 }}
+            />
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+            <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", lineHeight: 1, margin: 0, flexShrink: 0 }}>By</p>
+            <p style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "var(--tt-text-2)", lineHeight: 1, margin: 0 }}>{POINT_OF_CONTACT_NAME}</p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Header stays pinned to the top; the content block below it (project
+  // name through the photo) is vertically centered in whatever page
+  // height is left over, rather than just stacking directly under the
+  // header and leaving the rest of the page blank underneath it.
   const renderCoverPage = () => (
     <div style={{ padding: PAGE_PAD, display: "flex", flexDirection: "column", flex: 1 }}>
       {renderCoverHeader()}
-      {renderCoverContent()}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+        {renderCoverContent()}
+      </div>
     </div>
   );
 
-  // Running header — every page after the cover: company name/address as
-  // plain text (editing lives on the cover; see renderCoverHeader) and
-  // the "VIA TASKTAG" mark, deliberately without the logo (that only ever
-  // shows on the cover).
+  // Running header — every page after the cover: company name only (no
+  // address — editing both lives on the cover; see renderCoverHeader),
+  // colored to match the "VIA TASKTAG" mark right beside it, and no logo
+  // (that only ever shows on the cover).
   const renderRunningHeader = () => (
     <div style={{ padding: `${PAGE_PAD}px ${PAGE_PAD}px 0` }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 16 }}>
         <div>
-          {preview.companyName && <p style={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 2px" }}>{preview.companyName}</p>}
-          {preview.companyAddress && <p style={{ fontSize: 11, fontWeight: 400, color: "var(--tt-grey05)", margin: 0 }}>{preview.companyAddress}</p>}
+          {preview.companyName && <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", lineHeight: 1, margin: 0 }}>{preview.companyName}</p>}
         </div>
-        <div style={{ whiteSpace: "nowrap", marginTop: 10 }}>
+        <div style={{ whiteSpace: "nowrap" }}>
           <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", lineHeight: 1 }}>
             VIA TASKTAG
           </span>
@@ -4185,9 +4669,9 @@ function ReportsTab({ demoCase }) {
     });
   };
 
-  const handlePreviewDownload = () => {
+  const handlePreviewDownload = async () => {
     if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to export"); return; }
-    handleDownload({ includeSummary: preview.includeSummary, period: preview.period, version: preview.version, data: { ...previewData, groups: previewFinalGroups }, photoCaptions: preview.photoCaptions });
+    await handleDownload({ includeSummary: preview.includeSummary, period: preview.period, version: preview.version, data: { ...previewData, groups: previewFinalGroups }, photoCaptions: preview.photoCaptions });
   };
 
   const handlePreviewCopy = async () => {
@@ -4236,10 +4720,10 @@ function ReportsTab({ demoCase }) {
     return () => window.removeEventListener("resize", handler);
   }, []);
 
-  const handleDownload = (report) => {
+  const handleDownload = async (report) => {
     // Company identity always reflects the latest save, not this report's
     // own (possibly older) snapshot — see companyIdentity.
-    const html = buildReportHTML({ ...report, logo: companyIdentity.logo, companyName: companyIdentity.companyName, companyAddress: companyIdentity.companyAddress, companyEmail: companyIdentity.companyEmail, companyPhone: companyIdentity.companyPhone });
+    const html = await buildReportHTML({ ...report, logo: companyIdentity.logo, companyName: companyIdentity.companyName, companyAddress: companyIdentity.companyAddress, companyEmail: companyIdentity.companyEmail, companyPhone: companyIdentity.companyPhone });
     const fileName = "report_" + sanitizePeriodForUrl(report.period) + ".html";
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -4309,9 +4793,13 @@ function ReportsTab({ demoCase }) {
     // summary text content gets its own key.
     if (report.summary) params.set("summaryText", report.summary);
     if (report.clientName) params.set("clientName", report.clientName);
-    // Just the IMG_MAP key (e.g. "img3"), not the resolved asset URL —
-    // cheap to carry in the link, same as clientName above.
-    if (report.coverImage) params.set("coverImage", report.coverImage);
+    // Only when it's still an IMG_MAP key (e.g. "img3") — cheap to carry
+    // in the link, same as clientName above. An uploaded cover photo (see
+    // handleCoverImageUpload) is a full data URL instead, excluded here
+    // for the same reason the logo is: it would turn an otherwise short,
+    // simple link into an unreadable multi-thousand-character block. The
+    // download (which has no such constraint) still includes it in full.
+    if (report.coverImage && IMG_MAP[report.coverImage]) params.set("coverImage", report.coverImage);
     const url = `${window.location.href.split("?")[0]}?${params.toString()}`;
     try { await navigator.clipboard.writeText(url); }
     catch {
@@ -4441,6 +4929,7 @@ function ReportsTab({ demoCase }) {
             <button
               disabled={generating}
               style={{
+                position: "relative",
                 height: 40, padding: "0 24px",
                 minWidth: isWide ? 120 : "auto",
                 background: "var(--tt-text-1)", color: "white",
@@ -4454,9 +4943,24 @@ function ReportsTab({ demoCase }) {
               onMouseLeave={e => e.currentTarget.style.opacity = generating ? 0.7 : 1}
               onClick={() => { setShowCal(false); handleGenerate(); }}
             >
-              {generating
-                ? <span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.35)", borderTopColor: "white", display: "inline-block", animation: "tt-spin 0.75s linear infinite" }} />
-                : "Generate"}
+              {/* "Generate" stays in the DOM (just hidden) rather than
+                  being swapped out for the spinner — that's what keeps
+                  the button's own width constant between the two states;
+                  swapping content outright let it shrink to the
+                  spinner's much narrower intrinsic width whenever
+                  minWidth wasn't already pinning it (e.g. on narrow
+                  layouts, where it's "auto"). */}
+              <span style={{ visibility: generating ? "hidden" : "visible" }}>Generate</span>
+              {generating && (
+                // tt-spin-centered (not plain tt-spin) — its keyframes
+                // bake the translate(-50%,-50%) centering in alongside
+                // the rotation, since an animated "transform" otherwise
+                // fully replaces this element's own inline one for as
+                // long as the animation runs, silently dropping the
+                // centering and leaving the icon offset by half its own
+                // size (see the keyframe's own comment).
+                <Loader size={14} strokeWidth={SW} color="white" style={{ display: "block", position: "absolute", top: "50%", left: "50%", animation: "tt-spin-centered 0.75s linear infinite" }} />
+              )}
             </button>
           </div>
         </div>
@@ -4523,11 +5027,11 @@ function ReportsTab({ demoCase }) {
                     {r.status === "in_progress" ? (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--tt-text-2)" }}>
                         In progress
-                        <span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid var(--tt-grey03)", borderTopColor: "var(--tt-grey05)", display: "inline-block", animation: "tt-spin 0.75s linear infinite" }} />
+                        <Loader size={14} strokeWidth={SW} color="var(--tt-grey05)" style={{ display: "block", animation: "tt-spin 0.75s linear infinite" }} />
                       </span>
                     ) : (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                        <FixedTooltipBtn label="Download" onAction={() => { handleDownload(r); showToast("success", "Downloaded"); }}><Download size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
+                        <FixedTooltipBtn label="Download" onAction={async () => { await handleDownload(r); showToast("success", "Downloaded"); }}><Download size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
                         <FixedTooltipBtn label="Copy link to share" onAction={async () => { await handleCopy(r); showToast("success", "Link copied"); }}><Link size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
                         <FixedTooltipBtn label="Delete report" onAction={() => setDeleteTarget(r)}><Trash2 size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
                       </span>
@@ -4665,6 +5169,7 @@ function ReportsTab({ demoCase }) {
                       onMouseEnter={e => !(previewLoading || saving) && (e.currentTarget.style.opacity = "0.85")}
                       onMouseLeave={e => e.currentTarget.style.opacity = (previewLoading || saving) ? 0.5 : 1}
                       style={{
+                        position: "relative",
                         height: 40, padding: "0 24px", minWidth: isWide ? 120 : "auto", borderRadius: 8, border: "none",
                         background: "var(--tt-text-1)", fontSize: 13, fontWeight: 500, color: "white",
                         display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center",
@@ -4672,9 +5177,20 @@ function ReportsTab({ demoCase }) {
                         opacity: (previewLoading || saving) ? 0.5 : 1, transition: "opacity 0.15s",
                       }}
                     >
-                      {saving
-                        ? <span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.35)", borderTopColor: "white", display: "inline-block", animation: "tt-spin 0.75s linear infinite" }} />
-                        : "Save Report"}
+                      {/* "Save Report" stays in the DOM (just hidden) rather
+                          than being swapped out for the icon — see the
+                          Generate button's own identical fix — so the
+                          button's width stays constant between the two
+                          states instead of shrinking to the icon's much
+                          narrower intrinsic width whenever minWidth wasn't
+                          already pinning it (e.g. on narrow layouts, where
+                          it's "auto"). */}
+                      <span style={{ visibility: saving ? "hidden" : "visible" }}>Save Report</span>
+                      {saving && (
+                        // tt-spin-centered — see Generate's own identical
+                        // fix/comment above.
+                        <Loader size={14} strokeWidth={SW} color="white" style={{ display: "block", position: "absolute", top: "50%", left: "50%", animation: "tt-spin-centered 0.75s linear infinite" }} />
+                      )}
                     </button>
                   </>
                 )}
@@ -4993,7 +5509,28 @@ function ReportPage({ dateRange, period, version, includeSummary, includeNoPhoto
     catch { /* malformed/tampered param — ignore */ }
   }
   data = { ...data, groups };
-  const html = buildReportHTML({ includeSummary, period, version, data, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, summary: summaryText, clientName, coverImage, photoCaptions });
+
+  // buildReportHTML is async (it preloads each photo's real dimensions
+  // before laying out the justified photo rows — see loadImageDims), so
+  // the shared-link recipient's own render has to wait for it too, same
+  // as Download/Copy link do.
+  const [html, setHtml] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    buildReportHTML({ includeSummary, period, version, data, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, summary: summaryText, clientName, coverImage, photoCaptions }).then(result => {
+      if (!cancelled) setHtml(result);
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (html === null) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "var(--tt-grey02)" }}>
+        <Loader size={24} strokeWidth={SW} color="var(--tt-grey05)" style={{ display: "block", animation: "tt-spin 0.75s linear infinite" }} />
+      </div>
+    );
+  }
 
   return (
     <iframe
