@@ -5225,8 +5225,24 @@ function ReportsTab({ demoCase }) {
   // component adds the extra chrome (Period/Generation date on the left,
   // Download/Copy link on the right — see ReportPreviewChrome) around it
   // instead of rendering the bare iframe a real recipient sees.
+  // The logo, footer avatar and an uploaded cover photo are data URLs —
+  // too big for the URL (see buildShareURL), so a preview tab rebuilt from
+  // the URL alone rendered without them while the table's own Download
+  // (built from the full report object) had them. The owner's own new tab
+  // is same-origin, so those three ride along via localStorage instead,
+  // keyed by report id (pid); same latest-identity values handleDownload
+  // uses, so Preview, its Download and the table's Download all match.
   const handlePreviewOpen = (report) => {
-    window.open(buildShareURL(report, { preview: true }), "_blank", "noopener,noreferrer");
+    const url = new URL(buildShareURL(report, { preview: true }));
+    try {
+      localStorage.setItem(`tt-preview-assets-${report.id}`, JSON.stringify({
+        logo: companyIdentity.logo,
+        contactPhoto: contactIdentity.photo,
+        coverImage: report.coverImage,
+      }));
+      url.searchParams.set("pid", String(report.id));
+    } catch { /* storage full/blocked — preview still works, just without those images */ }
+    window.open(url.toString(), "_blank", "noopener,noreferrer");
   };
 
   // Dynamic period options — add "Since last report" if a report exists.
@@ -6182,7 +6198,7 @@ function ReportPaywall() {
 // from ReportPage below so ReportPreviewChrome's own Download button can
 // build the exact same HTML on demand (e.g. for a fresh preview tab)
 // without duplicating this reconstruction logic a second time.
-async function buildReportHTMLFromParams({ dateRange, period, version, includeSummary, includeNoPhotoTasks, notesParam, excludedParam, titlesParam, checklistsParam, captionsParam, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, contactName, contactRole, summaryText, clientName, additionalInfo, coverImage }) {
+async function buildReportHTMLFromParams({ dateRange, period, version, includeSummary, includeNoPhotoTasks, notesParam, excludedParam, titlesParam, checklistsParam, captionsParam, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, contactName, contactRole, contactPhoto, summaryText, clientName, additionalInfo, coverImage }) {
   let data = buildReportData(dateRange, period, null, includeNoPhotoTasks);
   let groups = data.groups;
   // Always runs (even with nothing excluded) — this is what embeds each
@@ -6243,7 +6259,7 @@ async function buildReportHTMLFromParams({ dateRange, period, version, includeSu
     taskChildren.push({ id: `report-task-${e.entryKey}`, label: e.note });
   }));
   if (taskChildren.length > 0) navItems.push({ type: "group", label: "Task List", icon: "task", children: taskChildren });
-  const html = await buildReportHTML({ includeSummary, period, version, data, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, contactName, contactRole, summary: summaryText, clientName, additionalInfo, coverImage, photoCaptions });
+  const html = await buildReportHTML({ includeSummary, period, version, data, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, contactName, contactRole, contactPhoto, summary: summaryText, clientName, additionalInfo, coverImage, photoCaptions });
   return { html, navItems };
 }
 
@@ -6340,6 +6356,7 @@ function ReportPreviewChrome({ reportPageProps, period, dateLabel }) {
     const clean = new URL(window.location.href);
     clean.searchParams.delete("preview");
     clean.searchParams.delete("date");
+    clean.searchParams.delete("pid");
     const url = clean.toString();
     try { await navigator.clipboard.writeText(url); }
     catch {
@@ -6355,8 +6372,35 @@ function ReportPreviewChrome({ reportPageProps, period, dateLabel }) {
   // directly — no postMessage/cross-origin dance needed to scroll into
   // it from out here.
   const scrollToSection = (id) => {
-    setActiveId(id);
     iframeRef.current?.contentDocument?.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  // Scroll-spy, same rule as draft mode's updateActiveSection: the last
+  // section (in document order, which is also nav order) whose top has
+  // reached the top of the scroll viewport is the active one. Driven
+  // purely by scroll — clicking a nav item just scrolls, and the scroll
+  // event then sets it — so click and manual scrolling can't disagree.
+  // The scroll listener lives on the iframe's own window (that's what
+  // actually scrolls), attached from onLoad since srcDoc's document
+  // doesn't exist until then. 2px tolerance for sub-pixel rounding.
+  const navIds = navItems.flatMap(item => item.type === "group" ? item.children.map(c => c.id) : [item.id]);
+  const navIdsRef = useRef([]);
+  navIdsRef.current = navIds;
+  const updateActiveFromScroll = () => {
+    const doc = iframeRef.current?.contentDocument;
+    if (!doc) return;
+    let current = navIdsRef.current[0] || null;
+    for (const id of navIdsRef.current) {
+      const el = doc.getElementById(id);
+      if (el && el.getBoundingClientRect().top <= 2) current = id;
+    }
+    setActiveId(current);
+  };
+  const handleIframeLoad = () => {
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return;
+    win.addEventListener("scroll", updateActiveFromScroll, { passive: true });
+    updateActiveFromScroll();
   };
 
   const btnStyle = { height: 40, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "0 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s" };
@@ -6511,6 +6555,7 @@ function ReportPreviewChrome({ reportPageProps, period, dateLabel }) {
             <iframe
               ref={iframeRef}
               srcDoc={html}
+              onLoad={handleIframeLoad}
               title="Report"
               style={{ border: "none", width: PAGE_W + 48, height: "100%", display: "block" }}
             />
@@ -6527,6 +6572,15 @@ export default function ProjectDetail() {
   const sharedPeriodRaw = params.get("period");
   const sharedPeriod = sharedPeriodRaw ? desanitizePeriodFromUrl(sharedPeriodRaw) : sharedPeriodRaw;
   if (sharedPeriod) {
+    // Only an owner's own Preview tab carries pid (see handlePreviewOpen)
+    // — the heavy data-URL images the URL itself can't hold. A real shared
+    // link never has it, so its logo/avatar/uploaded cover stay off, same
+    // as before.
+    let handedOff = {};
+    if (params.get("preview") === "1" && params.get("pid")) {
+      try { handedOff = JSON.parse(localStorage.getItem(`tt-preview-assets-${params.get("pid")}`)) || {}; }
+      catch { /* missing/corrupt — fall back to URL-only */ }
+    }
     const reportPageProps = {
       dateRange: params.get("range"),
       period: sharedPeriod,
@@ -6540,7 +6594,8 @@ export default function ProjectDetail() {
       captionsParam: params.get("captions"),
       projectName: params.get("projectName"),
       address: params.get("address"),
-      logo: params.get("logo"),
+      logo: handedOff.logo || params.get("logo"),
+      contactPhoto: handedOff.contactPhoto || null,
       companyName: params.get("companyName"),
       companyAddress: params.get("companyAddress"),
       companyEmail: params.get("companyEmail"),
@@ -6550,7 +6605,7 @@ export default function ProjectDetail() {
       summaryText: params.get("summaryText"),
       clientName: params.get("clientName"),
       additionalInfo: params.get("additionalInfo"),
-      coverImage: params.get("coverImage"),
+      coverImage: handedOff.coverImage || params.get("coverImage"),
     };
     // preview=1 (see handlePreviewOpen) — only ever set by the report's
     // own owner opening the Preview action, never present on a link
