@@ -6270,11 +6270,22 @@ async function buildReportHTMLFromParams({ dateRange, period, version, includeSu
     { type: "leaf", id: "report-cover", label: "Cover", icon: "cover" },
   ];
   if (summaryText) navItems.push({ type: "leaf", id: "report-summary", label: "Summary", icon: "summary" });
+  // groupLabel (week/month only — day grouping has none, same as the
+  // draft's own sidebar) rides on the first task of each group, so the
+  // sidebar can draw a divider above it, e.g. "September 2026".
   const taskChildren = [];
-  groups.forEach(g => g.entries.forEach(e => {
-    if (e.isNote) return;
-    taskChildren.push({ id: `report-task-${e.entryKey}`, label: e.note });
-  }));
+  groups.forEach(g => {
+    let firstInGroup = true;
+    g.entries.forEach(e => {
+      if (e.isNote) return;
+      taskChildren.push({
+        id: `report-task-${e.entryKey}`,
+        label: e.note,
+        groupLabel: firstInGroup && data.grouping !== "day" ? formatGroupLabel(g, data.grouping) : null,
+      });
+      firstInGroup = false;
+    });
+  });
   if (taskChildren.length > 0) navItems.push({ type: "group", label: "Task List", icon: "task", children: taskChildren });
   const html = await buildReportHTML({ includeSummary, period, version, data, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, contactName, contactRole, contactPhoto, summary: summaryText, clientName, additionalInfo, coverImage, missingImages, photoCaptions });
   return { html, navItems };
@@ -6519,29 +6530,38 @@ function ReportPreviewChrome({ reportPageProps, period, dateLabel }) {
                     <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.label}</span>
                   </div>
                   <div style={{ marginLeft: 21, paddingLeft: 12, borderLeft: "2px solid var(--tt-grey03)" }}>
-                    {group.children.map(child => {
+                    {group.children.map((child, ci) => {
                       const active = activeId === child.id;
                       return (
-                        <button
-                          key={child.id}
-                          onClick={() => scrollToSection(child.id)}
-                          onMouseEnter={e => { if (!active) e.currentTarget.style.background = "var(--tt-grey02)"; }}
-                          onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
-                          style={{
-                            display: "flex", alignItems: "center", width: "100%", textAlign: "left",
-                            padding: "6px 10px", marginTop: 2, borderRadius: 6, border: "none",
-                            background: active ? "var(--tt-grey02)" : "transparent",
-                            color: active ? "var(--tt-text-1)" : "var(--tt-grey06)",
-                            fontSize: 12, fontWeight: active ? 600 : 400,
-                            cursor: "pointer", transition: "background 0.15s",
-                          }}
-                        >
-                          {/* minWidth:0 — flex items default to
-                              min-width:auto, which would otherwise stop
-                              this from ever actually shrinking/truncating
-                              below its content's natural width. */}
-                          <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{child.label}</span>
-                        </button>
+                        <div key={child.id}>
+                          {/* Week/month divider, same as the draft's own
+                              sidebar — only present when the report is
+                              actually grouped that way. */}
+                          {child.groupLabel && (
+                            <p style={{ margin: ci === 0 ? "0 0 4px" : "12px 0 4px", padding: "0 10px", fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--tt-text-1)" }}>
+                              {child.groupLabel}
+                            </p>
+                          )}
+                          <button
+                            onClick={() => scrollToSection(child.id)}
+                            onMouseEnter={e => { if (!active) e.currentTarget.style.background = "var(--tt-grey02)"; }}
+                            onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
+                            style={{
+                              display: "flex", alignItems: "center", width: "100%", textAlign: "left",
+                              padding: "6px 10px", marginTop: 2, borderRadius: 6, border: "none",
+                              background: active ? "var(--tt-grey02)" : "transparent",
+                              color: active ? "var(--tt-text-1)" : "var(--tt-grey06)",
+                              fontSize: 12, fontWeight: active ? 600 : 400,
+                              cursor: "pointer", transition: "background 0.15s",
+                            }}
+                          >
+                            {/* minWidth:0 — flex items default to
+                                min-width:auto, which would otherwise stop
+                                this from ever actually shrinking/truncating
+                                below its content's natural width. */}
+                            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{child.label}</span>
+                          </button>
+                        </div>
                       );
                     })}
                   </div>
