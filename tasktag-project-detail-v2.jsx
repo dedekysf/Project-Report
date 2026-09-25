@@ -3392,11 +3392,18 @@ const buildReportHTML = async (report) => {
   // reliably "as wide as the cap allows" (it rendered far narrower than
   // 180 in practice); an explicit width sidesteps that, making this box
   // always exactly 180px wide, full stop.
+  // Stand-in for an image that exists but couldn't be carried into this
+  // view (a shared link can't hold data-URL images — see buildShareURL's
+  // `missing` flag). Only ever shown when the real image is absent AND
+  // flagged missing; a download, or an owner's Preview, has the real thing.
+  const missingImageHTML = (style) => h("div", { style: `display:flex;align-items:center;justify-content:center;background:#f7f8fa;border:1px dashed #bdbdbd;border-radius:8px;color:#828282;font-family:${SANS};font-size:12px;text-align:center;${style}` }, "Image can't be loaded");
   const coverLogoHTML = report.logo
     ? h("div", { style: "width:180px;height:auto;flex-shrink:0;" },
         selfClose("img", { src: report.logo, alt: "Company logo", style: "display:block;width:100%;height:auto;" })
       )
-    : "";
+    : (report.missingImages && report.missingImages.includes("logo")
+        ? missingImageHTML("width:180px;height:64px;flex-shrink:0;")
+        : "");
   const coverHeaderHTML = h("div", { style: "display:flex;align-items:center;justify-content:space-between;gap:24px;" },
     coverLogoHTML || h("div", {}, ""),
     h("div", { style: "text-align:right;" }, companyNameHTML, companyAddressHTML, companyContactHTML)
@@ -3435,7 +3442,9 @@ const buildReportHTML = async (report) => {
     ? h("div", { style: "border-radius:12px;overflow:hidden;margin-bottom:32px;" },
         selfClose("img", { src: coverImageSrc, alt: "", style: "display:block;width:100%;max-height:360px;object-fit:cover;" })
       )
-    : "";
+    : (report.missingImages && report.missingImages.includes("cover")
+        ? missingImageHTML("height:240px;border-radius:12px;margin-bottom:32px;")
+        : "");
   // X is this report's position in the project's save history (matches
   // the same "Update No." shown in the live draft/the results table),
   // not tied to the period itself — the same period can be regenerated
@@ -5199,6 +5208,14 @@ function ReportsTab({ demoCase }) {
     // simple link into an unreadable multi-thousand-character block. The
     // download (which has no such constraint) still includes it in full.
     if (report.coverImage && IMG_MAP[report.coverImage]) params.set("coverImage", report.coverImage);
+    // The logo and an uploaded cover photo exist but can't ride in the URL
+    // — flag which ones, so the shared page can show a "can't be loaded"
+    // placeholder where they'd be instead of silently leaving blank space
+    // (or, worse, looking like they were never set).
+    const missingImages = [];
+    if (companyIdentity.logo) missingImages.push("logo");
+    if (report.coverImage && !IMG_MAP[report.coverImage]) missingImages.push("cover");
+    if (missingImages.length > 0) params.set("missing", missingImages.join(","));
     // preview=1 (see handlePreviewOpen) is what tells the root component
     // to wrap ReportPage in ReportPreviewChrome instead of rendering it
     // bare — date rides along only for that chrome's own "Generation
@@ -6198,7 +6215,7 @@ function ReportPaywall() {
 // from ReportPage below so ReportPreviewChrome's own Download button can
 // build the exact same HTML on demand (e.g. for a fresh preview tab)
 // without duplicating this reconstruction logic a second time.
-async function buildReportHTMLFromParams({ dateRange, period, version, includeSummary, includeNoPhotoTasks, notesParam, excludedParam, titlesParam, checklistsParam, captionsParam, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, contactName, contactRole, contactPhoto, summaryText, clientName, additionalInfo, coverImage }) {
+async function buildReportHTMLFromParams({ dateRange, period, version, includeSummary, includeNoPhotoTasks, notesParam, excludedParam, titlesParam, checklistsParam, captionsParam, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, contactName, contactRole, contactPhoto, summaryText, clientName, additionalInfo, coverImage, missingImages }) {
   let data = buildReportData(dateRange, period, null, includeNoPhotoTasks);
   let groups = data.groups;
   // Always runs (even with nothing excluded) — this is what embeds each
@@ -6259,7 +6276,7 @@ async function buildReportHTMLFromParams({ dateRange, period, version, includeSu
     taskChildren.push({ id: `report-task-${e.entryKey}`, label: e.note });
   }));
   if (taskChildren.length > 0) navItems.push({ type: "group", label: "Task List", icon: "task", children: taskChildren });
-  const html = await buildReportHTML({ includeSummary, period, version, data, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, contactName, contactRole, contactPhoto, summary: summaryText, clientName, additionalInfo, coverImage, photoCaptions });
+  const html = await buildReportHTML({ includeSummary, period, version, data, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, contactName, contactRole, contactPhoto, summary: summaryText, clientName, additionalInfo, coverImage, missingImages, photoCaptions });
   return { html, navItems };
 }
 
@@ -6606,6 +6623,7 @@ export default function ProjectDetail() {
       clientName: params.get("clientName"),
       additionalInfo: params.get("additionalInfo"),
       coverImage: handedOff.coverImage || params.get("coverImage"),
+      missingImages: (params.get("missing") || "").split(",").filter(Boolean),
     };
     // preview=1 (see handlePreviewOpen) — only ever set by the report's
     // own owner opening the Preview action, never present on a link
