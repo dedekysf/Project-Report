@@ -13,7 +13,7 @@ import {
   ArrowUpDown, Calendar, AlignJustify, Clock,
   UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, Crown, AlertTriangle,
   RotateCw, ZoomIn, ZoomOut, Folder, ArrowLeft, ArrowRight, Info, StickyNote,
-  ExternalLink, Forward, Loader, Mail, Phone, Upload, GripVertical,
+  ExternalLink, Forward, Loader, Mail, Phone, Upload, GripVertical, Eye,
 } from "lucide-react";
 
 import logoImg from "./src/Img/tasktag-logo.13f1babda8fdbb1b7251572a0fe11f9e.png";
@@ -5113,7 +5113,12 @@ function ReportsTab({ demoCase }) {
     URL.revokeObjectURL(url);
   };
 
-    const handleCopy = async (report) => {
+  // Shared by handleCopy and handlePreviewOpen below — both need the
+  // exact same reproducible-from-params URL, the only difference is what
+  // happens with it afterward (clipboard vs. a new tab) and whether the
+  // preview-only chrome (Period/Generation date + Download/Copy link —
+  // see ReportPreviewChrome) should come along for the ride.
+  const buildShareURL = (report, { preview } = {}) => {
     // Report content is fully reproducible from these params, so the link
     // needs no server/storage round-trip — it can never fail to resolve.
     // Manually-added notes aren't part of the base activity log, so they
@@ -5190,13 +5195,34 @@ function ReportsTab({ demoCase }) {
     // simple link into an unreadable multi-thousand-character block. The
     // download (which has no such constraint) still includes it in full.
     if (report.coverImage && IMG_MAP[report.coverImage]) params.set("coverImage", report.coverImage);
-    const url = `${window.location.href.split("?")[0]}?${params.toString()}`;
+    // preview=1 (see handlePreviewOpen) is what tells the root component
+    // to wrap ReportPage in ReportPreviewChrome instead of rendering it
+    // bare — date rides along only for that chrome's own "Generation
+    // date" line, a plain display string ReportPage itself never reads.
+    if (preview) {
+      params.set("preview", "1");
+      if (report.date) params.set("date", report.date);
+    }
+    return `${window.location.href.split("?")[0]}?${params.toString()}`;
+  };
+
+  const handleCopy = async (report) => {
+    const url = buildShareURL(report);
     try { await navigator.clipboard.writeText(url); }
     catch {
       const el = document.createElement("textarea");
       el.value = url; el.style.cssText = "position:fixed;opacity:0";
       document.body.appendChild(el); el.select(); document.execCommand("copy"); document.body.removeChild(el);
     }
+  };
+
+  // Preview — opens the exact same reproducible-from-params document a
+  // copied link would, in a new tab, just with preview=1 so the root
+  // component adds the extra chrome (Period/Generation date on the left,
+  // Download/Copy link on the right — see ReportPreviewChrome) around it
+  // instead of rendering the bare iframe a real recipient sees.
+  const handlePreviewOpen = (report) => {
+    window.open(buildShareURL(report, { preview: true }), "_blank", "noopener,noreferrer");
   };
 
   // Dynamic period options — add "Since last report" if a report exists.
@@ -5400,7 +5426,7 @@ function ReportsTab({ demoCase }) {
                 {["Project Name", "Period", "Generation date"].map((h) => (
                   <th key={h} style={{ textAlign: "left", padding: "10px 16px", fontSize: 12, fontWeight: 500, color: "var(--tt-text-1)" }}>{h}</th>
                 ))}
-                <th style={{ padding: "10px 16px", width: 160 }} />
+                <th style={{ padding: "10px 16px", width: 190 }} />
               </tr>
             </thead>
             <tbody>
@@ -5414,7 +5440,7 @@ function ReportsTab({ demoCase }) {
                     Update No. {r.version} · {r.period}
                   </td>
                   <td style={{ padding: "0 16px", fontSize: 13, color: "var(--tt-text-2)", whiteSpace: "nowrap", height: 52, verticalAlign: "middle" }}>{r.date}</td>
-                  <td style={{ padding: "0 14px 0 16px", textAlign: "right", height: 52, verticalAlign: "middle", width: 160 }}>
+                  <td style={{ padding: "0 14px 0 16px", textAlign: "right", height: 52, verticalAlign: "middle", width: 190 }}>
                     {r.status === "in_progress" ? (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--tt-text-2)" }}>
                         In progress
@@ -5422,6 +5448,7 @@ function ReportsTab({ demoCase }) {
                       </span>
                     ) : (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                        <FixedTooltipBtn label="Preview" onAction={() => handlePreviewOpen(r)}><Eye size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
                         <FixedTooltipBtn label="Download" onAction={async () => { await handleDownload(r); showToast("success", "Downloaded"); }}><Download size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
                         <FixedTooltipBtn label="Copy link to share" onAction={async () => { await handleCopy(r); showToast("success", "Link copied"); }}><Link size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
                         <FixedTooltipBtn label="Delete report" onAction={() => setDeleteTarget(r)}><Trash2 size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
@@ -6147,8 +6174,11 @@ function ReportPaywall() {
 // Report content is fully reproducible from its URL params (dateRange,
 // period, included sections, excluded photos, and any manually-added
 // notes) — rebuilt on the fly rather than fetched from storage, so a
-// shared link works on any device/browser and can never 404.
-function ReportPage({ dateRange, period, version, includeSummary, includeNoPhotoTasks, notesParam, excludedParam, titlesParam, checklistsParam, captionsParam, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, contactName, contactRole, summaryText, clientName, additionalInfo, coverImage }) {
+// shared link works on any device/browser and can never 404. Split out
+// from ReportPage below so ReportPreviewChrome's own Download button can
+// build the exact same HTML on demand (e.g. for a fresh preview tab)
+// without duplicating this reconstruction logic a second time.
+async function buildReportHTMLFromParams({ dateRange, period, version, includeSummary, includeNoPhotoTasks, notesParam, excludedParam, titlesParam, checklistsParam, captionsParam, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, contactName, contactRole, summaryText, clientName, additionalInfo, coverImage }) {
   let data = buildReportData(dateRange, period, null, includeNoPhotoTasks);
   let groups = data.groups;
   // Always runs (even with nothing excluded) — this is what embeds each
@@ -6185,15 +6215,22 @@ function ReportPage({ dateRange, period, version, includeSummary, includeNoPhoto
     catch { /* malformed/tampered param — ignore */ }
   }
   data = { ...data, groups };
+  return buildReportHTML({ includeSummary, period, version, data, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, contactName, contactRole, summary: summaryText, clientName, additionalInfo, coverImage, photoCaptions });
+}
 
-  // buildReportHTML is async (it preloads each photo's real dimensions
-  // before laying out the justified photo rows — see loadImageDims), so
-  // the shared-link recipient's own render has to wait for it too, same
-  // as Download/Copy link do.
+// fillParent — ReportPreviewChrome renders this inside its own flex
+// column (chrome bar + this filling whatever's left), so it needs
+// height:100% there instead of the bare 100vh a real, chrome-less
+// shared-link recipient gets (the default, unchanged from before).
+function ReportPage(props) {
+  // buildReportHTMLFromParams is async (it preloads each photo's real
+  // dimensions before laying out the justified photo rows — see
+  // loadImageDims), so the shared-link recipient's own render has to
+  // wait for it too, same as Download/Copy link do.
   const [html, setHtml] = useState(null);
   useEffect(() => {
     let cancelled = false;
-    buildReportHTML({ includeSummary, period, version, data, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, contactName, contactRole, summary: summaryText, clientName, additionalInfo, coverImage, photoCaptions }).then(result => {
+    buildReportHTMLFromParams(props).then(result => {
       if (!cancelled) setHtml(result);
     });
     return () => { cancelled = true; };
@@ -6202,7 +6239,7 @@ function ReportPage({ dateRange, period, version, includeSummary, includeNoPhoto
 
   if (html === null) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "var(--tt-grey02)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: props.fillParent ? "100%" : "100vh", background: "var(--tt-grey02)" }}>
         <Loader size={24} strokeWidth={SW} color="var(--tt-grey05)" style={{ display: "block", animation: "tt-spin 0.75s linear infinite" }} />
       </div>
     );
@@ -6212,8 +6249,103 @@ function ReportPage({ dateRange, period, version, includeSummary, includeNoPhoto
     <iframe
       srcDoc={html}
       title="Report"
-      style={{ border: "none", width: "100%", height: "100vh", display: "block" }}
+      style={{ border: "none", width: "100%", height: props.fillParent ? "100%" : "100vh", display: "block" }}
     />
+  );
+}
+
+// ── Report Preview Chrome (owner's own "Preview" tab) ──
+// Same document a copied link renders, just with an added top bar the
+// report's owner sees and a real recipient never would: Period/
+// Generation date on the left, Download/Copy link on the right (see
+// ProjectDetail's own identical pair of buttons in the results table),
+// same visual language as the draft modal's own locked/saved chrome.
+// Rebuilds the HTML itself for Download rather than reusing whatever
+// ReportPage's own iframe is currently showing — the two are
+// independent, on-demand builds from the same params, not shared state,
+// so there's no coupling to keep in sync between them.
+function ReportPreviewChrome({ reportPageProps, period, dateLabel }) {
+  const [downloading, setDownloading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleDownload = async () => {
+    if (downloading) return;
+    setDownloading(true);
+    const html = await buildReportHTMLFromParams(reportPageProps);
+    const fileName = "report_" + sanitizePeriodForUrl(period) + ".html";
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setDownloading(false);
+  };
+
+  const handleCopyLink = async () => {
+    // The plain shareable link, not this preview tab's own URL — a
+    // recipient of this link is meant to see the bare document (what
+    // ReportPage renders on its own), never this owner-only chrome.
+    const clean = new URL(window.location.href);
+    clean.searchParams.delete("preview");
+    clean.searchParams.delete("date");
+    const url = clean.toString();
+    try { await navigator.clipboard.writeText(url); }
+    catch {
+      const el = document.createElement("textarea");
+      el.value = url; el.style.cssText = "position:fixed;opacity:0";
+      document.body.appendChild(el); el.select(); document.execCommand("copy"); document.body.removeChild(el);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const btnStyle = { height: 40, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "0 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s" };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+      {/* Content centered to PAGE_W (the document's own width below, not
+          this full-width bar) — same "chrome bar centers its content
+          column, same width as the document it sits above" pattern the
+          draft modal's own #draft-chrome uses (there it's ROW_W, sidebar
+          included; there's no sidebar here, so PAGE_W alone is the right
+          column width to match). */}
+      <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--tt-grey03)", background: "white", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: PAGE_W, width: "100%", margin: "0 auto" }}>
+          <div>
+            <p style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 2px" }}>{period}</p>
+            {dateLabel && (
+              <p style={{ fontSize: 12, fontWeight: 500, color: "var(--tt-grey05)", margin: 0 }}>Generated {dateLabel}</p>
+            )}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button
+              disabled={downloading}
+              onClick={handleDownload}
+              onMouseEnter={e => !downloading && (e.currentTarget.style.background = "var(--tt-grey02)")}
+              onMouseLeave={e => e.currentTarget.style.background = "white"}
+              style={{ ...btnStyle, cursor: downloading ? "not-allowed" : "pointer", opacity: downloading ? 0.5 : 1 }}
+            >
+              <Download size={14} strokeWidth={SW} /> Download
+            </button>
+            <button
+              onClick={handleCopyLink}
+              onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+              onMouseLeave={e => e.currentTarget.style.background = "white"}
+              style={btnStyle}
+            >
+              {copied ? <><Check size={14} strokeWidth={SW} /> Link copied</> : <><Link size={14} strokeWidth={SW} /> Copy link</>}
+            </button>
+          </div>
+        </div>
+      </div>
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <ReportPage {...reportPageProps} fillParent />
+      </div>
+    </div>
   );
 }
 
@@ -6222,33 +6354,41 @@ export default function ProjectDetail() {
   const params = new URLSearchParams(window.location.search);
   const sharedPeriodRaw = params.get("period");
   const sharedPeriod = sharedPeriodRaw ? desanitizePeriodFromUrl(sharedPeriodRaw) : sharedPeriodRaw;
-  if (sharedPeriod) return (
-    <ReportPage
-      dateRange={params.get("range")}
-      period={sharedPeriod}
-      version={params.get("version")}
-      includeSummary={params.get("summary") !== "0"}
-      includeNoPhotoTasks={params.get("nophotos") !== "0"}
-      notesParam={params.get("notes")}
-      excludedParam={params.get("excluded")}
-      titlesParam={params.get("titles")}
-      checklistsParam={params.get("checklists")}
-      captionsParam={params.get("captions")}
-      projectName={params.get("projectName")}
-      address={params.get("address")}
-      logo={params.get("logo")}
-      companyName={params.get("companyName")}
-      companyAddress={params.get("companyAddress")}
-      companyEmail={params.get("companyEmail")}
-      companyPhone={params.get("companyPhone")}
-      contactName={params.get("contactName")}
-      contactRole={params.get("contactRole")}
-      summaryText={params.get("summaryText")}
-      clientName={params.get("clientName")}
-      additionalInfo={params.get("additionalInfo")}
-      coverImage={params.get("coverImage")}
-    />
-  );
+  if (sharedPeriod) {
+    const reportPageProps = {
+      dateRange: params.get("range"),
+      period: sharedPeriod,
+      version: params.get("version"),
+      includeSummary: params.get("summary") !== "0",
+      includeNoPhotoTasks: params.get("nophotos") !== "0",
+      notesParam: params.get("notes"),
+      excludedParam: params.get("excluded"),
+      titlesParam: params.get("titles"),
+      checklistsParam: params.get("checklists"),
+      captionsParam: params.get("captions"),
+      projectName: params.get("projectName"),
+      address: params.get("address"),
+      logo: params.get("logo"),
+      companyName: params.get("companyName"),
+      companyAddress: params.get("companyAddress"),
+      companyEmail: params.get("companyEmail"),
+      companyPhone: params.get("companyPhone"),
+      contactName: params.get("contactName"),
+      contactRole: params.get("contactRole"),
+      summaryText: params.get("summaryText"),
+      clientName: params.get("clientName"),
+      additionalInfo: params.get("additionalInfo"),
+      coverImage: params.get("coverImage"),
+    };
+    // preview=1 (see handlePreviewOpen) — only ever set by the report's
+    // own owner opening the Preview action, never present on a link
+    // actually meant to be shared, which renders ReportPage bare exactly
+    // as it always has.
+    if (params.get("preview") === "1") {
+      return <ReportPreviewChrome reportPageProps={reportPageProps} period={sharedPeriod} dateLabel={params.get("date")} />;
+    }
+    return <ReportPage {...reportPageProps} />;
+  }
 
   const [activeTab, setActiveTab] = useState("reports");
   const [demoCase, setDemoCase] = useState("happy");
