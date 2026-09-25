@@ -2894,7 +2894,7 @@ const buildReportHTML = async (report) => {
     return `<${tag}${attrStr}/>`;
   };
 
-  // Comparison path for the previous CSS column-count masonry photo
+  // Comparison path for an alternative fixed-3-column masonry photo
   // layout — visit the app at /masonry to preview that instead of the
   // current default (orientation-grouped rows, see packRowsByOrientation
   // below). Read once per export so a link copied while on /masonry keeps
@@ -3047,41 +3047,73 @@ const buildReportHTML = async (report) => {
     return rows;
   };
 
-  // ── /masonry comparison path — the previous CSS column-count layout ──
+  // ── /masonry comparison path — fixed 3-column, shortest-column-first ──
   // Kept only for side-by-side preview against the justified-row default
   // above; not used unless useMasonry is true. Every photo shows here (no
-  // "+N more" cap), at its own natural size, in fixed-size chunks (see
+  // "+N more" cap), at its own natural aspect ratio (needs real
+  // photoDims up front, same as the default path — see allPhotoSrcs
+  // below, no longer skipped for this path), in fixed-size chunks (see
   // PHOTO_CHUNK) so the pagination pass can still place each chunk on
-  // whichever page it fits.
-  const renderPhotoChunk = (photos, entryKey, captions, originalIndices, marginTop, isLast) => {
-    const cells = photos.map((k, i) => {
-      const src = IMG_MAP[k];
-      if (!src) return "";
-      const caption = captions && captions[`${entryKey}_${originalIndices[i]}`];
-      return h("div", { style: "break-inside:avoid;margin-bottom:8px;" },
-        selfClose("img", { src: toAbsoluteUrl(src), style: "width:100%;height:auto;border-radius:4px;display:block;" }),
-        caption ? h("p", { style: `font-size:12px;font-style:italic;color:#828282;font-family:${SERIF};text-align:center;margin:6px 0 0;` }, caption) : ""
-      );
-    }).filter(Boolean);
-    if (cells.length === 0) return "";
-    return h("div", { style: `column-count:2;column-gap:8px;margin-top:${marginTop}px;margin-bottom:${isLast ? 80 : 0}px;` }, ...cells);
+  // whichever page it fits — masonry columns reset per chunk, they don't
+  // carry state across a page-fitting boundary.
+  const MASONRY_COLUMNS = 3;
+  // A photo goes into whichever column is currently shortest — not by
+  // display order/orientation the way the default path groups (a
+  // landscape, a square and a portrait shot can all end up next to each
+  // other in different columns here, entirely by whichever column needed
+  // filling next) — purely to keep the 3 columns' total heights as even
+  // as possible. Height comes straight from the column's own fixed width
+  // and the photo's real aspect ratio — never stretched, never cropped.
+  // No highlight here either — the fixed-3-column grid is this layout's
+  // entire visual idea, a solo full-width photo wouldn't fit that idea.
+  // Placed tallest-first, not in upload order — a single very tall photo
+  // landing late (once the "shortest" column is already a poor choice
+  // for it) can throw the 3 columns badly out of balance; sorting so the
+  // tallest photos get first pick of a still-empty column, while every
+  // shorter one still gets placed purely by "which column is shortest
+  // right now," keeps the actual column heights much closer to each
+  // other without changing that placement rule at all.
+  const packMasonryColumns = (photos, columnWidth, gap) => {
+    const ordered = [...photos].sort((a, b) => (b.height / b.width) - (a.height / a.width));
+    const columns = Array.from({ length: MASONRY_COLUMNS }, () => ({ photos: [], height: 0 }));
+    ordered.forEach(photo => {
+      const col = columns.reduce((shortest, c) => (c.height < shortest.height ? c : shortest), columns[0]);
+      const renderHeight = photo.height * (columnWidth / photo.width);
+      if (col.photos.length > 0) col.height += gap;
+      col.photos.push({ ...photo, renderHeight });
+      col.height += renderHeight;
+    });
+    return columns;
   };
-  const PHOTO_CHUNK = 4;
+  const masonryHTML = (photos, columnWidth, gap, marginTop, marginBottom) => {
+    const columns = packMasonryColumns(photos, columnWidth, gap);
+    const columnsHTML = columns.map(col =>
+      h("div", { style: `width:${Math.round(columnWidth)}px;flex-shrink:0;` },
+        col.photos.map(p => {
+          const cellH = Math.round(p.renderHeight);
+          return h("div", { style: "margin-bottom:8px;" },
+            selfClose("img", { src: p.src, style: `display:block;width:${Math.round(columnWidth)}px;height:${cellH}px;border-radius:4px;` }),
+            p.caption ? h("p", { style: `font-size:12px;font-style:italic;color:#828282;font-family:${SERIF};text-align:center;margin:6px 0 0;` }, p.caption) : ""
+          );
+        }).join("")
+      )
+    ).join("");
+    return h("div", { style: `display:flex;gap:${gap}px;align-items:flex-start;margin-top:${marginTop}px;margin-bottom:${marginBottom}px;` }, columnsHTML);
+  };
+  const PHOTO_CHUNK = 9;
 
   // Every unique photo src used anywhere in this report, deduped so a
   // bundled photo reused across several entries only ever loads once —
-  // row packing needs each photo's real aspect ratio up front (not
-  // discovered after the fact via CSS/reflow the way the old masonry's
-  // height:auto could), so this has to resolve before blocks below are
-  // built at all. Skipped entirely on the /masonry comparison path, which
-  // never reads photoDims.
+  // both this path and the default path need each photo's real aspect
+  // ratio up front (masonry needs it to know each photo's rendered
+  // height before deciding which column is shortest; the default path
+  // needs it for its own row packing), so this has to resolve before
+  // blocks below are built at all either way.
   const allPhotoSrcs = new Set();
-  if (!useMasonry) {
-    groups.forEach(g => g.entries.forEach(e => {
-      if (e.isNote || e.noPhotos) return;
-      (e.photos || []).forEach(k => { const src = IMG_MAP[k]; if (src) allPhotoSrcs.add(src); });
-    }));
-  }
+  groups.forEach(g => g.entries.forEach(e => {
+    if (e.isNote || e.noPhotos) return;
+    (e.photos || []).forEach(k => { const src = IMG_MAP[k]; if (src) allPhotoSrcs.add(src); });
+  }));
   const photoDims = new Map();
   await Promise.all([...allPhotoSrcs].map(async src => {
     photoDims.set(src, await loadImageDims(src));
@@ -3230,30 +3262,28 @@ const buildReportHTML = async (report) => {
             // applyPhotoExclusions) — never a chunk's own 0-based index,
             // which would only be correct for the first row/chunk.
             const originalIndices = e.photoOriginalIndices || photos.map((_, idx) => idx);
+            const photoMetas = photos.map((k, i) => {
+              const src = IMG_MAP[k];
+              if (!src) return null;
+              const dims = photoDims.get(src) || { width: 4, height: 3 };
+              const caption = report.photoCaptions && report.photoCaptions[`${e.entryKey}_${originalIndices[i]}`];
+              return { src: toAbsoluteUrl(src), width: dims.width, height: dims.height, caption };
+            }).filter(Boolean);
             if (useMasonry) {
-              for (let start = 0; start < photos.length; start += PHOTO_CHUNK) {
+              const columnWidth = (PHOTO_ROW_WIDTH - JUSTIFIED_GAP * (MASONRY_COLUMNS - 1)) / MASONRY_COLUMNS;
+              for (let start = 0; start < photoMetas.length; start += PHOTO_CHUNK) {
                 const isFirst = start === 0;
-                const isLast = start + PHOTO_CHUNK >= photos.length;
+                const isLast = start + PHOTO_CHUNK >= photoMetas.length;
                 groupBlocks.push({
-                  html: renderPhotoChunk(
-                    photos.slice(start, start + PHOTO_CHUNK),
-                    e.entryKey,
-                    report.photoCaptions,
-                    originalIndices.slice(start, start + PHOTO_CHUNK),
-                    isFirst ? 16 : 8,
-                    isLast
+                  html: masonryHTML(
+                    photoMetas.slice(start, start + PHOTO_CHUNK),
+                    columnWidth, JUSTIFIED_GAP,
+                    isFirst ? 16 : 8, isLast ? 80 : 0
                   ),
                   isLabel: false,
                 });
               }
             } else {
-              const photoMetas = photos.map((k, i) => {
-                const src = IMG_MAP[k];
-                if (!src) return null;
-                const dims = photoDims.get(src) || { width: 4, height: 3 };
-                const caption = report.photoCaptions && report.photoCaptions[`${e.entryKey}_${originalIndices[i]}`];
-                return { src: toAbsoluteUrl(src), width: dims.width, height: dims.height, caption };
-              }).filter(Boolean);
               const rows = packRowsByOrientation(photoMetas, PHOTO_ROW_WIDTH, JUSTIFIED_GAP);
               rows.forEach((row, idx) => {
                 const isFirst = idx === 0;
