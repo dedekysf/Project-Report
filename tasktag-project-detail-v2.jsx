@@ -3136,21 +3136,12 @@ const buildReportHTML = async (report) => {
       dividerHTML;
   };
 
-  // Per-entry (not a shared constant) since whether the "limited to the
-  // 10 most recent" caveat applies depends on this specific entry's own
-  // checklist length — see checklistItems' own slice(-10) below, which is
-  // what this label is describing.
-  const checklistLabelHTML = (e) => {
-    const isTruncated = (e.checklist || []).length > 10;
-    return h("div", { style: "margin-top:20px;" },
-      h("p", { style: `font-family:${SANS};font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;margin:${isTruncated ? "0" : "0 0 12px"};` },
+  const checklistLabelHTML = (e) =>
+    h("div", { style: "margin-top:20px;" },
+      h("p", { style: `font-family:${SANS};font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;margin:0 0 12px;` },
         "Checklist items completed as of this update"
-      ),
-      isTruncated
-        ? h("p", { style: `font-family:${SANS};font-size:10px;font-weight:400;color:#828282;margin:2px 0 12px;` }, "Limited to the 10 most recent")
-        : ""
+      )
     );
-  };
 
   const checklistItemRowHTML = (item) =>
     h("div", { style: "display:flex;align-items:center;gap:8px;" },
@@ -3312,10 +3303,11 @@ const buildReportHTML = async (report) => {
   const summaryFitsOnCover = !!report.summary && report.summary.length <= SUMMARY_INLINE_MAX_CHARS;
   const coverSummaryHTML = summaryFitsOnCover
     ? h("div", { style: "margin-bottom:40px;" },
-        // Divider above it, not below — this only ever sits right after
-        // coverMetaHTML (Prepared For/By), so it's what actually marks
-        // "Summary" as its own distinct block on the cover rather than
-        // reading like a continuation of Prepared For/By right above it.
+        // Divider above it, not below — this sits last on the cover
+        // (after Prepared For/By, then Additional Information if either
+        // is present), so it's what actually marks "Summary" as its own
+        // distinct block rather than reading like a continuation of
+        // whatever's directly above it.
         h("div", { style: "height:1px;background:#e8e8e6;margin-bottom:24px;" }, ""),
         h("p", { style: `font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;margin:0 0 6px;` }, "Summary"),
         h("p", { style: `font-family:${SANS};font-size:14px;font-weight:400;color:#303742;line-height:1.6;margin:0;white-space:pre-wrap;` }, report.summary)
@@ -3397,7 +3389,7 @@ const buildReportHTML = async (report) => {
   // what it's reading) this one's short/contextual enough to speak for
   // itself. Pre-wrap so line breaks the user typed survive.
   const additionalInfoHTML = report.additionalInfo
-    ? h("p", { style: `font-family:${SANS};font-size:14px;font-weight:400;color:#303742;line-height:1.6;margin:0;white-space:pre-wrap;` }, report.additionalInfo)
+    ? h("p", { style: `font-family:${SANS};font-size:14px;font-weight:400;color:#303742;line-height:1.6;margin:0 0 40px;white-space:pre-wrap;` }, report.additionalInfo)
     : "";
   // Resolves either form report.coverImage can hold: an IMG_MAP key (the
   // random initial pick — needs toAbsoluteUrl, same as every other
@@ -3432,8 +3424,8 @@ const buildReportHTML = async (report) => {
           h("h1", { style: `font-family:${SERIF};font-size:40px;font-weight:700;color:#0a1629;line-height:1.1;margin:0 0 8px;` }, projectName),
           h("p", { style: `font-family:${SERIF};font-size:15px;font-weight:400;font-style:italic;color:#828282;line-height:1.3;margin:0 0 32px;` }, address),
           coverMetaHTML,
-          coverSummaryHTML,
-          additionalInfoHTML
+          additionalInfoHTML,
+          coverSummaryHTML
         )
       )
     )
@@ -4036,8 +4028,8 @@ function ReportsTab({ demoCase }) {
   // synchronously during this same render pass, so a later declaration
   // would still be in its temporal dead zone at that point.
   // slice(-10) — never more than 10 items, same hard cap the export's own
-  // checklistLabelHTML/slice(-10) already enforces (that one truncates a
-  // raw e.checklist longer than 10 down to its most recent 10); capping it
+  // checklistItems/slice(-10) already enforces (that one truncates a raw
+  // e.checklist longer than 10 down to its most recent 10); capping it
   // here too means the draft can never even start from/hold more than 10,
   // not just refuse to add an 11th on top of however many already exist.
   const getChecklist = (entryKey, e) => (checklistOverrides[entryKey] ?? (e.checklist || [])).slice(-10);
