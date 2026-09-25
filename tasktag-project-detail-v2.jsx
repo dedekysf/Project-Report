@@ -3644,6 +3644,7 @@ function ReportsTab({ demoCase }) {
   const [openPeriod,  setOpenPeriod]  = useState(false);
   const [toast,       setToast]       = useState(null); // { type: "success" | "error", message }
   const [deleteTarget, setDeleteTarget] = useState(null); // report pending delete confirmation
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false); // Save Report clicked, confirmation pending
   const [lightbox, setLightbox] = useState(null); // { photos, index, caption } | null — full-screen photo viewer
   const [photoManager, setPhotoManager] = useState(false); // report-wide "manage photos" modal, opened by hovering the Photo Limit indicator
   const [expandedPhotoGroups, setExpandedPhotoGroups] = useState({}); // { [entryKey]: revealedChunkCount } — how many extra "+N more" chunks are showing per entry; lifted (not local to PhotoGrid) so every PhotoGrid call for that entry (see renderTaskSection's chunkNums) agrees on how many chunks to render
@@ -3896,14 +3897,15 @@ function ReportsTab({ demoCase }) {
     setPhotoManager(false);
     setExpandedPhotoGroups({});
     setExpandedChecklists({});
+    setShowSaveConfirm(false);
   };
 
   useEffect(() => {
-    if (!preview || lightbox || deleteTarget || photoManager) return;
+    if (!preview || lightbox || deleteTarget || photoManager || showSaveConfirm) return;
     const handler = (e) => { if (e.key === "Escape") closePreview(); };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [preview, lightbox, deleteTarget, photoManager]);
+  }, [preview, lightbox, deleteTarget, photoManager, showSaveConfirm]);
 
   // This screen is a full-screen takeover with its own scroll container —
   // the page behind it has no reason to scroll (or show its own scrollbar)
@@ -5038,14 +5040,31 @@ function ReportsTab({ demoCase }) {
     setTimeout(() => setPreviewCopied(false), 2000);
   };
 
-  // Saving locks the draft into a read-only view (chrome swaps to a back
-  // button + Download/Copy link) instead of closing outright — closing is
-  // left to the user, same as the click-to-edit fields locking in place.
-  const handlePreviewSave = () => {
+  // Save Report itself only validates and opens the confirmation modal
+  // below (see showSaveConfirm) — the actual save (handleSaveConfirmed)
+  // only runs once the user confirms there, same "confirm before an
+  // action that locks/can't be undone" pattern the delete flow already
+  // uses (see deleteTarget).
+  const handleSaveReportClick = () => {
     if (saving) return;
     // Notes already live in preview.extraNotes — every EditableField note
     // commits there the moment its check icon is clicked, so there's no
     // draft state left to fold in here.
+    const finalGroups = applyExtraNotesToGroups(applyChecklistOverrides(applyTitleOverrides(applyPhotoExclusions(previewData.groups, preview.excludedPhotos), titleOverrides), checklistOverrides), preview.extraNotes);
+    if (!hasGroupData(finalGroups)) { showToast("error", "No data to save"); return; }
+    setShowSaveConfirm(true);
+  };
+
+  // Saving locks the draft into a read-only view (chrome swaps to a back
+  // button + Download/Copy link) instead of closing outright — closing is
+  // left to the user, same as the click-to-edit fields locking in place.
+  const handleSaveConfirmed = () => {
+    if (saving) return;
+    setShowSaveConfirm(false);
+    // Recomputed rather than threaded through from handleSaveReportClick —
+    // the confirm modal sits open long enough (however briefly) that
+    // re-deriving it here keeps this from ever saving a stale snapshot if
+    // anything changed while it was up.
     const finalGroups = applyExtraNotesToGroups(applyChecklistOverrides(applyTitleOverrides(applyPhotoExclusions(previewData.groups, preview.excludedPhotos), titleOverrides), checklistOverrides), preview.extraNotes);
     if (!hasGroupData(finalGroups)) { showToast("error", "No data to save"); return; }
     setSaving(true);
@@ -5378,7 +5397,7 @@ function ReportsTab({ demoCase }) {
           <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
             <thead style={{ position: "sticky", top: 0, zIndex: 1 }}>
               <tr style={{ background: "var(--tt-grey02)", borderBottom: `1px solid var(--tt-grey03)` }}>
-                {["Generation date", "Period"].map((h) => (
+                {["Project Name", "Period", "Generation date"].map((h) => (
                   <th key={h} style={{ textAlign: "left", padding: "10px 16px", fontSize: 12, fontWeight: 500, color: "var(--tt-text-1)" }}>{h}</th>
                 ))}
                 <th style={{ padding: "10px 16px", width: 160 }} />
@@ -5387,13 +5406,14 @@ function ReportsTab({ demoCase }) {
             <tbody>
               {reports.map((r, i) => (
                 <tr key={r.id} style={{ background: r.id === lastSavedId ? "var(--tt-mint)" : "white", borderTop: i > 0 ? `1px solid var(--tt-grey03)` : "none", transition: "background 0.6s ease" }}>
-                  <td style={{ padding: "0 16px", fontSize: 13, color: "var(--tt-text-2)", whiteSpace: "nowrap", height: 52, verticalAlign: "middle" }}>{r.date}</td>
+                  <td style={{ padding: "0 16px", fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", height: 52, verticalAlign: "middle", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.projectName || PROJECT_NAME}</td>
                   <td style={{ padding: "0 16px", fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", height: 52, verticalAlign: "middle", whiteSpace: "nowrap" }}>
                     {/* Update No. shown alongside the period since the same
                         period can be regenerated and saved more than once —
                         the period alone can't tell those saves apart. */}
                     Update No. {r.version} · {r.period}
                   </td>
+                  <td style={{ padding: "0 16px", fontSize: 13, color: "var(--tt-text-2)", whiteSpace: "nowrap", height: 52, verticalAlign: "middle" }}>{r.date}</td>
                   <td style={{ padding: "0 14px 0 16px", textAlign: "right", height: 52, verticalAlign: "middle", width: 160 }}>
                     {r.status === "in_progress" ? (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--tt-text-2)" }}>
@@ -5549,7 +5569,7 @@ function ReportsTab({ demoCase }) {
                     </button>
                     <button
                       disabled={previewLoading || saving}
-                      onClick={handlePreviewSave}
+                      onClick={handleSaveReportClick}
                       onMouseEnter={e => !(previewLoading || saving) && (e.currentTarget.style.opacity = "0.85")}
                       onMouseLeave={e => e.currentTarget.style.opacity = (previewLoading || saving) ? 0.5 : 1}
                       style={{
@@ -5972,6 +5992,53 @@ function ReportsTab({ demoCase }) {
                 onMouseLeave={e => e.currentTarget.style.opacity = "1"}
               >
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Save report confirmation — same "confirm before an action that
+          locks/can't be undone" pattern as the delete modal just above,
+          same zIndex so it layers above the preview overlay (2000) the
+          same way. */}
+      {showSaveConfirm && preview && (
+        <div
+          style={{ position: "fixed", inset: 0, zIndex: 4000, background: "rgba(10,22,41,0.45)", display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setShowSaveConfirm(false)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ width: 420, maxWidth: "calc(100vw - 32px)", background: "white", borderRadius: 16, padding: 24, boxShadow: "0 16px 48px rgba(10,22,41,0.25)" }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <p style={{ fontSize: 20, fontWeight: 700, color: "var(--tt-text-1)", margin: 0 }}>Save Report</p>
+              <button
+                onClick={() => setShowSaveConfirm(false)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--tt-text-1)", padding: 4, display: "flex", borderRadius: 6, transition: "background 0.15s" }}
+                onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              >
+                <X size={20} strokeWidth={SW} />
+              </button>
+            </div>
+            <p style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: 1.6, margin: "0 0 4px" }}>
+              {preview.projectName || PROJECT_NAME}
+            </p>
+            <p style={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, margin: "0 0 16px" }}>
+              Update No. {preview.version} · {preview.period}
+            </p>
+            <p style={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, margin: "0 0 24px" }}>
+              Once saved, this report becomes read-only — to make changes, you'll need to generate a new one.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                onClick={handleSaveConfirmed}
+                style={{ height: 40, padding: "0 20px", borderRadius: 8, border: "none", background: "var(--tt-text-1)", color: "white", fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "opacity 0.15s" }}
+                onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
+                onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+              >
+                Confirm
               </button>
             </div>
           </div>
