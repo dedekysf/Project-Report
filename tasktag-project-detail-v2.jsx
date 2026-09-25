@@ -1318,7 +1318,9 @@ function LogoUploadBox({ src, onChange, disabled, width = 180 }) {
 // `icon` is a lucide component. Top-level rows (leaf or group heading) are
 // bold text-1 with an icon; group children sit in a left-bordered rail,
 // smaller and lighter, with an optional week/month divider above a child.
+const NAV_CHILD_LIMIT = 10;
 function NavSidebar({ items, activeKey, onSelect }) {
+  const [expanded, setExpanded] = useState({});
   return (
     <div style={{ width: NAV_W, flexShrink: 0, borderRight: "1px solid var(--tt-grey03)", background: "white", overflowY: "auto", padding: 16 }}>
       {items.map((group, gi) => {
@@ -1354,7 +1356,7 @@ function NavSidebar({ items, activeKey, onSelect }) {
               <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.label}</span>
             </div>
             <div style={{ marginLeft: 21, paddingLeft: 12, borderLeft: "2px solid var(--tt-grey03)" }}>
-              {group.children.map((child, ci) => {
+              {(expanded[group.label] ? group.children : group.children.slice(0, NAV_CHILD_LIMIT)).map((child, ci) => {
                 const active = activeKey === child.key;
                 return (
                   <div key={child.key}>
@@ -1384,6 +1386,14 @@ function NavSidebar({ items, activeKey, onSelect }) {
                   </div>
                 );
               })}
+              {group.children.length > NAV_CHILD_LIMIT && (
+                <button
+                  onClick={() => setExpanded(prev => ({ ...prev, [group.label]: !prev[group.label] }))}
+                  style={{ display: "block", width: "100%", textAlign: "left", padding: "6px 10px", marginTop: 2, border: "none", background: "transparent", color: "var(--tt-text-1)", fontSize: 12, fontWeight: 500, cursor: "pointer" }}
+                >
+                  {expanded[group.label] ? "Show less" : `Show all (${group.children.length})`}
+                </button>
+              )}
             </div>
           </div>
         );
