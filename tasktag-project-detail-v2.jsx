@@ -1310,6 +1310,88 @@ function LogoUploadBox({ src, onChange, disabled, width = 180 }) {
   );
 }
 
+// ── Section nav sidebar ──
+// One component shared by the draft modal and the Preview tab, so their
+// icons, fonts, sizes and spacing can never drift apart again. Items:
+//   leaf  { type:"leaf", key, label, icon }                      — a nav target
+//   group { type:"group", label, icon, children:[{ key, label, groupLabel? }] }
+// `icon` is a lucide component. Top-level rows (leaf or group heading) are
+// bold text-1 with an icon; group children sit in a left-bordered rail,
+// smaller and lighter, with an optional week/month divider above a child.
+function NavSidebar({ items, activeKey, onSelect }) {
+  return (
+    <div style={{ width: NAV_W, flexShrink: 0, borderRight: "1px solid var(--tt-grey03)", background: "white", overflowY: "auto", padding: 16 }}>
+      {items.map((group, gi) => {
+        const topStyle = active => ({
+          display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left",
+          padding: "8px 12px", marginTop: gi === 0 ? 0 : 14, borderRadius: 8, border: "none",
+          background: active ? "var(--tt-grey02)" : "transparent",
+          color: "var(--tt-text-1)", fontSize: 13, fontWeight: 700,
+          cursor: "pointer", transition: "background 0.15s",
+        });
+        const Icon = group.icon;
+        if (group.type === "leaf") {
+          const active = activeKey === group.key;
+          return (
+            <button
+              key={group.key}
+              onClick={() => onSelect(group.key)}
+              onMouseEnter={e => { if (!active) e.currentTarget.style.background = "var(--tt-grey02)"; }}
+              onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
+              style={topStyle(active)}
+            >
+              <Icon size={16} strokeWidth={SW} color="var(--tt-text-1)" style={{ flexShrink: 0 }} />
+              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.label}</span>
+            </button>
+          );
+        }
+        // Group heading is plain text, not a button — there's nothing of its
+        // own to scroll to, only its children.
+        return (
+          <div key={group.label}>
+            <div style={topStyle(false)}>
+              <Icon size={16} strokeWidth={SW} color="var(--tt-text-1)" style={{ flexShrink: 0 }} />
+              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.label}</span>
+            </div>
+            <div style={{ marginLeft: 21, paddingLeft: 12, borderLeft: "2px solid var(--tt-grey03)" }}>
+              {group.children.map((child, ci) => {
+                const active = activeKey === child.key;
+                return (
+                  <div key={child.key}>
+                    {child.groupLabel && (
+                      <p style={{ margin: ci === 0 ? "0 0 4px" : "12px 0 4px", padding: "0 10px", fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--tt-text-1)" }}>
+                        {child.groupLabel}
+                      </p>
+                    )}
+                    <button
+                      onClick={() => onSelect(child.key)}
+                      onMouseEnter={e => { if (!active) e.currentTarget.style.background = "var(--tt-grey02)"; }}
+                      onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
+                      style={{
+                        display: "flex", alignItems: "center", width: "100%", textAlign: "left",
+                        padding: "6px 10px", marginTop: 2, borderRadius: 6, border: "none",
+                        background: active ? "var(--tt-grey02)" : "transparent",
+                        color: active ? "var(--tt-text-1)" : "var(--tt-grey06)",
+                        fontSize: 12, fontWeight: active ? 600 : 400,
+                        cursor: "pointer", transition: "background 0.15s",
+                      }}
+                    >
+                      {/* minWidth:0 — flex items default to min-width:auto,
+                          which would otherwise stop this from ever actually
+                          shrinking/truncating below its content's width. */}
+                      <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{child.label}</span>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Fixed-position tooltip button ──
 // Renders tooltip via a fixed div that escapes overflow clipping
 function FixedTooltipBtn({ children, label, onAction }) {
@@ -5719,115 +5801,7 @@ function ReportsTab({ demoCase }) {
                 </div>
               )}
               {isWide && !previewLoading && sections.length > 0 && (
-                <div style={{ width: NAV_W, flexShrink: 0, borderRight: "1px solid var(--tt-grey03)", background: "white", overflowY: "auto", padding: 16 }}>
-                  {navGroups.map((group, gi) => {
-                    // Top-level row shared by both a leaf (Summary, Footer —
-                    // itself a nav target) and a group heading (Cover, Task
-                    // List — not a nav target, just labels what's nested
-                    // below it): bold, text-1, with its own icon — the
-                    // "peer" level of the hierarchy. `marginTop` (skipped on
-                    // the very first row) is what actually separates one
-                    // group from the next; a leaf and a group otherwise look
-                    // identical at this level, which is the point — a user
-                    // shouldn't have to guess Summary/Footer are "different"
-                    // from Cover/Task List just because one happens to have
-                    // children.
-                    const topStyle = active => ({
-                      display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left",
-                      padding: "8px 12px", marginTop: gi === 0 ? 0 : 14, borderRadius: 8, border: "none",
-                      background: active ? "var(--tt-grey02)" : "transparent",
-                      color: "var(--tt-text-1)", fontSize: 13, fontWeight: 700,
-                      cursor: "pointer", transition: "background 0.15s",
-                    });
-                    if (group.type === "leaf") {
-                      const active = activeSectionKey === group.key;
-                      const Icon = group.icon;
-                      return (
-                        <button
-                          key={group.key}
-                          onClick={() => scrollToSection(group.key)}
-                          onMouseEnter={e => { if (!active) e.currentTarget.style.background = "var(--tt-grey02)"; }}
-                          onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
-                          style={topStyle(active)}
-                        >
-                          <Icon size={16} strokeWidth={SW} color="var(--tt-text-1)" style={{ flexShrink: 0 }} />
-                          <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.label}</span>
-                        </button>
-                      );
-                    }
-                    // Group (Cover, Task List) — the heading itself is
-                    // plain text, not a button (it isn't one of
-                    // sectionRefs' own keys, so there's nothing to scroll
-                    // to). Its children sit inside a left-bordered rail
-                    // (a visible connector line, not just whitespace) —
-                    // smaller, lighter-weight and grey by default, so they
-                    // read as clearly subordinate to the heading above them
-                    // rather than as more items at the same level.
-                    const GroupIcon = group.icon;
-                    return (
-                      <div key={group.label}>
-                        <div style={topStyle(false)}>
-                          <GroupIcon size={16} strokeWidth={SW} color="var(--tt-text-1)" style={{ flexShrink: 0 }} />
-                          <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.label}</span>
-                        </div>
-                        <div style={{ marginLeft: 21, paddingLeft: 12, borderLeft: "2px solid var(--tt-grey03)" }}>
-                          {group.children.map((child, ci) => {
-                            const active = activeSectionKey === child.key;
-                            return (
-                              <div key={child.key}>
-                                {/* Week/month divider (e.g. "September
-                                    2026") — the same info that used to
-                                    show as a heading inside the section
-                                    content itself, now living here instead
-                                    (see navGroups' own comment on why). No
-                                    top margin on the very first one — the
-                                    Task List heading above already
-                                    provides that separation. */}
-                                {child.groupLabel && (
-                                  // text-1, not grey05 — grey05 (#828282) is
-                                  // actually LIGHTER than the grey06
-                                  // (#303742) the items below use for their
-                                  // own inactive state, so a grey05 divider
-                                  // read as weaker than the very items it's
-                                  // supposed to head, backwards from what a
-                                  // heading needs. text-1 is darker than
-                                  // both, so it reads as the more
-                                  // authoritative label above them — the
-                                  // uppercase/11px/letter-spacing treatment
-                                  // itself was fine, color was the actual
-                                  // problem.
-                                  <p style={{ margin: ci === 0 ? "0 0 4px" : "12px 0 4px", padding: "0 10px", fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--tt-text-1)" }}>
-                                    {child.groupLabel}
-                                  </p>
-                                )}
-                                <button
-                                  onClick={() => scrollToSection(child.key)}
-                                  onMouseEnter={e => { if (!active) e.currentTarget.style.background = "var(--tt-grey02)"; }}
-                                  onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
-                                  style={{
-                                    display: "flex", alignItems: "center", width: "100%", textAlign: "left",
-                                    padding: "6px 10px", marginTop: 2, borderRadius: 6, border: "none",
-                                    background: active ? "var(--tt-grey02)" : "transparent",
-                                    color: active ? "var(--tt-text-1)" : "var(--tt-grey06)",
-                                    fontSize: 12, fontWeight: active ? 600 : 400,
-                                    cursor: "pointer", transition: "background 0.15s",
-                                  }}
-                                >
-                                  {/* minWidth:0 — flex items default to
-                                      min-width:auto, which would otherwise stop
-                                      this from ever actually shrinking/
-                                      truncating below its content's natural
-                                      width. */}
-                                  <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{child.label}</span>
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                <NavSidebar items={navGroups} activeKey={activeSectionKey} onSelect={scrollToSection} />
               )}
               {/* No scrollbarGutter reservation here (unlike elsewhere in
                   this modal) — this column is flex:1 with no width cap of
@@ -6438,21 +6412,26 @@ function ReportPreviewChrome({ reportPageProps, period, dateLabel }) {
 
   const btnStyle = { height: 40, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "0 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s" };
 
-  // Own NAV_W/CONTENT_BUFFER — the draft modal's own versions are scoped
-  // inside ReportsTab, not reachable from a module-level component like
-  // this one, so this needs its own (same values, same "chrome bar
-  // centers to sidebar+document width combined" reasoning). BUFFER here
+  // Same NAV_W as the draft modal (the chrome bar centers to sidebar +
+  // document width combined). The buffer here
   // is 48, not draft mode's 24 — it has to exactly match the iframe's own
   // fixed width below (PAGE_W + 48, the export's own 24px body padding
   // on each side), or the content column's flex-allotted share of
   // previewRowW would come out narrower than the iframe actually needs
   // and the iframe would overflow it instead of fitting exactly flush.
-  const PREVIEW_NAV_W = 240;
   const PREVIEW_CONTENT_BUFFER = 48;
-  const previewRowW = PREVIEW_NAV_W + PAGE_W + PREVIEW_CONTENT_BUFFER;
+  const previewRowW = NAV_W + PAGE_W + PREVIEW_CONTENT_BUFFER;
+
+  // navItems' shape (string icon names, id) mapped to what the shared
+  // NavSidebar takes (icon components, key) — the same component the draft
+  // modal renders, so the two can't look different.
+  const iconFor = name => (name === "summary" ? AlignJustify : name === "task" ? Hash : FileText);
+  const sidebarItems = navItems.map(item => item.type === "group"
+    ? { type: "group", label: item.label, icon: iconFor(item.icon), children: item.children.map(c => ({ key: c.id, label: c.label, groupLabel: c.groupLabel })) }
+    : { type: "leaf", key: item.id, label: item.label, icon: iconFor(item.icon) });
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "var(--tt-grey02)" }}>
+    <div className="font-sans text-[var(--tt-text-1)] text-[14px] leading-[1.5]" style={{ display: "flex", flexDirection: "column", height: "100vh", background: "var(--tt-grey02)" }}>
       <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--tt-grey03)", background: "white", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: previewRowW, width: "100%", margin: "0 auto" }}>
           <div>
@@ -6500,80 +6479,7 @@ function ReportPreviewChrome({ reportPageProps, period, dateLabel }) {
           // them, Summary as a flat leaf at the same top-level weight —
           // see buildReportHTMLFromParams' own navItems comment for why
           // the shape matches but Footer doesn't appear here at all.
-          <div style={{ width: PREVIEW_NAV_W, flexShrink: 0, borderRight: "1px solid var(--tt-grey03)", background: "white", overflowY: "auto", padding: 16 }}>
-            {navItems.map((group, gi) => {
-              const GroupIcon = group.icon === "summary" ? AlignJustify : group.icon === "task" ? Hash : FileText;
-              const topStyle = active => ({
-                display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left",
-                padding: "8px 12px", marginTop: gi === 0 ? 0 : 14, borderRadius: 8, border: "none",
-                background: active ? "var(--tt-grey02)" : "transparent",
-                color: "var(--tt-text-1)", fontSize: 13, fontWeight: 700,
-                cursor: "pointer", transition: "background 0.15s",
-              });
-              if (group.type === "leaf") {
-                const active = activeId === group.id;
-                return (
-                  <button
-                    key={group.id}
-                    onClick={() => scrollToSection(group.id)}
-                    onMouseEnter={e => { if (!active) e.currentTarget.style.background = "var(--tt-grey02)"; }}
-                    onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
-                    style={topStyle(active)}
-                  >
-                    <GroupIcon size={16} strokeWidth={SW} color="var(--tt-text-1)" style={{ flexShrink: 0 }} />
-                    <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.label}</span>
-                  </button>
-                );
-              }
-              // Group (Cover, Task List) — plain text heading, not a
-              // button (there's no single anchor for the group itself to
-              // scroll to, only its children).
-              return (
-                <div key={group.label}>
-                  <div style={topStyle(false)}>
-                    <GroupIcon size={16} strokeWidth={SW} color="var(--tt-text-1)" style={{ flexShrink: 0 }} />
-                    <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.label}</span>
-                  </div>
-                  <div style={{ marginLeft: 21, paddingLeft: 12, borderLeft: "2px solid var(--tt-grey03)" }}>
-                    {group.children.map((child, ci) => {
-                      const active = activeId === child.id;
-                      return (
-                        <div key={child.id}>
-                          {/* Week/month divider, same as the draft's own
-                              sidebar — only present when the report is
-                              actually grouped that way. */}
-                          {child.groupLabel && (
-                            <p style={{ margin: ci === 0 ? "0 0 4px" : "12px 0 4px", padding: "0 10px", fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--tt-text-1)" }}>
-                              {child.groupLabel}
-                            </p>
-                          )}
-                          <button
-                            onClick={() => scrollToSection(child.id)}
-                            onMouseEnter={e => { if (!active) e.currentTarget.style.background = "var(--tt-grey02)"; }}
-                            onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
-                            style={{
-                              display: "flex", alignItems: "center", width: "100%", textAlign: "left",
-                              padding: "6px 10px", marginTop: 2, borderRadius: 6, border: "none",
-                              background: active ? "var(--tt-grey02)" : "transparent",
-                              color: active ? "var(--tt-text-1)" : "var(--tt-grey06)",
-                              fontSize: 12, fontWeight: active ? 600 : 400,
-                              cursor: "pointer", transition: "background 0.15s",
-                            }}
-                          >
-                            {/* minWidth:0 — flex items default to
-                                min-width:auto, which would otherwise stop
-                                this from ever actually shrinking/truncating
-                                below its content's natural width. */}
-                            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{child.label}</span>
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <NavSidebar items={sidebarItems} activeKey={activeId} onSelect={scrollToSection} />
         )}
         {/* background here (not just on the loader) — a fixed-width iframe
             below no longer fills this whole column, so whatever's left
