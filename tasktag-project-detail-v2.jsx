@@ -3163,7 +3163,11 @@ const buildReportHTML = async (report) => {
     // Same divider the live view always shows now (see renderTaskSection) —
     // the checklist (if any) and/or the attached note both sit below it.
     const dividerHTML = h("div", { style: "height:1px;background:#e8e8e6;margin-top:20px;" }, "");
-    return h("p", { style: `font-family:${SERIF};font-size:18px;font-weight:600;color:#0a1629;line-height:1.35;margin:0;` }, e.note) +
+    // id — jump target for the Preview tab's own sidebar nav (see
+    // ReportPreviewChrome/buildReportHTMLFromParams' navItems); a plain
+    // shared-link recipient never sees or uses it, it's just inert markup
+    // to them.
+    return h("p", { id: `report-task-${e.entryKey}`, style: `font-family:${SERIF};font-size:18px;font-weight:600;color:#0a1629;line-height:1.35;margin:0;` }, e.note) +
       h("div", { style: "margin-top:6px;" }, metaLine) +
       dividerHTML;
   };
@@ -3332,7 +3336,7 @@ const buildReportHTML = async (report) => {
   const SUMMARY_INLINE_MAX_CHARS = 200;
   const summaryFitsOnCover = !!report.summary && report.summary.length <= SUMMARY_INLINE_MAX_CHARS;
   const coverSummaryHTML = summaryFitsOnCover
-    ? h("div", { style: "margin-bottom:40px;" },
+    ? h("div", { id: "report-summary", style: "margin-bottom:40px;" },
         // Divider above it, not below — this sits last on the cover
         // (after Prepared For/By, then Additional Information if either
         // is present), so it's what actually marks "Summary" as its own
@@ -3444,7 +3448,7 @@ const buildReportHTML = async (report) => {
   // fills the .card's full min-height, not just its own content's
   // height) and the inner one (so justify-content:center has real free
   // space to center the content block within).
-  const coverHTML = h("div", { class: "card", style: "box-shadow:0 1px 3px rgba(10,22,41,0.08);" },
+  const coverHTML = h("div", { id: "report-cover", class: "card", style: "box-shadow:0 1px 3px rgba(10,22,41,0.08);" },
     h("div", { style: `padding:${PAGE_PAD}px;display:flex;flex-direction:column;flex:1;` },
       coverHeaderHTML,
       h("div", { style: "flex:1;display:flex;flex-direction:column;justify-content:center;" },
@@ -3505,7 +3509,7 @@ const buildReportHTML = async (report) => {
   // coverSummaryHTML/summaryFitsOnCover above). When there's no page for
   // it, progress/entries simply become the page right after the cover.
   const summaryPageHTML = (summaryHTML && !summaryFitsOnCover)
-    ? h("div", { class: "card", style: "box-shadow:0 1px 3px rgba(10,22,41,0.08);" },
+    ? h("div", { id: "report-summary", class: "card", style: "box-shadow:0 1px 3px rgba(10,22,41,0.08);" },
         runningHeaderHTML,
         h("div", { class: "card__body" },
           h("p", { style: `font-family:${SANS};font-size:22px;font-weight:600;color:#0a1629;text-align:center;margin:0 0 12px;` }, "Summary"),
@@ -6215,13 +6219,39 @@ async function buildReportHTMLFromParams({ dateRange, period, version, includeSu
     catch { /* malformed/tampered param — ignore */ }
   }
   data = { ...data, groups };
-  return buildReportHTML({ includeSummary, period, version, data, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, contactName, contactRole, summary: summaryText, clientName, additionalInfo, coverImage, photoCaptions });
+  // navItems — only ReportPreviewChrome's own sidebar reads this
+  // (ReportPage's plain iframe render ignores it entirely). Grouped the
+  // same general shape the draft's own sidebar uses (navGroups), but
+  // Cover is a flat leaf here, not a group with Header/Content children
+  // the way the draft's own sidebar splits it — unlike the draft, this
+  // export's cover is one unified page/card, not two separate sections,
+  // so there's nothing distinct to split into children. Summary is a
+  // flat leaf too, Task List a group with one child per task. No Footer
+  // entry — unlike the draft's own dedicated Footer section, this
+  // export's footer repeats on every page (a running byline, not a
+  // single addressable section), so there's no one place for a "Footer"
+  // nav item to actually point at. Every id here has to match an
+  // id="..." buildReportHTML actually puts in the HTML, or a click would
+  // have nothing to scroll to.
+  const navItems = [
+    { type: "leaf", id: "report-cover", label: "Cover", icon: "cover" },
+  ];
+  if (summaryText) navItems.push({ type: "leaf", id: "report-summary", label: "Summary", icon: "summary" });
+  const taskChildren = [];
+  groups.forEach(g => g.entries.forEach(e => {
+    if (e.isNote) return;
+    taskChildren.push({ id: `report-task-${e.entryKey}`, label: e.note });
+  }));
+  if (taskChildren.length > 0) navItems.push({ type: "group", label: "Task List", icon: "task", children: taskChildren });
+  const html = await buildReportHTML({ includeSummary, period, version, data, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, contactName, contactRole, summary: summaryText, clientName, additionalInfo, coverImage, photoCaptions });
+  return { html, navItems };
 }
 
-// fillParent — ReportPreviewChrome renders this inside its own flex
-// column (chrome bar + this filling whatever's left), so it needs
-// height:100% there instead of the bare 100vh a real, chrome-less
-// shared-link recipient gets (the default, unchanged from before).
+// Plain shared-link render — what an actual recipient sees, unchanged:
+// no chrome, no nav, just the document full-screen. ReportPreviewChrome
+// (the owner's own Preview tab) doesn't use this — it needs a direct ref
+// to the iframe for its own sidebar nav to scroll, so it fetches
+// html/navItems and renders its own iframe instead (see below).
 function ReportPage(props) {
   // buildReportHTMLFromParams is async (it preloads each photo's real
   // dimensions before laying out the justified photo rows — see
@@ -6231,7 +6261,7 @@ function ReportPage(props) {
   useEffect(() => {
     let cancelled = false;
     buildReportHTMLFromParams(props).then(result => {
-      if (!cancelled) setHtml(result);
+      if (!cancelled) setHtml(result.html);
     });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -6239,7 +6269,7 @@ function ReportPage(props) {
 
   if (html === null) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: props.fillParent ? "100%" : "100vh", background: "var(--tt-grey02)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "var(--tt-grey02)" }}>
         <Loader size={24} strokeWidth={SW} color="var(--tt-grey05)" style={{ display: "block", animation: "tt-spin 0.75s linear infinite" }} />
       </div>
     );
@@ -6249,29 +6279,47 @@ function ReportPage(props) {
     <iframe
       srcDoc={html}
       title="Report"
-      style={{ border: "none", width: "100%", height: props.fillParent ? "100%" : "100vh", display: "block" }}
+      style={{ border: "none", width: "100%", height: "100vh", display: "block" }}
     />
   );
 }
 
 // ── Report Preview Chrome (owner's own "Preview" tab) ──
-// Same document a copied link renders, just with an added top bar the
-// report's owner sees and a real recipient never would: Period/
-// Generation date on the left, Download/Copy link on the right (see
-// ProjectDetail's own identical pair of buttons in the results table),
-// same visual language as the draft modal's own locked/saved chrome.
-// Rebuilds the HTML itself for Download rather than reusing whatever
-// ReportPage's own iframe is currently showing — the two are
-// independent, on-demand builds from the same params, not shared state,
-// so there's no coupling to keep in sync between them.
+// Same document a copied link renders, just with the owner-only chrome a
+// real recipient never sees: a top bar (Period/Generation date left,
+// Download/Copy link right) and a left sidebar nav (Cover/Summary/one
+// per task — see navItems), same visual language and layout shape as the
+// draft modal's own sidebar+chrome (NAV_W-ish rail, chrome bar centered
+// to the sidebar+document width together). Fetches html/navItems itself
+// and renders its own iframe (with a ref) rather than delegating to
+// ReportPage — it needs direct access to the iframe's contentDocument to
+// scroll a clicked nav item into view, and reusing ReportPage would mean
+// either threading a ref through it for no other reason or fetching the
+// same html twice.
 function ReportPreviewChrome({ reportPageProps, period, dateLabel }) {
+  const [html, setHtml] = useState(null);
+  const [navItems, setNavItems] = useState([]);
+  const [activeId, setActiveId] = useState(null);
+  const iframeRef = useRef(null);
   const [downloading, setDownloading] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  useEffect(() => {
+    let cancelled = false;
+    buildReportHTMLFromParams(reportPageProps).then(result => {
+      if (!cancelled) { setHtml(result.html); setNavItems(result.navItems); }
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleDownload = async () => {
-    if (downloading) return;
+    // html is already sitting in state from the fetch above — no need to
+    // rebuild it a second time just for the file, unlike before this had
+    // its own ref/nav (when this and ReportPage's own fetch were two
+    // fully independent builds).
+    if (downloading || html === null) return;
     setDownloading(true);
-    const html = await buildReportHTMLFromParams(reportPageProps);
     const fileName = "report_" + sanitizePeriodForUrl(period) + ".html";
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -6303,18 +6351,33 @@ function ReportPreviewChrome({ reportPageProps, period, dateLabel }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // srcDoc content is same-origin, so contentDocument is reachable
+  // directly — no postMessage/cross-origin dance needed to scroll into
+  // it from out here.
+  const scrollToSection = (id) => {
+    setActiveId(id);
+    iframeRef.current?.contentDocument?.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   const btnStyle = { height: 40, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "0 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s" };
 
+  // Own NAV_W/CONTENT_BUFFER — the draft modal's own versions are scoped
+  // inside ReportsTab, not reachable from a module-level component like
+  // this one, so this needs its own (same values, same "chrome bar
+  // centers to sidebar+document width combined" reasoning). BUFFER here
+  // is 48, not draft mode's 24 — it has to exactly match the iframe's own
+  // fixed width below (PAGE_W + 48, the export's own 24px body padding
+  // on each side), or the content column's flex-allotted share of
+  // previewRowW would come out narrower than the iframe actually needs
+  // and the iframe would overflow it instead of fitting exactly flush.
+  const PREVIEW_NAV_W = 240;
+  const PREVIEW_CONTENT_BUFFER = 48;
+  const previewRowW = PREVIEW_NAV_W + PAGE_W + PREVIEW_CONTENT_BUFFER;
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
-      {/* Content centered to PAGE_W (the document's own width below, not
-          this full-width bar) — same "chrome bar centers its content
-          column, same width as the document it sits above" pattern the
-          draft modal's own #draft-chrome uses (there it's ROW_W, sidebar
-          included; there's no sidebar here, so PAGE_W alone is the right
-          column width to match). */}
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "var(--tt-grey02)" }}>
       <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--tt-grey03)", background: "white", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: PAGE_W, width: "100%", margin: "0 auto" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: previewRowW, width: "100%", margin: "0 auto" }}>
           <div>
             <p style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 2px" }}>{period}</p>
             {dateLabel && (
@@ -6342,8 +6405,117 @@ function ReportPreviewChrome({ reportPageProps, period, dateLabel }) {
           </div>
         </div>
       </div>
-      <div style={{ flex: 1, minHeight: 0 }}>
-        <ReportPage {...reportPageProps} fillParent />
+      {/* Same maxWidth/margin:auto as the header bar above (previewRowW,
+          shared) — same "chrome and body row centered to the identical
+          width" fix draft mode's own sidebar+document needed (see
+          ReportsTab's ROW_W comment): without this, sidebar+iframe fill
+          the full viewport, piling everything up against the left edge
+          instead of balancing evenly on both sides once the window's
+          wider than the content actually needs. Sidebar and iframe still
+          sit flush against each other either way — this only centers
+          that combined unit as a whole, it doesn't add space between
+          them. */}
+      <div style={{ display: "flex", flex: 1, minHeight: 0, maxWidth: previewRowW, width: "100%", margin: "0 auto" }}>
+        {navItems.length > 0 && (
+          // Grouped the same shape/style as the draft modal's own sidebar
+          // (navGroups) — Cover/Task List as bold, non-clickable group
+          // headings with an indented connector-rail of children below
+          // them, Summary as a flat leaf at the same top-level weight —
+          // see buildReportHTMLFromParams' own navItems comment for why
+          // the shape matches but Footer doesn't appear here at all.
+          <div style={{ width: PREVIEW_NAV_W, flexShrink: 0, borderRight: "1px solid var(--tt-grey03)", background: "white", overflowY: "auto", padding: 16 }}>
+            {navItems.map((group, gi) => {
+              const GroupIcon = group.icon === "summary" ? AlignJustify : group.icon === "task" ? Hash : FileText;
+              const topStyle = active => ({
+                display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left",
+                padding: "8px 12px", marginTop: gi === 0 ? 0 : 14, borderRadius: 8, border: "none",
+                background: active ? "var(--tt-grey02)" : "transparent",
+                color: "var(--tt-text-1)", fontSize: 13, fontWeight: 700,
+                cursor: "pointer", transition: "background 0.15s",
+              });
+              if (group.type === "leaf") {
+                const active = activeId === group.id;
+                return (
+                  <button
+                    key={group.id}
+                    onClick={() => scrollToSection(group.id)}
+                    onMouseEnter={e => { if (!active) e.currentTarget.style.background = "var(--tt-grey02)"; }}
+                    onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
+                    style={topStyle(active)}
+                  >
+                    <GroupIcon size={16} strokeWidth={SW} color="var(--tt-text-1)" style={{ flexShrink: 0 }} />
+                    <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.label}</span>
+                  </button>
+                );
+              }
+              // Group (Cover, Task List) — plain text heading, not a
+              // button (there's no single anchor for the group itself to
+              // scroll to, only its children).
+              return (
+                <div key={group.label}>
+                  <div style={topStyle(false)}>
+                    <GroupIcon size={16} strokeWidth={SW} color="var(--tt-text-1)" style={{ flexShrink: 0 }} />
+                    <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.label}</span>
+                  </div>
+                  <div style={{ marginLeft: 21, paddingLeft: 12, borderLeft: "2px solid var(--tt-grey03)" }}>
+                    {group.children.map(child => {
+                      const active = activeId === child.id;
+                      return (
+                        <button
+                          key={child.id}
+                          onClick={() => scrollToSection(child.id)}
+                          onMouseEnter={e => { if (!active) e.currentTarget.style.background = "var(--tt-grey02)"; }}
+                          onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
+                          style={{
+                            display: "flex", alignItems: "center", width: "100%", textAlign: "left",
+                            padding: "6px 10px", marginTop: 2, borderRadius: 6, border: "none",
+                            background: active ? "var(--tt-grey02)" : "transparent",
+                            color: active ? "var(--tt-text-1)" : "var(--tt-grey06)",
+                            fontSize: 12, fontWeight: active ? 600 : 400,
+                            cursor: "pointer", transition: "background 0.15s",
+                          }}
+                        >
+                          {/* minWidth:0 — flex items default to
+                              min-width:auto, which would otherwise stop
+                              this from ever actually shrinking/truncating
+                              below its content's natural width. */}
+                          <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{child.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {/* background here (not just on the loader) — a fixed-width iframe
+            below no longer fills this whole column, so whatever's left
+            over to its right needs to read as the same page background
+            the sidebar/loader already use, not blank white. */}
+        <div style={{ flex: 1, minWidth: 0, background: "var(--tt-grey02)" }}>
+          {html === null ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
+              <Loader size={24} strokeWidth={SW} color="var(--tt-grey05)" style={{ display: "block", animation: "tt-spin 0.75s linear infinite" }} />
+            </div>
+          ) : (
+            // Fixed width (PAGE_W + the export's own 24px body padding on
+            // each side — see buildReportHTML's own `body{padding:32px
+            // 24px}`), not width:"100%" — the exported document centers
+            // its own 800px card within whatever width the iframe gives
+            // it, so a full-width iframe here left a wide gap between the
+            // sidebar and the card instead of sitting flush against it
+            // the way draft mode's own document does. Flush left by
+            // default (no margin), same "extra space bleeds off to the
+            // right, not split evenly" layout draft mode uses.
+            <iframe
+              ref={iframeRef}
+              srcDoc={html}
+              title="Report"
+              style={{ border: "none", width: PAGE_W + 48, height: "100%", display: "block" }}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
