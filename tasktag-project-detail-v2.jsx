@@ -2916,103 +2916,96 @@ const buildReportHTML = async (report) => {
   // rather than cropped to a fixed tile like the live draft's grid (see
   // PhotoGrid): there's no interactive lightbox left to see the full
   // frame in once this is a static export, so the export itself has to
-  // show it. Rows are grouped by ORIENTATION first (landscape, then
-  // square, then portrait — see packRowsByOrientation below), a coarser
-  // and more reliable grouping than comparing raw pixel widths alone (a
-  // landscape and a portrait shot can share a width and still look
-  // mismatched side by side); within each orientation, consecutive photos
-  // whose original width is the same or close enough still join the same
-  // row (see packRowsByWidth) — rather than by picking a target row
-  // height and solving for whatever width makes everything fit (a
-  // "justified gallery"). Nothing about an individual
-  // photo is stretched to a height it wasn't shot at or cropped to a
-  // width it wasn't shot at: once a row is formed, every photo in it is
-  // scaled by the SAME single factor (never up past its own natural
-  // size, only down when the row's combined natural width is wider than
-  // the page), so each photo's own aspect ratio — and its size relative
-  // to its row-mates — comes through exactly as shot. This is also
-  // deliberately NOT a CSS column-count masonry: a column layout balances
-  // its columns by their TOTAL height, so the same photos render at a
-  // different height depending on how many end up sharing one
-  // column-count container — which made two chunks landing on the same
-  // page look like a disconnected seam, and made a chunk's pre-measured
-  // height (see blockHeights below) drift from its actual rendered height
-  // once adjacent chunks changed what it was grouped with. A row's
-  // scale here only ever depends on the photos actually IN that row, so
-  // it renders identically — and measures accurately — no matter what's
+  // show it. Rows group by ORIENTATION only now (landscape, then square,
+  // then portrait — see packRowsByOrientation below) — no more comparing
+  // raw pixel widths within a bucket, that's gone entirely. Each bucket's
+  // own photo COUNT (not their widths) decides how many rows it becomes
+  // and how many photos share each one (see rowMaxPhotos/distributeEvenly),
+  // and every row that isn't a special case (the landscape highlight, or
+  // a genuinely lone leftover photo — see below) is a true justified row:
+  // one shared height solved so the row's photos exactly fill the page
+  // width edge to edge, each photo's own width simply following from its
+  // own aspect ratio at that height. Nothing is cropped and no individual
+  // photo's own aspect ratio is distorted — this still isn't a CSS
+  // column-count masonry (a column layout balances columns by their
+  // TOTAL height, so the same photos would render at a different height
+  // depending on what else ends up sharing their column-count container,
+  // which made two chunks landing on the same page look like a
+  // disconnected seam, and made a chunk's pre-measured height — see
+  // blockHeights below — drift from its actual rendered height once
+  // adjacent chunks changed what it was grouped with). A row's height
+  // here only ever depends on the photos actually IN that row, so it
+  // renders identically — and measures accurately — no matter what's
   // above or below it. Each row is its own pagination block (like the old
   // fixed-size photo chunks were), so a long photo set can still flow
   // across a page break instead of dragging the whole entry to the next
   // page as one piece.
   const JUSTIFIED_GAP = 8;
   const PHOTO_ROW_WIDTH = PAGE_W - PAGE_PAD * 2;
-  // How far apart two consecutive photos' original widths can be (as a
-  // fraction of the row's own first photo) and still count as "the same
-  // row" — 0.15 = within 15%.
-  const ROW_WIDTH_TOLERANCE = 0.15;
-  // Stops a row from growing indefinitely once one more same-width photo
-  // would shrink everything past a reasonably viewable size — a new row
-  // starts there instead, even though the next photo's width still
-  // technically qualifies.
-  const MIN_ROW_HEIGHT = 90;
-  // No max-height cap — every row's scale is now purely width-driven (see
-  // rowScale below): capped at 1 (never upscaled past a photo's own
-  // resolution) and at whatever keeps the row's combined width within
-  // containerWidth, full stop. A row's own height is just however tall
-  // that makes it, uncropped.
-  // Hard cap on how many photos share one row — separate from (and
-  // usually reached before) MIN_ROW_HEIGHT above; a row still closes
-  // early via that same-width/MIN_ROW_HEIGHT check same as before, this
-  // is just an upper bound on top of it.
-  const MAX_ROW_PHOTOS = 3;
-
-  // Greedily grows a row for as long as the next photo's original width
-  // stays within ROW_WIDTH_TOLERANCE of the row's own RUNNING AVERAGE
-  // width so far (not just its first photo — anchoring to the first
-  // photo alone let two genuinely similar-width photos end up split
-  // across rows whenever a photo in between happened to drift slightly
-  // further from that first one than from its actual neighbors; the
-  // running average moves gradually as the row grows, so it stays
-  // representative of the row as a whole instead of being pinned to
-  // whichever photo happened to come first), doesn't shrink the row below
-  // MIN_ROW_HEIGHT once scaled, and hasn't already hit MAX_ROW_PHOTOS —
-  // otherwise the current row closes and a new one starts with that
-  // photo.
-  const packRowsByWidth = (photos, containerWidth, gap) => {
-    const rowScale = (candidateRow) => {
-      const sumW = candidateRow.reduce((sum, p) => sum + p.width, 0);
-      const widthScale = (containerWidth - gap * (candidateRow.length - 1)) / sumW;
-      return Math.min(1, widthScale);
-    };
-    const rows = [];
-    let row = [];
-    let widthSum = 0;
-    const flush = () => {
-      if (row.length === 0) return;
-      rows.push({ photos: row, scale: rowScale(row) });
-      row = []; widthSum = 0;
-    };
-    photos.forEach(photo => {
-      if (row.length > 0 && row.length < MAX_ROW_PHOTOS) {
-        const avgWidth = widthSum / row.length;
-        const sameWidth = Math.abs(photo.width - avgWidth) / avgWidth <= ROW_WIDTH_TOLERANCE;
-        const scale = sameWidth ? rowScale([...row, photo]) : 0;
-        const fits = scale > 0 && [...row, photo].every(p => p.height * scale >= MIN_ROW_HEIGHT);
-        if (sameWidth && fits) { row.push(photo); widthSum += photo.width; return; }
-      }
-      flush();
-      row.push(photo);
-      widthSum = photo.width;
-    });
-    flush();
-    return rows;
+  const ORIENTATION_SQUARE_TOLERANCE = 0.05; // within 5% aspect ratio counts as square
+  const photoOrientation = (p) => {
+    const ratio = p.width / p.height;
+    if (Math.abs(ratio - 1) <= ORIENTATION_SQUARE_TOLERANCE) return "square";
+    return ratio > 1 ? "landscape" : "portrait";
+  };
+  // 2 per row when the group's own total is even, 3 when it's odd — a
+  // flat rule applied once per group (the landscape highlight's own
+  // leftover count, or square/portrait's plain total), not recomputed
+  // photo-by-photo the way the old width-tolerance packer worked.
+  const rowMaxPhotos = (total) => (total % 2 === 0 ? 2 : 3);
+  // Splits `list` into rows no larger than maxPerRow, as evenly sized as
+  // possible (7 at max 3 becomes [3,2,2], never [3,3,1] — a trailing row
+  // of 1 stranded alone is exactly what this avoids). Front-loads any
+  // remainder onto the earliest rows; which rows get the extra photo
+  // doesn't matter, only that no row ends up more than one photo apart
+  // from any other.
+  const distributeEvenly = (list, maxPerRow) => {
+    if (list.length === 0) return [];
+    const numRows = Math.ceil(list.length / maxPerRow);
+    const base = Math.floor(list.length / numRows);
+    const remainder = list.length - base * numRows;
+    const groups = [];
+    let idx = 0;
+    for (let r = 0; r < numRows; r++) {
+      const size = base + (r < remainder ? 1 : 0);
+      groups.push(list.slice(idx, idx + size));
+      idx += size;
+    }
+    return groups;
+  };
+  // A true justified row — one shared height solved so photos.length
+  // photos' combined width (at that height, each keeping its own aspect
+  // ratio) plus the gaps between them exactly fills containerWidth.
+  const justifiedRow = (photos, containerWidth, gap) => {
+    const sumAspect = photos.reduce((sum, p) => sum + p.width / p.height, 0);
+    const height = (containerWidth - gap * (photos.length - 1)) / sumAspect;
+    return { photos, height };
+  };
+  // The one sizing exception: a group that's down to exactly one leftover
+  // photo doesn't stretch that lone photo to fill the entire row width
+  // (it'd render enormous, especially a portrait shot) — instead it's
+  // sized as if it were one of three photos sharing a row, same width a
+  // photo would get in a full 3-up row, just on its own line.
+  const loneRow = (photo, containerWidth, gap) => {
+    const thirdWidth = (containerWidth - gap * 2) / 3;
+    return { photos: [photo], height: photo.height * (thirdWidth / photo.width) };
+  };
+  // Turns one orientation bucket (or the landscape leftovers after its
+  // own highlight is pulled out) into its final rows — a lone photo gets
+  // loneRow's special sizing, otherwise rowMaxPhotos/distributeEvenly
+  // decide row membership and justifiedRow does the actual sizing.
+  const buildRows = (list, containerWidth, gap) => {
+    if (list.length === 0) return [];
+    if (list.length === 1) return [loneRow(list[0], containerWidth, gap)];
+    return distributeEvenly(list, rowMaxPhotos(list.length))
+      .map(group => justifiedRow(group, containerWidth, gap));
   };
 
-  const widthGroupedRowHTML = (row, marginTop, marginBottom) => {
+  const photoRowHTML = (row, marginTop, marginBottom) => {
     const gap = JUSTIFIED_GAP;
+    const cellH = Math.round(row.height);
     const cells = row.photos.map(p => {
-      const w = Math.round(p.width * row.scale);
-      const cellH = Math.round(p.height * row.scale);
+      const w = Math.round(row.height * (p.width / p.height));
       return h("div", { style: `flex-shrink:0;width:${w}px;` },
         selfClose("img", { src: p.src, style: `display:block;width:${w}px;height:${cellH}px;border-radius:4px;` }),
         p.caption ? h("p", { style: `font-size:12px;font-style:italic;color:#828282;font-family:${SERIF};text-align:center;margin:6px 0 0;` }, p.caption) : ""
@@ -3021,42 +3014,36 @@ const buildReportHTML = async (report) => {
     return h("div", { style: `display:flex;gap:${gap}px;align-items:flex-start;margin-top:${marginTop}px;margin-bottom:${marginBottom}px;` }, cells);
   };
 
-  // Rows group by orientation, not by raw width — landscape/portrait/
-  // square rarely share a row well even at similar widths (a landscape
-  // and a portrait shot can be the same width and still look mismatched
-  // side by side), and grouping by orientation first keeps every row
-  // visually coherent. Within each orientation bucket, packRowsByWidth
-  // still does the same same-width row-forming it always did — this only
-  // changes what feed it, not how a row itself gets built once grouped.
-  // If there's at least one landscape photo, the very first one (in
-  // original order) gets its own single-photo "hero" row up front, sized
-  // to fill the row width — same "never upscale past its own resolution,
-  // no max-height" rule every other row follows, just alone in its row
-  // instead of sharing it — everything else, including any other
-  // landscape photos, then follows in landscape/square/portrait order
-  // (every non-hero row still capped at MAX_ROW_PHOTOS, see
-  // packRowsByWidth — the hero is the only row that's ever just one). No
-  // hero at all when there's no landscape photo — the set just goes
-  // straight to landscape/square/portrait grouping, unhighlighted.
-  const ORIENTATION_SQUARE_TOLERANCE = 0.05; // within 5% aspect ratio counts as square
-  const photoOrientation = (p) => {
-    const ratio = p.width / p.height;
-    if (Math.abs(ratio - 1) <= ORIENTATION_SQUARE_TOLERANCE) return "square";
-    return ratio > 1 ? "landscape" : "portrait";
-  };
+  // Rows group by orientation — landscape/square/portrait rarely share a
+  // row well even at similar widths (a landscape and a portrait shot can
+  // be the same width and still look mismatched side by side). Highlight
+  // rules (landscape only):
+  //   - 1 landscape photo total: it's the highlight alone, full page
+  //     width, and there's no landscape left over for buildRows below.
+  //   - 2 landscape photos: NO highlight — both just become one normal
+  //     2-photo row via buildRows, same as any other pair.
+  //   - 3+ landscape photos: the first one (original order) becomes the
+  //     highlight, full page width; everything else goes through
+  //     buildRows same as the rest.
+  // Square, then portrait, always follow in that order, each through the
+  // same buildRows — nothing else about them is special.
   const packRowsByOrientation = (photos, containerWidth, gap) => {
     const landscape = photos.filter(p => photoOrientation(p) === "landscape");
-    const portrait = photos.filter(p => photoOrientation(p) === "portrait");
     const square = photos.filter(p => photoOrientation(p) === "square");
+    const portrait = photos.filter(p => photoOrientation(p) === "portrait");
     const rows = [];
-    if (landscape.length > 0) {
-      const [hero, ...restLandscape] = landscape;
-      const heroScale = Math.min(1, containerWidth / hero.width);
-      rows.push({ photos: [hero], scale: heroScale });
-      rows.push(...packRowsByWidth(restLandscape, containerWidth, gap));
+    let landscapeRest = landscape;
+    if (landscape.length === 1) {
+      rows.push(justifiedRow(landscape, containerWidth, gap));
+      landscapeRest = [];
+    } else if (landscape.length >= 3) {
+      const [hero, ...rest] = landscape;
+      rows.push(justifiedRow([hero], containerWidth, gap));
+      landscapeRest = rest;
     }
-    rows.push(...packRowsByWidth(square, containerWidth, gap));
-    rows.push(...packRowsByWidth(portrait, containerWidth, gap));
+    rows.push(...buildRows(landscapeRest, containerWidth, gap));
+    rows.push(...buildRows(square, containerWidth, gap));
+    rows.push(...buildRows(portrait, containerWidth, gap));
     return rows;
   };
 
@@ -3281,7 +3268,7 @@ const buildReportHTML = async (report) => {
                 const isFirst = idx === 0;
                 const isLast = idx === rows.length - 1;
                 groupBlocks.push({
-                  html: widthGroupedRowHTML(row, isFirst ? 16 : 8, isLast ? 80 : 0),
+                  html: photoRowHTML(row, isFirst ? 16 : 8, isLast ? 80 : 0),
                   isLabel: false,
                 });
               });
