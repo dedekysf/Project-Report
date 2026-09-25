@@ -3683,7 +3683,7 @@ function ReportsTab({ demoCase }) {
   const [previewLoading,   setPreviewLoading]    = useState(false);
   const [previewSaved,     setPreviewSaved]      = useState(false); // chrome switches from Cancel/Save to back/Download/Copy link once true
   const [previewCopied,    setPreviewCopied]     = useState(false); // Copy link button shows "Link copied" briefly
-  const [visibleCount,     setVisibleCount]      = useState(10); // infinite scroll — entries revealed so far
+  const [visibleCount,     setVisibleCount]      = useState(Infinity); // every entry is rendered at once (no batched infinite scroll) so the sidebar can list them all
   const [loadingMore,      setLoadingMore]       = useState(false);
   const [generating,       setGenerating]        = useState(false); // Generate button's own disabled/spinner state, before the inline view appears
   const [saving,           setSaving]             = useState(false); // Save report button's own disabled/spinner state, before the toast appears
@@ -3890,7 +3890,7 @@ function ReportsTab({ demoCase }) {
       setActiveEditField(null);
       setTitleOverrides({});
       setChecklistOverrides({});
-      setVisibleCount(10);
+      setVisibleCount(Infinity);
       setLoadingMore(false);
       setGenerating(false);
     }, 900);
@@ -3905,7 +3905,7 @@ function ReportsTab({ demoCase }) {
     setChecklistOverrides({});
     setPreviewSaved(false);
     setPreviewCopied(false);
-    setVisibleCount(10);
+    setVisibleCount(Infinity);
     setLoadingMore(false);
     setPhotoManager(false);
     setExpandedPhotoGroups({});
@@ -3937,7 +3937,7 @@ function ReportsTab({ demoCase }) {
   useEffect(() => {
     if (!preview) return;
     setPreviewLoading(true);
-    setVisibleCount(10); // new period = new dataset, restart infinite scroll from the top
+    setVisibleCount(Infinity); // new period = new dataset, still all of it at once
     setLoadingMore(false);
     const t = setTimeout(() => {
       setPreviewLoading(false);
