@@ -3100,7 +3100,7 @@ const buildReportHTML = async (report) => {
       const w = Math.round(row.height * (p.width / p.height));
       return h("div", { style: `flex-shrink:0;width:${w}px;` },
         selfClose("img", { src: p.src, style: `display:block;width:${w}px;height:${cellH}px;border-radius:4px;` }),
-        p.caption ? h("p", { style: `font-size:12px;font-style:italic;color:#828282;font-family:${SERIF};text-align:center;margin:6px 0 0;` }, p.caption) : ""
+        p.caption ? h("p", { style: `font-size:14px;line-height:1.6;font-style:italic;color:#828282;font-family:${SERIF};text-align:center;margin:6px 0 0;` }, p.caption) : ""
       );
     }).join("");
     return h("div", { style: `display:flex;gap:${gap}px;align-items:flex-start;margin-top:${marginTop}px;margin-bottom:${marginBottom}px;` }, cells);
@@ -3185,7 +3185,7 @@ const buildReportHTML = async (report) => {
           const cellH = Math.round(p.renderHeight);
           return h("div", { style: "margin-bottom:8px;" },
             selfClose("img", { src: p.src, style: `display:block;width:${Math.round(columnWidth)}px;height:${cellH}px;border-radius:4px;` }),
-            p.caption ? h("p", { style: `font-size:12px;font-style:italic;color:#828282;font-family:${SERIF};text-align:center;margin:6px 0 0;` }, p.caption) : ""
+            p.caption ? h("p", { style: `font-size:14px;line-height:1.6;font-style:italic;color:#828282;font-family:${SERIF};text-align:center;margin:6px 0 0;` }, p.caption) : ""
           );
         }).join("")
       )
