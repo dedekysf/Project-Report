@@ -4684,7 +4684,7 @@ function ReportsTab({ demoCase }) {
             alwaysEditing
             aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Phone</p>}
             validate={v => US_PHONE_PATTERN.test(v)}
-            errorMessage="Enter a valid US phone number, e.g. (212) 555-0100."
+            errorMessage="Enter a valid US phone number."
             onSave={v => setPreview(p => ({ ...p, companyPhone: v }))}
             textStyle={{ fontSize: 14, fontWeight: 400, color: "var(--tt-text-2)", margin: 0 }}
             inputStyle={{ fontSize: 14, height: 40, width: 160 }}
