@@ -3588,7 +3588,13 @@ const buildReportHTML = async (report) => {
     : h("div", { style: "width:36px;height:36px;border-radius:50%;background:#a85796;display:flex;align-items:center;justify-content:center;flex-shrink:0;" },
         h("span", { style: `font-family:${SANS};font-size:13px;font-weight:700;color:white;` }, initialsOf(contactName))
       );
-  const footerHTML = h("div", { style: "padding:20px 40px;border-top:1px solid #e8e8e6;" },
+  // pageNum/totalPages render as "Page X of Y", centered — the three
+  // children under justify-content:space-between land left/center/right
+  // for free, no extra layout needed. A function (not a constant) because
+  // totalPages isn't known until pagination below runs; the placeholder
+  // call used to measure this footer's height (footerEl) passes dummy
+  // numbers since the digits themselves don't affect layout height.
+  const footerHTML = (pageNum, totalPages) => h("div", { style: "padding:20px 40px;border-top:1px solid #e8e8e6;" },
     h("div", { style: "display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;" },
       h("div", { style: "display:flex;align-items:center;gap:10px;" },
         contactAvatarHTML,
@@ -3597,6 +3603,7 @@ const buildReportHTML = async (report) => {
           h("p", { style: `font-family:${SANS};font-size:11px;font-weight:400;color:#828282;line-height:1;margin:0;` }, contactRoleLine)
         )
       ),
+      h("div", { style: `font-family:${SANS};font-size:11px;color:#828282;line-height:1;align-self:center;white-space:nowrap;` }, `Page ${pageNum} of ${totalPages}`),
       h("div", { style: "text-align:right;" },
         h("p", { style: `font-family:${SANS};font-size:11px;color:#828282;line-height:1;margin:0 0 6px;` }, "Generated via TaskTag"),
         h("p", { style: `font-family:${SANS};font-size:11px;color:#828282;line-height:1;margin:0;` }, `Report ID: ${REPORT_ID}`)
@@ -3609,16 +3616,13 @@ const buildReportHTML = async (report) => {
   // that it isn't already folded into the cover instead (see
   // coverSummaryHTML/summaryFitsOnCover above). When there's no page for
   // it, progress/entries simply become the page right after the cover.
-  const summaryPageHTML = (summaryHTML && !summaryFitsOnCover)
-    ? h("div", { id: "report-summary", class: "card", style: "box-shadow:0 1px 3px rgba(10,22,41,0.08);" },
-        runningHeaderHTML,
-        h("div", { class: "card__body" },
-          h("p", { style: `font-family:${SANS};font-size:22px;font-weight:600;color:#0a1629;text-align:center;margin:0 0 12px;` }, "Summary"),
-          summaryHTML
-        ),
-        footerHTML
-      )
-    : "";
+  // Its own HTML is built further down (see summaryPageHTML reassignment
+  // near contentPagesHTML) once totalPages is known — the footer needs
+  // the real page count, which isn't known until the content pages are
+  // measured and split below. hasSummaryPage is decided right here
+  // though, since it only depends on summaryHTML/summaryFitsOnCover.
+  const hasSummaryPage = Boolean(summaryHTML && !summaryFitsOnCover);
+  let summaryPageHTML = "";
 
   // ── Pagination — split into real Letter pages, same as the live draft ──
   // Real DOM measurement (offsetHeight), same technique as the live
@@ -3651,7 +3655,7 @@ const buildReportHTML = async (report) => {
     return el;
   };
   const runningHeaderEl = appendMeasureEl(runningHeaderHTML);
-  const footerEl = appendMeasureEl(footerHTML);
+  const footerEl = appendMeasureEl(footerHTML(1, 1));
   const blockEls = blocks.map(b => appendMeasureEl(b.html, PAGE_W - PAGE_PAD * 2));
 
   const runningHeaderH = runningHeaderEl.offsetHeight;
@@ -3701,11 +3705,29 @@ const buildReportHTML = async (report) => {
   // comment for why relying on flex:1 alone isn't reliable enough.
   const css = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:${SERIF};background:#f7f8fa;min-height:100vh;padding:32px 24px}.card{background:white;border:1px solid #e8e8e6;border-radius:12px;overflow:hidden;width:${PAGE_W}px;min-height:${PAGE_H}px;margin:0 auto;display:flex;flex-direction:column}.card+.card{margin-top:24px}.card__body{padding:0 ${PAGE_PAD}px ${PAGE_BOTTOM_BUFFER}px;flex:1}`;
 
-  const contentPagesHTML = contentPages.map(pageBlocks =>
+  // Page numbers: the cover is excluded from the count entirely (it
+  // carries no footer/number of its own anyway — see coverHTML), so the
+  // summary page, when present, is page 1; content pages fill in the
+  // rest. This is the first point totalPages is known, so summaryPageHTML
+  // (deferred above) is actually built here too, alongside the content
+  // pages.
+  const totalPages = (hasSummaryPage ? 1 : 0) + contentPages.length;
+  summaryPageHTML = hasSummaryPage
+    ? h("div", { id: "report-summary", class: "card", style: "box-shadow:0 1px 3px rgba(10,22,41,0.08);" },
+        runningHeaderHTML,
+        h("div", { class: "card__body" },
+          h("p", { style: `font-family:${SANS};font-size:22px;font-weight:600;color:#0a1629;text-align:center;margin:0 0 12px;` }, "Summary"),
+          summaryHTML
+        ),
+        footerHTML(1, totalPages)
+      )
+    : "";
+  const firstContentPageNum = 1 + (hasSummaryPage ? 1 : 0);
+  const contentPagesHTML = contentPages.map((pageBlocks, i) =>
     h("div", { class: "card", style: "box-shadow:0 1px 3px rgba(10,22,41,0.08);" },
       runningHeaderHTML,
       h("div", { class: "card__body" }, pageBlocks.join("")),
-      footerHTML
+      footerHTML(firstContentPageNum + i, totalPages)
     )
   ).join("");
   const cardsHTML = coverHTML + summaryPageHTML + contentPagesHTML;
