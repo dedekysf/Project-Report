@@ -3,4 +3,35 @@
 body {
   margin: 0;
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* This is a desktop-only tool — nothing in it reflows for a narrow
+     viewport. Without a floor, a phone's own narrow width (device-width,
+     per index.html's viewport meta) squeezes every fixed-width layout
+     here (chrome bars, tables, draft mode's ROW_W column, etc.) down
+     into itself, which doesn't just look cramped — absolutely-positioned
+     pieces (tooltips, labels) actively overlap other content once their
+     assumed width no longer exists. Pinning a safe desktop width here
+     instead makes the browser render the real, working desktop layout
+     and let the viewer pinch-zoom/scroll to it, exactly like "Request
+     desktop site" is supposed to but isn't reliably doing on its own. */
+  min-width: 1200px;
+  overflow-x: auto;
+}
+
+/* Photo caption box (PhotoLightbox) — the one piece of that fixed-width
+   toolbar it sits inside that's still worth sizing off the real device
+   screen instead of the locked desktop width above: unlike the toolbar
+   itself (which breaks without full desktop width), a caption textbox is
+   just centered text and reads fine at any width, so on an actual phone
+   screen it's more comfortable to type into at 90% of that real width
+   than to stay pinned to a desktop-proportioned 30%. `vw` here is always
+   relative to the true device viewport, not affected by any element's
+   own min-width (see body's own comment) — same reasoning as why
+   previewPanelRef's minWidth had to move off the fixed element itself. */
+.tt-caption-box {
+  width: 30vw;
+}
+@media (max-width: 768px) {
+  .tt-caption-box {
+    width: 90vw;
+  }
 }

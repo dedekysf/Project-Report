@@ -1958,13 +1958,20 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
 
   useEffect(() => {
     const handler = (e) => {
+      // Escape while the caption textarea is focused is already handled
+      // (and stopped from bubbling here) by its own onKeyDown — it
+      // reverts the caption, not the whole lightbox. Arrow keys have no
+      // such guard of their own though: without captionEditing here too,
+      // pressing Left/Right to move the caret while typing a caption
+      // would also jump to the previous/next photo underneath it.
       if (e.key === "Escape") onClose();
+      if (captionEditing) return;
       if (e.key === "ArrowLeft") onIndexChange(Math.max(0, index - 1));
       if (e.key === "ArrowRight") onIndexChange(Math.min(photos.length - 1, index + 1));
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [index, photos.length, onClose, onIndexChange]);
+  }, [index, photos.length, onClose, onIndexChange, captionEditing]);
 
   const iconBtnStyle = {
     background: "none", border: "none", cursor: "pointer", color: "white",
@@ -1999,7 +2006,12 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
   const caption = captions && captions[`${entryKey}_${originalIdx}`];
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 5500, background: "black", display: "flex", flexDirection: "column" }}>
+    // Stays exactly viewport-sized (overflowX here, no minWidth) — same
+    // "fixed parent scrolls a wider plain child" split previewPanelRef
+    // uses (see its own comment for why position:fixed + its own
+    // min-width doesn't reliably become swipeable on a phone).
+    <div style={{ position: "fixed", inset: 0, zIndex: 5500, background: "black", overflowX: "auto" }}>
+    <div style={{ minWidth: 1200, height: "100%", display: "flex", flexDirection: "column" }}>
       {/* Top bar */}
       <div style={{
         display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 12,
@@ -2179,14 +2191,17 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
               Button component's scale is sm/default/lg, "default" is its
               md), centered, sticky-note icon + "Add caption".
             - editing (clicked from either state below): a textarea styled
-              exactly like Summary's own (see renderSummaryBlock/Textarea)
-              — same border/radius/font/resize:vertical — 5 rows by
-              default, 30% of the window wide. The character counter and
-              Check/X both sit overlaid INSIDE the box's own bottom
-              corners (counter bottom-left, buttons bottom-right), same
-              "controls live inside the textarea" idea Summary's own
-              alwaysEditing textarea uses for its Check/X, just with the
-              counter added on the opposite corner.
+              like Summary's own (see renderSummaryBlock/Textarea) — same
+              border/radius/font — 1 row by default (see .tt-caption-box
+              in index.css for the width: 30% of the window, 90% on a
+              real phone screen), but grows with its content past that
+              instead of staying fixed or needing a manual resize handle
+              (see the Textarea's own ref callback). The character
+              counter and Check/X both sit overlaid INSIDE the box's own
+              bottom corners (counter bottom-left, buttons bottom-right),
+              same "controls live inside the textarea" idea Summary's own
+              alwaysEditing textarea uses for its
+              Check/X, just with the counter added on the opposite corner.
             - saved, not editing: centered plain text, 14px/1.6 line
               height, clickable to re-edit. Bound directly to the
               `caption` prop (no separate draft/commit step) — every
@@ -2197,9 +2212,26 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
           padding: "20px 24px 18px", background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent)",
         }}>
           {captionEditing ? (
-            <div style={{ position: "relative", width: "30vw" }}>
+            <div className="tt-caption-box" style={{ position: "relative" }}>
               <Textarea
-                autoFocus
+                // Combines two jobs in one ref callback (same pattern
+                // EditableField's own alwaysEditing textarea uses — see
+                // its own comment): focusAtEnd only once, right when this
+                // textarea first mounts (el !== document.activeElement
+                // guards that from re-firing on every keystroke's
+                // re-render and yanking the caret back to the end while
+                // mid-edit); the height auto-grow below, on the other
+                // hand, is SUPPOSED to rerun on every one of those
+                // re-renders, since that's what keeps the box's height
+                // matching its content as it's typed. Resetting to "auto"
+                // first is what lets scrollHeight shrink back down too,
+                // not just grow.
+                ref={el => {
+                  if (!el) return;
+                  if (el !== document.activeElement) focusAtEnd(el);
+                  el.style.height = "auto";
+                  el.style.height = el.scrollHeight + "px";
+                }}
                 value={caption || ""}
                 onChange={ev => onCaptionChange && onCaptionChange(originalIdx, ev.target.value.slice(0, CAPTION_MAX_LEN))}
                 onKeyDown={ev => {
@@ -2209,16 +2241,20 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
                   if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); onCaptionChange && onCaptionChange(originalIdx, captionStartRef.current); setCaptionEditing(false); }
                 }}
                 placeholder="Add a caption"
-                rows={5}
+                rows={1}
                 maxLength={CAPTION_MAX_LEN}
-                // fontSize/color/lineHeight/resize match Summary's own
-                // inputStyle exactly (see renderSummaryBlock); paddingLeft/
-                // Right/Bottom carve out room for the counter (bottom-left)
-                // and Check/X (bottom-right) overlaid on top of the text.
-                style={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, resize: "vertical", paddingLeft: 12, paddingRight: 68, paddingBottom: 30 }}
+                // fontSize/color/lineHeight match Summary's own inputStyle
+                // exactly (see renderSummaryBlock); resize:none — height
+                // is the ref callback's job now, not a manual drag handle
+                // fighting it on the next keystroke. paddingLeft/Right/
+                // Bottom carve out room for the counter (bottom-left) and
+                // Check/X (bottom-right) overlaid on top of the text.
+                style={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, resize: "none", overflow: "hidden", paddingLeft: 12, paddingRight: 68, paddingBottom: 30 }}
               />
+              {/* Remaining count, not "used/max" — starts at CAPTION_MAX_LEN
+                  and counts down (250, 249, 248, ...) as you type. */}
               <span style={{ position: "absolute", left: 12, bottom: 9, fontSize: 11, fontWeight: 500, color: (caption || "").length >= CAPTION_MAX_LEN ? "var(--tt-red)" : "var(--tt-grey05)" }}>
-                {(caption || "").length}/{CAPTION_MAX_LEN}
+                {CAPTION_MAX_LEN - (caption || "").length}
               </span>
               <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>
                 <button
@@ -2244,7 +2280,13 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
           ) : caption ? (
             <p
               onClick={() => { captionStartRef.current = caption || ""; setCaptionEditing(true); }}
-              style={{ width: "30vw", margin: 0, textAlign: "center", fontSize: 14, lineHeight: 1.6, color: "white", textShadow: "0 1px 3px rgba(0,0,0,0.6)", cursor: "pointer", whiteSpace: "pre-wrap" }}
+              className="tt-caption-box"
+              // underline only on hover — the "this text is clickable"
+              // signal, without permanently making a saved caption look
+              // like a link/placeholder at rest.
+              onMouseEnter={ev => ev.currentTarget.style.textDecoration = "underline"}
+              onMouseLeave={ev => ev.currentTarget.style.textDecoration = "none"}
+              style={{ margin: 0, textAlign: "center", fontSize: 14, lineHeight: 1.6, color: "white", textShadow: "0 1px 3px rgba(0,0,0,0.6)", cursor: "pointer", textDecoration: "none", whiteSpace: "pre-wrap" }}
             >
               {caption}
             </p>
@@ -2254,7 +2296,22 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
               variant="ghost"
               size="default"
               onClick={() => { captionStartRef.current = ""; setCaptionEditing(true); }}
-              style={{ color: "white", textShadow: "0 1px 3px rgba(0,0,0,0.6)" }}
+              // The ghost variant's own hover (a light gray-100 fill,
+              // see buttonVariants) reads fine on this app's own white/
+              // grey02 chrome, but disappears (or looks like a stray grey
+              // box) over an arbitrary photo. Swapping it for this app's
+              // own "black" button fill (var(--tt-text-1), the same dark
+              // background every other primary button here uses — Check/
+              // Confirm/Save Report/Upgrade to Team Plan) instead reads
+              // clearly regardless of what's behind it; text stays white
+              // in both states so it doesn't need to change on hover too.
+              onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-text-1)"}
+              onMouseLeave={ev => ev.currentTarget.style.background = "transparent"}
+              // Native <button> elements default to cursor:default (an
+              // arrow, not a hand) in most browsers unless told otherwise
+              // — the Button component's own buttonVariants classes don't
+              // set cursor-pointer, so this needs to be explicit.
+              style={{ color: "white", textShadow: "0 1px 3px rgba(0,0,0,0.6)", cursor: "pointer" }}
             >
               <StickyNote size={14} strokeWidth={2} /> Add caption
             </Button>
@@ -2334,6 +2391,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 }
@@ -5360,12 +5418,19 @@ function ReportsTab({ demoCase }) {
     }, 900);
   };
 
-  const [isWide, setIsWide] = useState(window.innerWidth > 1280);
-  useEffect(() => {
-    const handler = () => setIsWide(window.innerWidth > 1280);
-    window.addEventListener("resize", handler);
-    return () => window.removeEventListener("resize", handler);
-  }, []);
+  // Used to read window.innerWidth and hide the sidebar/collapse a couple
+  // of buttons below it once the real browser window got too narrow. Now
+  // that body/previewPanelRef both carry an explicit min-width (see
+  // index.css and previewPanelRef's own style) guaranteeing this column
+  // is always at least that wide regardless of the actual device/window
+  // — scrolling to it instead of shrinking below it — there's no longer
+  // a real "too narrow" case left to detect: window.innerWidth on a
+  // phone still reports its own small size even though the rendered
+  // layout itself never drops below the guaranteed floor, which was
+  // hiding the sidebar there for no reason. Left as a plain constant
+  // (not removed outright) so every call site below still reads the
+  // same, in case a real narrow-layout mode is worth reintroducing later.
+  const isWide = true;
 
   // Returns whether the download actually happened — callers use this to
   // decide whether their own follow-up feedback (the table row's success
@@ -5787,16 +5852,33 @@ function ReportsTab({ demoCase }) {
           <div
             ref={previewPanelRef}
             style={{
-              position: "fixed", inset: 0, zIndex: 2000,
+              // Stays exactly viewport-sized (no minWidth here) — the
+              // minWidth instead lives on the plain block child just
+              // below, which is what actually needs to be ≥1200px. Doing
+              // it there instead of here is what makes overflowX below
+              // actually pannable/swipeable on a phone: a position:fixed
+              // box that's forced wider than the real viewport via its
+              // own min-width doesn't reliably become horizontally
+              // scrollable at all (fixed positioning is resolved against
+              // the viewport itself, not any box's own overflow) — but a
+              // normal, non-fixed child that's wider than ITS (correctly
+              // viewport-sized) fixed parent scrolls exactly like any
+              // other overflowing content would.
+              position: "fixed", inset: 0, zIndex: 2000, overflowX: "auto",
               // grey02 — the sidebar, chrome bar, and every section card
               // each set their own explicit white background, so against
               // this slightly-off-white body they still stand apart via
               // that contrast (plus their own shadow, for the section
               // cards) rather than blending into an identically-white page.
               background: "var(--tt-grey02)",
-              display: "flex", flexDirection: "column",
             }}
           >
+          {/* minWidth is the actual desktop floor (see the outer div's own
+              comment); height:100% carries this fixed box's own definite
+              viewport height down to here, since that's what the flex
+              column below (and its own flex:1 scrollable body row) needs
+              to size correctly against. */}
+          <div style={{ minWidth: 1200, height: "100%", display: "flex", flexDirection: "column" }}>
 
             {/* Modal chrome. Draft: Photo Limit usage on the left, Cancel +
                 Save Report on the right — the period is locked in once
@@ -6195,6 +6277,7 @@ function ReportsTab({ demoCase }) {
               </div>
             </div>
 
+          </div>
           </div>
         </ActiveEditContext.Provider>
       )}
