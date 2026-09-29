@@ -4184,6 +4184,13 @@ function ReportsTab({ demoCase }) {
 
   const handleGenerate = () => {
     if (generating) return;
+    // Free tier — the one report it includes is a ONE-TIME allowance, not
+    // a re-generatable slot (see the row actions' own Delete removal for
+    // the same reasoning: deleting it and generating again would be an
+    // easy way around this). Download/Copy link stay open for that report
+    // regardless (see handleDownload/handleCopy) — only another Generate
+    // past it is what's actually gated here.
+    if (paywalled && reports.length >= 1) { setShowPaywallModal(true); return; }
     setGenerating(true);
     setTimeout(() => {
       // Demo case: "Error states" always fails to generate, regardless of
@@ -5529,12 +5536,16 @@ function ReportsTab({ demoCase }) {
   // same, in case a real narrow-layout mode is worth reintroducing later.
   const isWide = true;
 
-  // Returns whether the download actually happened — callers use this to
-  // decide whether their own follow-up feedback (the table row's success
-  // toast, handlePreviewCopy's "Link copied" flash) should fire at all,
-  // since none of that applies when this bails out to the paywall instead.
+  // Always succeeds now (Download/Copy link are no longer paywall-gated —
+  // see the comment inside) — still returns a boolean since callers (the
+  // table row's success toast, handlePreviewCopy's "Link copied" flash)
+  // key their own follow-up feedback off it.
   const handleDownload = async (report) => {
-    if (paywalled) { setShowPaywallModal(true); return false; }
+    // Free tier — Download/Copy link stay available for the one report it
+    // already includes (see the paywall's own "Shareable link for any
+    // period" unlock item — that's about OTHER periods, not this one).
+    // What's actually gated is Generate past that first save (see
+    // handleGenerate) and Delete (see the row actions), not this.
     // Company/contact identity always reflect the latest save, not this
     // report's own (possibly older) snapshot — see companyIdentity/
     // contactIdentity.
@@ -5655,7 +5666,8 @@ function ReportsTab({ demoCase }) {
 
   // Same "returns whether it actually happened" contract as handleDownload.
   const handleCopy = async (report) => {
-    if (paywalled) { setShowPaywallModal(true); return false; }
+    // Same "free tier still gets Download/Copy link for its one included
+    // report" reasoning as handleDownload above.
     const url = buildShareURL(report);
     try { await navigator.clipboard.writeText(url); }
     catch {
@@ -5898,13 +5910,17 @@ function ReportsTab({ demoCase }) {
                   <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", marginBottom: 4 }}>No reports yet</p>
                   <p style={{ fontSize: 13, color: "var(--tt-grey05)", lineHeight: "20px", marginTop: 4 }}>
                     {paywalled
-                      ? "Free preview · 1 report included"
+                      ? "Generate your first report free — download or share it anytime"
                       : "Configure your report first and click Generate to create your report."}
                   </p>
                 </td>
               </tr>
             ) : reports.map((r, i) => (
-                <tr key={r.id} style={{ background: r.id === lastSavedId ? "var(--tt-mint)" : "white", borderTop: i > 0 ? `1px solid var(--tt-grey03)` : "none", transition: "background 0.6s ease" }}>
+                /* No "just saved" mint highlight while paywalled — free
+                   tier's one report never gets a next save to hand the
+                   highlight off to (see lastSavedId), so it would just
+                   sit there permanently instead of reading as recent. */
+                <tr key={r.id} style={{ background: (!paywalled && r.id === lastSavedId) ? "var(--tt-mint)" : "white", borderTop: i > 0 ? `1px solid var(--tt-grey03)` : "none", transition: "background 0.6s ease" }}>
                   <td style={{ padding: "0 16px", fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", height: 52, verticalAlign: "middle", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.projectName || PROJECT_NAME}</td>
                   <td style={{ padding: "0 16px", fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", height: 52, verticalAlign: "middle", whiteSpace: "nowrap" }}>
                     {/* Update No. shown alongside the period since the same
@@ -5924,7 +5940,13 @@ function ReportsTab({ demoCase }) {
                         <FixedTooltipBtn label="Preview" onAction={() => handlePreviewOpen(r)}><Eye size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
                         <FixedTooltipBtn label="Download" onAction={async () => { const ok = await handleDownload(r); if (ok) showToast("success", "Downloaded"); }}><Download size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
                         <FixedTooltipBtn label="Copy link to share" onAction={async () => { const ok = await handleCopy(r); if (ok) showToast("success", "Link copied"); }}><Link size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
-                        <FixedTooltipBtn label="Delete report" onAction={() => setDeleteTarget(r)}><Trash2 size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
+                        {/* Free tier's one report is a one-time allowance
+                            (see handleGenerate) — Delete stays hidden while
+                            paywalled so there's no way to clear it and
+                            generate a "fresh" free report in its place. */}
+                        {!paywalled && (
+                          <FixedTooltipBtn label="Delete report" onAction={() => setDeleteTarget(r)}><Trash2 size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
+                        )}
                       </span>
                     )}
                   </td>
@@ -5936,7 +5958,21 @@ function ReportsTab({ demoCase }) {
       </div>
       {reports.length > 0 && (
         <p style={{ fontSize: 12, color: "var(--tt-grey05)", marginTop: 8 }}>
-          Saved reports are read-only. To make changes, generate a new report for the range you need.
+          {paywalled
+            ? (
+              <span style={{ color: "var(--tt-text-1)" }}>
+                Your free report is saved and read-only.{" "}
+                <strong
+                  onClick={() => setShowPaywallModal(true)}
+                  onMouseEnter={ev => ev.currentTarget.style.textDecoration = "underline"}
+                  onMouseLeave={ev => ev.currentTarget.style.textDecoration = "none"}
+                  style={{ fontWeight: 600, cursor: "pointer" }}
+                >
+                  Upgrade to generate more.
+                </strong>
+              </span>
+            )
+            : "Saved reports are read-only. To make changes, generate a new report for the range you need."}
         </p>
       )}
       </>
