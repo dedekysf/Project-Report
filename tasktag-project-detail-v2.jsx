@@ -272,6 +272,15 @@ const NAV_W = 280;
 // the same way), so their content lines up and any leftover space on a
 // wide screen balances evenly on both sides instead of the whole unit
 // piling up against one edge.
+// Set to 24, matching Preview's own VISIBLE right-hand gap — not
+// ReportPreviewChrome's PREVIEW_CONTENT_BUFFER (48) directly, which
+// budgets the iframe's whole fixed width (PAGE_W + 48) and is mostly
+// spent inside the iframe itself: the exported document's own
+// `body{padding:32px 24px}` (see buildReportHTML) splits that into 24px
+// on each side of the 800px card, so the gap actually visible next to
+// the card in Preview is 24, not 48. Matching this constant to 24 (rather
+// than 48) is what makes draft and Preview's right-hand gap look
+// identical side by side.
 const CONTENT_BUFFER = 24;
 const ROW_W = NAV_W + PAGE_W + CONTENT_BUFFER;
 // Two jobs: (1) reserved on top of the footer's own measured height when
@@ -2986,13 +2995,14 @@ const buildReportHTML = async (report) => {
     return `<${tag}${attrStr}/>`;
   };
 
-  // Comparison path for an alternative fixed-3-column masonry photo
-  // layout — visit the app at /masonry to preview that instead of the
-  // current default (orientation-grouped rows, see packRowsByOrientation
-  // below). Read once per export so a link copied while on /masonry keeps
-  // rendering masonry for whoever opens it too (handleCopy's share URL
-  // keeps whatever pathname was current when it was built).
-  const useMasonry = typeof window !== "undefined" && /\/masonry\/?$/.test(window.location.pathname);
+  // Fixed 3-column masonry (see packMasonryColumns/masonryHTML below) is
+  // now the default photo layout. The previous default — orientation-
+  // grouped justified rows, see packRowsByOrientation below — lives on as
+  // a comparison path: visit the app at /row-grouping to preview that
+  // instead. Read once per export so a link copied while on /row-grouping
+  // keeps rendering row-grouping for whoever opens it too (handleCopy's
+  // share URL keeps whatever pathname was current when it was built).
+  const useRowGrouping = typeof window !== "undefined" && /\/row-grouping\/?$/.test(window.location.pathname);
 
   const STATUS_HEX = { completed: "#16a97d", open: "#138eff" };
   // Editorial serif for headline/body content (title, address, summary,
@@ -3139,18 +3149,18 @@ const buildReportHTML = async (report) => {
     return rows;
   };
 
-  // ── /masonry comparison path — fixed 3-column, shortest-column-first ──
-  // Kept only for side-by-side preview against the justified-row default
-  // above; not used unless useMasonry is true. Every photo shows here (no
-  // "+N more" cap), at its own natural aspect ratio (needs real
-  // photoDims up front, same as the default path — see allPhotoSrcs
-  // below, no longer skipped for this path), in fixed-size chunks (see
-  // PHOTO_CHUNK) so the pagination pass can still place each chunk on
-  // whichever page it fits — masonry columns reset per chunk, they don't
-  // carry state across a page-fitting boundary.
+  // ── Default photo layout — fixed 3-column masonry, shortest-column-first ──
+  // The orientation-grouped justified rows above are now the /row-grouping
+  // comparison path instead; this runs whenever useRowGrouping is false.
+  // Every photo shows here (no "+N more" cap), at its own natural aspect
+  // ratio (needs real photoDims up front, same as the row-grouping path —
+  // see allPhotoSrcs below, no longer skipped for this path), in
+  // fixed-size chunks (see PHOTO_CHUNK) so the pagination pass can still
+  // place each chunk on whichever page it fits — masonry columns reset
+  // per chunk, they don't carry state across a page-fitting boundary.
   const MASONRY_COLUMNS = 3;
   // A photo goes into whichever column is currently shortest — not by
-  // display order/orientation the way the default path groups (a
+  // display order/orientation the way the row-grouping path groups (a
   // landscape, a square and a portrait shot can all end up next to each
   // other in different columns here, entirely by whichever column needed
   // filling next) — purely to keep the 3 columns' total heights as even
@@ -3196,11 +3206,11 @@ const buildReportHTML = async (report) => {
 
   // Every unique photo src used anywhere in this report, deduped so a
   // bundled photo reused across several entries only ever loads once —
-  // both this path and the default path need each photo's real aspect
-  // ratio up front (masonry needs it to know each photo's rendered
-  // height before deciding which column is shortest; the default path
-  // needs it for its own row packing), so this has to resolve before
-  // blocks below are built at all either way.
+  // both the default masonry path and the /row-grouping path need each
+  // photo's real aspect ratio up front (masonry needs it to know each
+  // photo's rendered height before deciding which column is shortest;
+  // row-grouping needs it for its own row packing), so this has to
+  // resolve before blocks below are built at all either way.
   const allPhotoSrcs = new Set();
   groups.forEach(g => g.entries.forEach(e => {
     if (e.isNote || e.noPhotos) return;
@@ -3365,7 +3375,17 @@ const buildReportHTML = async (report) => {
               const caption = report.photoCaptions && report.photoCaptions[`${e.entryKey}_${originalIndices[i]}`];
               return { src: toAbsoluteUrl(src), width: dims.width, height: dims.height, caption };
             }).filter(Boolean);
-            if (useMasonry) {
+            if (useRowGrouping) {
+              const rows = packRowsByOrientation(photoMetas, PHOTO_ROW_WIDTH, JUSTIFIED_GAP);
+              rows.forEach((row, idx) => {
+                const isFirst = idx === 0;
+                const isLast = idx === rows.length - 1;
+                groupBlocks.push({
+                  html: photoRowHTML(row, isFirst ? 16 : 8, isLast ? 80 : 0),
+                  isLabel: false,
+                });
+              });
+            } else {
               const columnWidth = (PHOTO_ROW_WIDTH - JUSTIFIED_GAP * (MASONRY_COLUMNS - 1)) / MASONRY_COLUMNS;
               for (let start = 0; start < photoMetas.length; start += PHOTO_CHUNK) {
                 const isFirst = start === 0;
@@ -3379,16 +3399,6 @@ const buildReportHTML = async (report) => {
                   isLabel: false,
                 });
               }
-            } else {
-              const rows = packRowsByOrientation(photoMetas, PHOTO_ROW_WIDTH, JUSTIFIED_GAP);
-              rows.forEach((row, idx) => {
-                const isFirst = idx === 0;
-                const isLast = idx === rows.length - 1;
-                groupBlocks.push({
-                  html: photoRowHTML(row, isFirst ? 16 : 8, isLast ? 80 : 0),
-                  isLabel: false,
-                });
-              });
             }
           }
         });
@@ -5842,16 +5852,20 @@ function ReportsTab({ demoCase }) {
                   in addition to that fixed width was shrinking the actual
                   available space below PAGE_W, which pushed the card past
                   this container's right edge and forced an unwanted
-                  horizontal scrollbar on the whole modal. Its own 24px
-                  right padding below is what actually reserves room for a
-                  real scrollbar (when content is tall enough for one)
-                  instead. */}
+                  horizontal scrollbar on the whole modal. Its own right
+                  padding below (CONTENT_BUFFER) is what actually reserves
+                  room for a real scrollbar (when content is tall enough for
+                  one) instead. */}
               <div ref={mainScrollRef} style={{ overflowY: "auto", flex: 1 }} onScroll={handleModalScroll}>
               {/* No left padding (touches the sidebar directly) or top
                   padding (touches the chrome bar directly — see the "no
                   space before the first section" requirement); right/
-                  bottom keep their own breathing room. */}
-              <div style={{ padding: "0 24px 24px 0" }}>
+                  bottom keep their own breathing room. Right padding is
+                  CONTENT_BUFFER, not a separate guess — same value Preview
+                  reserves (see CONTENT_BUFFER's own comment), so draft and
+                  Preview's outer gutter feel identical when switching
+                  between them. */}
+              <div style={{ padding: `0 ${CONTENT_BUFFER}px 24px 0` }}>
               <div style={{ maxWidth: PAGE_W }}>
                 {previewLoading ? (
                   // One skeleton card per real section — same cardStyle
