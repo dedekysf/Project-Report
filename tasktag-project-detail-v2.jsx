@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect, useEffect, useMemo, useContext, createContext } from "react";
+import { useState, useRef, useLayoutEffect, useEffect, useMemo, useContext, createContext, Fragment } from "react";
 import { createPortal } from "react-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -828,7 +828,10 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
   const boxStyle = boxed ? { position: "relative", background: "var(--tt-grey02)", borderRadius: 8, padding: 8 } : {};
 
   if (disabled) {
-    if (value) return <div style={boxStyle}><Tag style={{ display: "block", ...textStyle }}>{value}</Tag></div>;
+    // whiteSpace here matches the live "display" branch further down —
+    // a read-only value with line breaks (multiline) still needs to keep
+    // them, not collapse to one line.
+    if (value) return <div style={boxStyle}><Tag style={{ display: "block", whiteSpace: multiline ? "pre-wrap" : "normal", ...textStyle }}>{value}</Tag></div>;
     return placeholder ? <div style={boxStyle}><Tag style={{ display: "block", ...textStyle, color: "var(--tt-grey05)" }}>{placeholder}</Tag></div> : null;
   }
 
@@ -1184,7 +1187,11 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
         onClick={() => { setDraft(value || ""); setActiveField(fieldId); setError(false); }}
         onMouseEnter={!boxed ? (ev => ev.currentTarget.style.background = "var(--tt-grey03)") : undefined}
         onMouseLeave={!boxed ? (ev => ev.currentTarget.style.background = "none") : undefined}
-        style={{ display: "inline-block", position: boxed ? "static" : "relative", cursor: "pointer", ...textStyle }}
+        // whiteSpace:pre-wrap for multiline — without it, a value with
+        // line breaks (this branch is reachable by a plain click-to-edit
+        // multiline field, not just alwaysEditing ones) collapses them
+        // to one line here same as any other CSS "normal" text would.
+        style={{ display: "inline-block", position: boxed ? "static" : "relative", cursor: "pointer", whiteSpace: multiline ? "pre-wrap" : "normal", ...textStyle }}
       >
         {value || <span style={{ color: "var(--tt-grey05)", textDecoration: "underline", ...placeholderStyle }}>{placeholder}</span>}
       </Tag>
@@ -1657,9 +1664,14 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, onDeletePhoto, ca
             {captionTooltipIdx === i && createPortal(
               // Portaled straight to <body> — same contentVisibility/
               // stacking-context reasoning as the lightbox's own caption
-              // editor; see its comment for the full explanation.
-              <div style={{ position: "fixed", top: captionTooltipPos.top, left: captionTooltipPos.left, zIndex: 5300, maxWidth: 220, pointerEvents: "none" }}>
-                <div style={{ background: "var(--tt-text-1)", color: "white", fontSize: 11, fontWeight: 500, lineHeight: 1.4, padding: "6px 10px", borderRadius: 6, boxShadow: "0 8px 24px rgba(10,22,41,0.24)" }}>
+              // editor; see its comment for the full explanation. 280 (up
+              // from 220) reads more comfortably now that a caption can
+              // run up to CAPTION_MAX_LEN characters — wide enough that a
+              // full-length caption wraps into a readable few lines
+              // instead of a tall, narrow column of short ones; no
+              // truncation either way, it just wraps.
+              <div style={{ position: "fixed", top: captionTooltipPos.top, left: captionTooltipPos.left, zIndex: 5300, maxWidth: 280, pointerEvents: "none" }}>
+                <div style={{ background: "var(--tt-text-1)", color: "white", fontSize: 11, fontWeight: 500, lineHeight: 1.4, padding: "6px 10px", borderRadius: 6, boxShadow: "0 8px 24px rgba(10,22,41,0.24)", whiteSpace: "pre-wrap" }}>
                   {caption}
                 </div>
               </div>,
@@ -2162,28 +2174,52 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
           </div>
         )}
 
-        {/* Caption — overlaid directly on the image. Not-editing states
-            (empty prompt or a saved caption) show the sticky-note icon
-            next to hug-content text; editing swaps in a plain input with
-            Check/X inside its own bottom-right corner (no icon), same
-            button styling as EditableField's alwaysEditing mode. */}
+        {/* Caption — overlaid directly on the image, three states:
+            - empty, not editing: a ghost Button (md/"default" size — this
+              Button component's scale is sm/default/lg, "default" is its
+              md), centered, sticky-note icon + "Add caption".
+            - editing (clicked from either state below): a textarea styled
+              exactly like Summary's own (see renderSummaryBlock/Textarea)
+              — same border/radius/font/resize:vertical — 5 rows by
+              default, 30% of the window wide. The character counter and
+              Check/X both sit overlaid INSIDE the box's own bottom
+              corners (counter bottom-left, buttons bottom-right), same
+              "controls live inside the textarea" idea Summary's own
+              alwaysEditing textarea uses for its Check/X, just with the
+              counter added on the opposite corner.
+            - saved, not editing: centered plain text, 14px/1.6 line
+              height, clickable to re-edit. Bound directly to the
+              `caption` prop (no separate draft/commit step) — every
+              keystroke while editing calls onCaptionChange immediately;
+              Escape is what reverts to captionStartRef instead. */}
         <div style={{
           position: "absolute", left: 0, right: 0, bottom: 0, display: "flex", justifyContent: "center",
           padding: "20px 24px 18px", background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent)",
         }}>
           {captionEditing ? (
-            <div style={{ position: "relative", width: "100%", maxWidth: 400 }}>
-              <Input
+            <div style={{ position: "relative", width: "30vw" }}>
+              <Textarea
                 autoFocus
                 value={caption || ""}
-                onChange={ev => onCaptionChange && onCaptionChange(originalIdx, ev.target.value)}
+                onChange={ev => onCaptionChange && onCaptionChange(originalIdx, ev.target.value.slice(0, CAPTION_MAX_LEN))}
                 onKeyDown={ev => {
-                  if (ev.key === "Enter") { ev.preventDefault(); setCaptionEditing(false); }
+                  // Enter alone confirms (closes editing, same as the
+                  // Check button); Shift+Enter inserts a real newline.
+                  if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); setCaptionEditing(false); }
                   if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); onCaptionChange && onCaptionChange(originalIdx, captionStartRef.current); setCaptionEditing(false); }
                 }}
                 placeholder="Add a caption"
-                style={{ fontSize: 12, height: 40, padding: "0 76px 0 12px" }}
+                rows={5}
+                maxLength={CAPTION_MAX_LEN}
+                // fontSize/color/lineHeight/resize match Summary's own
+                // inputStyle exactly (see renderSummaryBlock); paddingLeft/
+                // Right/Bottom carve out room for the counter (bottom-left)
+                // and Check/X (bottom-right) overlaid on top of the text.
+                style={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, resize: "vertical", paddingLeft: 12, paddingRight: 68, paddingBottom: 30 }}
               />
+              <span style={{ position: "absolute", left: 12, bottom: 9, fontSize: 11, fontWeight: 500, color: (caption || "").length >= CAPTION_MAX_LEN ? "var(--tt-red)" : "var(--tt-grey05)" }}>
+                {(caption || "").length}/{CAPTION_MAX_LEN}
+              </span>
               <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>
                 <button
                   onMouseDown={ev => ev.preventDefault()}
@@ -2205,19 +2241,24 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
                 </button>
               </div>
             </div>
-          ) : (
-            <button
+          ) : caption ? (
+            <p
               onClick={() => { captionStartRef.current = caption || ""; setCaptionEditing(true); }}
-              style={{
-                display: "inline-flex", alignItems: "center", gap: 6, maxWidth: 480, background: "none", border: "none",
-                padding: 0, cursor: "pointer", color: caption ? "white" : "rgba(255,255,255,0.55)",
-                fontSize: 13, fontWeight: 500, textShadow: "0 1px 3px rgba(0,0,0,0.6)",
-              }}
+              style={{ width: "30vw", margin: 0, textAlign: "center", fontSize: 14, lineHeight: 1.6, color: "white", textShadow: "0 1px 3px rgba(0,0,0,0.6)", cursor: "pointer", whiteSpace: "pre-wrap" }}
             >
-              <StickyNote size={13} strokeWidth={2} style={{ flexShrink: 0 }} />
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>{caption || "Add caption"}</span>
-            </button>
-          )}
+              {caption}
+            </p>
+          ) : onCaptionChange ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="default"
+              onClick={() => { captionStartRef.current = ""; setCaptionEditing(true); }}
+              style={{ color: "white", textShadow: "0 1px 3px rgba(0,0,0,0.6)" }}
+            >
+              <StickyNote size={14} strokeWidth={2} /> Add caption
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -2770,6 +2811,13 @@ function defaultGlobalOverflowExclusions(groups, perEntryExcluded, maxTotal = PH
 
 // TODO(BE): replace with the account's actual per-task-item photo cap from the API
 const PER_ENTRY_PHOTO_LIMIT = 15;
+
+// Photo captions never truncate for display (see PhotoLightbox/PhotoGrid) —
+// a hard length cap here is what keeps them from growing unbounded in the
+// first place, enforced at the source (EditableField's own maxLength —
+// see PhotoLightbox's caption field) rather than by cutting an
+// already-saved caption short later.
+const CAPTION_MAX_LEN = 250;
 
 // Marks everything past the first PER_ENTRY_PHOTO_LIMIT photos in each entry
 // as excluded by default, using the exact same excludedPhotos shape (and
@@ -3787,6 +3835,13 @@ const buildReportHTML = async (report) => {
 
 // ── Reports Tab ──
 function ReportsTab({ demoCase }) {
+  // Free tier: 1 report included, Download/Copy link past that gated
+  // behind the paywall modal below (see handleDownload/handleCopy) —
+  // no real report-count/billing state to check against here (this is a
+  // demo tool, not the real product), so the "paywall" demo case just
+  // simulates having already used up that free report.
+  const paywalled = demoCase === "paywall";
+  const [showPaywallModal, setShowPaywallModal] = useState(false);
   const [includeSummary,      setIncludeSummary]      = useState(true); // "Task summary" chip — progress bar section
   const [includeNoPhotoTasks, setIncludeNoPhotoTasks] = useState(false); // "Task complete without photos" chip
   const [dateRange,   setDateRange]   = useState("last_7");
@@ -5001,21 +5056,48 @@ function ReportsTab({ demoCase }) {
   // itself is covered separately by handleModalScroll.
   useEffect(() => { updateActiveSection(); }, [sections.length]);
 
+  // Group label + icon shown once above the first card of each group —
+  // mirrors navGroups' own grouping (Cover/Summary/Task List/Footer)
+  // below, so the document reads with the same section structure the
+  // sidebar nav does, instead of a flat stack of unlabeled cards.
+  // coverContent continues the "Cover" group coverHeader already
+  // labeled, so it's deliberately left out here.
+  const SECTION_GROUP = {
+    coverHeader: { label: "Cover", Icon: FileText },
+    summary:     { label: "Summary", Icon: AlignJustify },
+    task:        { label: "Task List", Icon: Hash },
+    footer:      { label: "Footer", Icon: IdCard },
+  };
   const sectionCards = (!preview || !previewData) ? null : sections.map((section, si) => {
     const isFirst = si === 0;
+    const group = SECTION_GROUP[section.type];
+    // A task section only gets the "Task List" heading on the first one —
+    // every later task in the same group continues under it instead of
+    // repeating the label.
+    const showGroupHeading = !!group && (section.type !== "task" || sections[si - 1]?.type !== "task");
     // border/radius/no-shadow and the 24px gap between cards both match
     // Preview/Download/Copy link's own `.card`/`.card+.card` exactly (see
     // buildReportHTML's css) — grey03 border, 12px radius, no shadow, so
     // each section reads as the same page whether it's this live draft or
-    // the exported document.
+    // the exported document. No top margin when a group heading is about
+    // to sit right above this card instead (its own margin/gap below
+    // already does that job) — only a heading-less continuation (like
+    // coverContent right after coverHeader, or task 2+ after task 1)
+    // still needs the plain 24px card-to-card gap.
     const cardStyle = {
-      width: PAGE_W, margin: isFirst ? 0 : "24px 0 0",
+      width: PAGE_W, margin: isFirst || showGroupHeading ? 0 : "24px 0 0",
       boxSizing: "border-box",
       background: "white",
       border: "1px solid var(--tt-grey03)",
       borderRadius: 12,
       display: "flex", flexDirection: "column",
     };
+    const groupHeading = showGroupHeading ? (
+      <div style={{ display: "flex", alignItems: "center", gap: 8, margin: isFirst ? "0 0 12px" : "40px 0 12px" }}>
+        <group.Icon size={16} strokeWidth={SW} color="var(--tt-text-1)" />
+        <p style={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: 0 }}>{group.label}</p>
+      </div>
+    ) : null;
     // Natural height on every section — no fixed Letter-page minHeight
     // forcing any of them taller than their own content. No running
     // header/footer repeated per section either — that was a print-page
@@ -5026,9 +5108,17 @@ function ReportsTab({ demoCase }) {
     // own dedicated Footer section instead (see below), shown once.
     if (section.type === "coverHeader") {
       return (
-        <div key={section.key} ref={el => { sectionRefs.current[section.key] = el; }} style={cardStyle}>
-          <div style={{ padding: PAGE_PAD }}>
-            {renderCoverHeader()}
+        // ref on this outer wrapper (heading + card together), not the
+        // card alone — scrollToSection's block:"start" then brings the
+        // heading into view too, instead of aligning the card's own top
+        // edge right at the container top and scrolling the heading just
+        // above it, out of view.
+        <div key={section.key} ref={el => { sectionRefs.current[section.key] = el; }}>
+          {groupHeading}
+          <div style={cardStyle}>
+            <div style={{ padding: PAGE_PAD }}>
+              {renderCoverHeader()}
+            </div>
           </div>
         </div>
       );
@@ -5044,33 +5134,39 @@ function ReportsTab({ demoCase }) {
     }
     if (section.type === "summary") {
       return (
-        <div key={section.key} ref={el => { sectionRefs.current[section.key] = el; }} style={cardStyle}>
-          {/* PAGE_PAD on every side, same as the cover's own padding — not
-              PAGE_BOTTOM_BUFFER (that one's specifically the export's own
-              pagination buffer; it happens to also be 40 today, but
-              borrowing it here made this padding only accidentally equal
-              to the cover's, not guaranteed to stay that way). */}
-          <div style={{ padding: PAGE_PAD }}>
-            {preview.includeSummary && renderProgressBlock()}
-            {renderSummaryBlock()}
-            {/* Only reachable when there's no activity at all for the
-                period — every real task otherwise gets its own Task N
-                section below this one. */}
-            {previewData.groups.length === 0 && renderNoteSlot("empty")}
+        <div key={section.key} ref={el => { sectionRefs.current[section.key] = el; }}>
+          {groupHeading}
+          <div style={cardStyle}>
+            {/* PAGE_PAD on every side, same as the cover's own padding — not
+                PAGE_BOTTOM_BUFFER (that one's specifically the export's own
+                pagination buffer; it happens to also be 40 today, but
+                borrowing it here made this padding only accidentally equal
+                to the cover's, not guaranteed to stay that way). */}
+            <div style={{ padding: PAGE_PAD }}>
+              {preview.includeSummary && renderProgressBlock()}
+              {renderSummaryBlock()}
+              {/* Only reachable when there's no activity at all for the
+                  period — every real task otherwise gets its own Task N
+                  section below this one. */}
+              {previewData.groups.length === 0 && renderNoteSlot("empty")}
+            </div>
           </div>
         </div>
       );
     }
     if (section.type === "task") {
       return (
-        <div key={section.key} ref={el => { sectionRefs.current[section.key] = el; }} style={cardStyle}>
-          {/* Same PAGE_PAD-on-every-side padding as every other section —
-              see the summary section's own comment on why this no longer
-              borrows PAGE_BOTTOM_BUFFER. Week/month group label (e.g.
-              "September 2026") no longer shows here — it's in the sidebar
-              now instead (see navGroups). */}
-          <div style={{ padding: PAGE_PAD }}>
-            {renderTaskSection(section)}
+        <div key={section.key} ref={el => { sectionRefs.current[section.key] = el; }}>
+          {groupHeading}
+          <div style={cardStyle}>
+            {/* Same PAGE_PAD-on-every-side padding as every other section —
+                see the summary section's own comment on why this no longer
+                borrows PAGE_BOTTOM_BUFFER. Week/month group label (e.g.
+                "September 2026") no longer shows here — it's in the sidebar
+                now instead (see navGroups). */}
+            <div style={{ padding: PAGE_PAD }}>
+              {renderTaskSection(section)}
+            </div>
           </div>
         </div>
       );
@@ -5082,7 +5178,9 @@ function ReportsTab({ demoCase }) {
     // the same way company logo/name/address/email/phone already do.
     const contactPhotoSrc = preview.contactPhoto;
     return (
-      <div key={section.key} ref={el => { sectionRefs.current[section.key] = el; }} style={cardStyle}>
+      <div key={section.key} ref={el => { sectionRefs.current[section.key] = el; }}>
+        {groupHeading}
+        <div style={cardStyle}>
         <div style={{ padding: PAGE_PAD, display: "flex", alignItems: "center", gap: 20 }}>
           <button
             className="group"
@@ -5159,6 +5257,7 @@ function ReportsTab({ demoCase }) {
             />
           </div>
         </div>
+        </div>
       </div>
     );
   });
@@ -5204,7 +5303,10 @@ function ReportsTab({ demoCase }) {
 
   const handlePreviewCopy = async () => {
     if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to export"); return; }
-    await handleCopy({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, version: preview.version, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides, checklistOverrides, photoCaptions: preview.photoCaptions });
+    const ok = await handleCopy({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, version: preview.version, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides, checklistOverrides, photoCaptions: preview.photoCaptions });
+    // Paywalled — handleCopy already opened the modal instead of copying
+    // anything, so there's nothing to flash "Link copied" about.
+    if (!ok) return;
     setPreviewCopied(true);
     setTimeout(() => setPreviewCopied(false), 2000);
   };
@@ -5265,7 +5367,12 @@ function ReportsTab({ demoCase }) {
     return () => window.removeEventListener("resize", handler);
   }, []);
 
+  // Returns whether the download actually happened — callers use this to
+  // decide whether their own follow-up feedback (the table row's success
+  // toast, handlePreviewCopy's "Link copied" flash) should fire at all,
+  // since none of that applies when this bails out to the paywall instead.
   const handleDownload = async (report) => {
+    if (paywalled) { setShowPaywallModal(true); return false; }
     // Company/contact identity always reflect the latest save, not this
     // report's own (possibly older) snapshot — see companyIdentity/
     // contactIdentity.
@@ -5280,6 +5387,7 @@ function ReportsTab({ demoCase }) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    return true;
   };
 
   // Shared by handleCopy and handlePreviewOpen below — both need the
@@ -5383,7 +5491,9 @@ function ReportsTab({ demoCase }) {
     return `${window.location.href.split("?")[0]}?${params.toString()}`;
   };
 
+  // Same "returns whether it actually happened" contract as handleDownload.
   const handleCopy = async (report) => {
+    if (paywalled) { setShowPaywallModal(true); return false; }
     const url = buildShareURL(report);
     try { await navigator.clipboard.writeText(url); }
     catch {
@@ -5391,6 +5501,7 @@ function ReportsTab({ demoCase }) {
       el.value = url; el.style.cssText = "position:fixed;opacity:0";
       document.body.appendChild(el); el.select(); document.execCommand("copy"); document.body.removeChild(el);
     }
+    return true;
   };
 
   // Preview — opens the exact same reproducible-from-params document a
@@ -5599,31 +5710,38 @@ function ReportsTab({ demoCase }) {
       )}
 
       {/* ── Results ── */}
-      {reports.length === 0 ? (
-        <div style={{ marginTop: 24, border: "1px solid var(--tt-grey03)", borderRadius: 16, padding: "48px 24px", textAlign: "center" }}>
-          <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--tt-grey02)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}>
-            <BarChart2 size={32} color="var(--tt-grey06)" strokeWidth={SW} />
-          </div>
-          <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", marginBottom: 4 }}>No reports yet</p>
-          <p style={{ fontSize: 13, color: "var(--tt-grey05)", lineHeight: "20px", marginTop: 4 }}>
-            Configure your report first and click Generate to create your report.
-          </p>
-        </div>
-      ) : (
-        <>
-        <div style={{ marginTop: 24, border: "1px solid var(--tt-grey03)", borderRadius: 12, overflow: "hidden" }}>
-          <div style={{ maxHeight: 556, overflowY: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
-            <thead style={{ position: "sticky", top: 0, zIndex: 1 }}>
-              <tr style={{ background: "var(--tt-grey02)", borderBottom: `1px solid var(--tt-grey03)` }}>
-                {["Project Name", "Period", "Generation date"].map((h) => (
-                  <th key={h} style={{ textAlign: "left", padding: "10px 16px", fontSize: 12, fontWeight: 500, color: "var(--tt-text-1)" }}>{h}</th>
-                ))}
-                <th style={{ padding: "10px 16px", width: 190 }} />
+      {/* The header row always renders, empty reports or not — only the
+          body swaps between the empty state (a single full-width row, so
+          it still lives inside the table the header describes rather
+          than replacing the whole table with an unrelated card) and the
+          real rows below. */}
+      <div style={{ marginTop: 24, border: "1px solid var(--tt-grey03)", borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ maxHeight: 556, overflowY: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+          <thead style={{ position: "sticky", top: 0, zIndex: 1 }}>
+            <tr style={{ background: "var(--tt-grey02)", borderBottom: `1px solid var(--tt-grey03)` }}>
+              {["Project Name", "Period", "Generation date"].map((h) => (
+                <th key={h} style={{ textAlign: "left", padding: "10px 16px", fontSize: 12, fontWeight: 500, color: "var(--tt-text-1)" }}>{h}</th>
+              ))}
+              <th style={{ padding: "10px 16px", width: 190 }} />
+            </tr>
+          </thead>
+          <tbody>
+            {reports.length === 0 ? (
+              <tr>
+                <td colSpan={4} style={{ padding: "48px 24px", textAlign: "center" }}>
+                  <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--tt-grey02)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}>
+                    <BarChart2 size={32} color="var(--tt-grey06)" strokeWidth={SW} />
+                  </div>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", marginBottom: 4 }}>No reports yet</p>
+                  <p style={{ fontSize: 13, color: "var(--tt-grey05)", lineHeight: "20px", marginTop: 4 }}>
+                    {paywalled
+                      ? "Free preview · 1 report included"
+                      : "Configure your report first and click Generate to create your report."}
+                  </p>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {reports.map((r, i) => (
+            ) : reports.map((r, i) => (
                 <tr key={r.id} style={{ background: r.id === lastSavedId ? "var(--tt-mint)" : "white", borderTop: i > 0 ? `1px solid var(--tt-grey03)` : "none", transition: "background 0.6s ease" }}>
                   <td style={{ padding: "0 16px", fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", height: 52, verticalAlign: "middle", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.projectName || PROJECT_NAME}</td>
                   <td style={{ padding: "0 16px", fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", height: 52, verticalAlign: "middle", whiteSpace: "nowrap" }}>
@@ -5642,22 +5760,22 @@ function ReportsTab({ demoCase }) {
                     ) : (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                         <FixedTooltipBtn label="Preview" onAction={() => handlePreviewOpen(r)}><Eye size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
-                        <FixedTooltipBtn label="Download" onAction={async () => { await handleDownload(r); showToast("success", "Downloaded"); }}><Download size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
-                        <FixedTooltipBtn label="Copy link to share" onAction={async () => { await handleCopy(r); showToast("success", "Link copied"); }}><Link size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
+                        <FixedTooltipBtn label="Download" onAction={async () => { const ok = await handleDownload(r); if (ok) showToast("success", "Downloaded"); }}><Download size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
+                        <FixedTooltipBtn label="Copy link to share" onAction={async () => { const ok = await handleCopy(r); if (ok) showToast("success", "Link copied"); }}><Link size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
                         <FixedTooltipBtn label="Delete report" onAction={() => setDeleteTarget(r)}><Trash2 size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
                       </span>
                     )}
                   </td>
                 </tr>
               ))}
-            </tbody>
-          </table>
-          </div>
+          </tbody>
+        </table>
         </div>
+      </div>
+      {reports.length > 0 && (
         <p style={{ fontSize: 12, color: "var(--tt-grey05)", marginTop: 8 }}>
           Saved reports are read-only. To make changes, generate a new report for the range you need.
         </p>
-        </>
       )}
       </>
       )}
@@ -5914,20 +6032,36 @@ function ReportsTab({ demoCase }) {
                   // gated behind this fake delay, so every skeleton below
                   // is sized off the real data instead of a generic guess.
                   sections.map((section, si) => {
-                    const skeletonCardStyle = { width: PAGE_W, margin: si === 0 ? 0 : "24px 0 0", boxSizing: "border-box", background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 12 };
+                    // Same group-heading logic as sectionCards below — the
+                    // label/icon itself renders as real text/icon, not a
+                    // shimmering bar, since it's static and already known
+                    // synchronously (same reasoning as every skeleton size
+                    // here), so it doesn't need to "load" at all.
+                    const group = SECTION_GROUP[section.type];
+                    const showGroupHeading = !!group && (section.type !== "task" || sections[si - 1]?.type !== "task");
+                    const skeletonCardStyle = { width: PAGE_W, margin: si === 0 || showGroupHeading ? 0 : "24px 0 0", boxSizing: "border-box", background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 12 };
+                    const groupHeading = showGroupHeading ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, margin: si === 0 ? "0 0 12px" : "40px 0 12px" }}>
+                        <group.Icon size={16} strokeWidth={SW} color="var(--tt-text-1)" />
+                        <p style={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: 0 }}>{group.label}</p>
+                      </div>
+                    ) : null;
                     if (section.type === "coverHeader") {
                       return (
-                        <div key={section.key} style={skeletonCardStyle}>
-                          <div style={{ padding: PAGE_PAD }}>
-                            <div className="tt-skeleton" style={{ width: 180, height: 90, borderRadius: 8, marginBottom: 24 }} />
-                            <div className="tt-skeleton" style={{ width: "50%", height: 22, marginBottom: 8 }} />
-                            <div className="tt-skeleton" style={{ width: "35%", height: 14, marginBottom: 12 }} />
-                            <div style={{ display: "flex", gap: 16 }}>
-                              <div className="tt-skeleton" style={{ width: 160, height: 14 }} />
-                              <div className="tt-skeleton" style={{ width: 120, height: 14 }} />
+                        <Fragment key={section.key}>
+                          {groupHeading}
+                          <div style={skeletonCardStyle}>
+                            <div style={{ padding: PAGE_PAD }}>
+                              <div className="tt-skeleton" style={{ width: 180, height: 90, borderRadius: 8, marginBottom: 24 }} />
+                              <div className="tt-skeleton" style={{ width: "50%", height: 22, marginBottom: 8 }} />
+                              <div className="tt-skeleton" style={{ width: "35%", height: 14, marginBottom: 12 }} />
+                              <div style={{ display: "flex", gap: 16 }}>
+                                <div className="tt-skeleton" style={{ width: 160, height: 14 }} />
+                                <div className="tt-skeleton" style={{ width: 120, height: 14 }} />
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        </Fragment>
                       );
                     }
                     if (section.type === "coverContent") {
@@ -5952,18 +6086,21 @@ function ReportsTab({ demoCase }) {
                     }
                     if (section.type === "summary") {
                       return (
-                        <div key={section.key} style={skeletonCardStyle}>
-                          <div style={{ padding: PAGE_PAD }}>
-                            {preview.includeSummary && (
-                              <div style={{ background: "var(--tt-grey02)", borderRadius: 8, padding: 16, marginBottom: 24 }}>
-                                <div className="tt-skeleton" style={{ width: 140, height: 16, marginBottom: 8 }} />
-                                <div className="tt-skeleton" style={{ width: "100%", height: 6, borderRadius: 99 }} />
-                              </div>
-                            )}
-                            <div className="tt-skeleton" style={{ width: 90, height: 14, marginBottom: 8 }} />
-                            <div className="tt-skeleton" style={{ width: "100%", height: 70, borderRadius: 8 }} />
+                        <Fragment key={section.key}>
+                          {groupHeading}
+                          <div style={skeletonCardStyle}>
+                            <div style={{ padding: PAGE_PAD }}>
+                              {preview.includeSummary && (
+                                <div style={{ background: "var(--tt-grey02)", borderRadius: 8, padding: 16, marginBottom: 24 }}>
+                                  <div className="tt-skeleton" style={{ width: 140, height: 16, marginBottom: 8 }} />
+                                  <div className="tt-skeleton" style={{ width: "100%", height: 6, borderRadius: 99 }} />
+                                </div>
+                              )}
+                              <div className="tt-skeleton" style={{ width: 90, height: 14, marginBottom: 8 }} />
+                              <div className="tt-skeleton" style={{ width: "100%", height: 70, borderRadius: 8 }} />
+                            </div>
                           </div>
-                        </div>
+                        </Fragment>
                       );
                     }
                     if (section.type === "task") {
@@ -5975,50 +6112,56 @@ function ReportsTab({ demoCase }) {
                       const checklistCount = Math.min((e?.checklist || []).length, 10);
                       const checklistPreviewCount = Math.min(checklistCount, CHECKLIST_COLLAPSE_COUNT);
                       return (
-                        <div key={section.key} style={skeletonCardStyle}>
-                          <div style={{ padding: PAGE_PAD }}>
-                            <div className="tt-skeleton" style={{ width: "60%", height: 18, marginBottom: 8 }} />
-                            <div className="tt-skeleton" style={{ width: 160, height: 11 }} />
-                            <div style={{ height: 1, background: "var(--tt-grey03)", marginTop: 16 }} />
-                            {checklistCount > 0 && (
-                              <div style={{ marginTop: 16 }}>
-                                <div className="tt-skeleton" style={{ width: 220, height: 11, marginBottom: 8 }} />
-                                {Array.from({ length: checklistPreviewCount }, (_, ci) => (
-                                  <div key={ci} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: ci === 0 ? 0 : 6 }}>
-                                    <div className="tt-skeleton" style={{ width: 14, height: 14, borderRadius: 4, flexShrink: 0 }} />
-                                    <div className="tt-skeleton" style={{ width: ci % 2 === 0 ? "60%" : "45%", height: 13 }} />
-                                  </div>
-                                ))}
+                        <Fragment key={section.key}>
+                          {groupHeading}
+                          <div style={skeletonCardStyle}>
+                            <div style={{ padding: PAGE_PAD }}>
+                              <div className="tt-skeleton" style={{ width: "60%", height: 18, marginBottom: 8 }} />
+                              <div className="tt-skeleton" style={{ width: 160, height: 11 }} />
+                              <div style={{ height: 1, background: "var(--tt-grey03)", marginTop: 16 }} />
+                              {checklistCount > 0 && (
+                                <div style={{ marginTop: 16 }}>
+                                  <div className="tt-skeleton" style={{ width: 220, height: 11, marginBottom: 8 }} />
+                                  {Array.from({ length: checklistPreviewCount }, (_, ci) => (
+                                    <div key={ci} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: ci === 0 ? 0 : 6 }}>
+                                      <div className="tt-skeleton" style={{ width: 14, height: 14, borderRadius: 4, flexShrink: 0 }} />
+                                      <div className="tt-skeleton" style={{ width: ci % 2 === 0 ? "60%" : "45%", height: 13 }} />
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {/* Note — always a live input while loading
+                                  (previewLoading only ever happens on an
+                                  unsaved draft, see renderNoteSlot). */}
+                              <div style={{ marginTop: 16, marginBottom: 12 }}>
+                                <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8 }} />
                               </div>
-                            )}
-                            {/* Note — always a live input while loading
-                                (previewLoading only ever happens on an
-                                unsaved draft, see renderNoteSlot). */}
-                            <div style={{ marginTop: 16, marginBottom: 12 }}>
-                              <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8 }} />
+                              {photoCount > 0 && (
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8 }}>
+                                  {Array.from({ length: photoCount }, (_, pi) => (
+                                    <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "16/9", borderRadius: 4 }} />
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                            {photoCount > 0 && (
-                              <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8 }}>
-                                {Array.from({ length: photoCount }, (_, pi) => (
-                                  <div key={pi} className="tt-skeleton" style={{ width: "100%", aspectRatio: "16/9", borderRadius: 4 }} />
-                                ))}
-                              </div>
-                            )}
                           </div>
-                        </div>
+                        </Fragment>
                       );
                     }
                     // type === "footer"
                     return (
-                      <div key={section.key} style={skeletonCardStyle}>
-                        <div style={{ padding: PAGE_PAD, display: "flex", alignItems: "center", gap: 20 }}>
-                          <div className="tt-skeleton" style={{ width: 64, height: 64, borderRadius: "50%", flexShrink: 0 }} />
-                          <div>
-                            <div className="tt-skeleton" style={{ width: 100, height: 16, marginBottom: 8 }} />
-                            <div className="tt-skeleton" style={{ width: 140, height: 14 }} />
+                      <Fragment key={section.key}>
+                        {groupHeading}
+                        <div style={skeletonCardStyle}>
+                          <div style={{ padding: PAGE_PAD, display: "flex", alignItems: "center", gap: 20 }}>
+                            <div className="tt-skeleton" style={{ width: 64, height: 64, borderRadius: "50%", flexShrink: 0 }} />
+                            <div>
+                              <div className="tt-skeleton" style={{ width: 100, height: 16, marginBottom: 8 }} />
+                              <div className="tt-skeleton" style={{ width: 140, height: 14 }} />
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      </Fragment>
                     );
                   })
                 ) : (
@@ -6169,6 +6312,16 @@ function ReportsTab({ demoCase }) {
         </div>
       )}
 
+      {/* Paywall — opened by handleDownload/handleCopy instead of actually
+          downloading/copying, once the free report is used up (see
+          `paywalled`). Defined once here rather than per call site since
+          both the table row actions and the post-generate Preview
+          overlay's own Download/Copy link route through those same two
+          functions. */}
+      {showPaywallModal && (
+        <PaywallModal onClose={() => setShowPaywallModal(false)} />
+      )}
+
       {lightbox && (
         <PhotoLightbox
           photos={lightbox.photos}
@@ -6217,7 +6370,11 @@ function ReportsTab({ demoCase }) {
   );
 }
 
-// ── Paywall (demo case: replaces all Reports tab content) ──
+// ── Paywall ── Content only (crown badge/headline/copy/unlock list/CTA) —
+// rendered inside PaywallModal below wherever Download/Copy link is
+// gated (see ReportsTab's handleDownload/handleCopy). No padding/margin
+// of its own; the modal shell supplies that, same "content vs. chrome"
+// split every other modal in this file uses.
 function ReportPaywall() {
   const unlockItems = [
     "Full report history across project",
@@ -6227,7 +6384,7 @@ function ReportPaywall() {
   ];
 
   return (
-    <div style={{ marginTop: 24, padding: "48px 40px", textAlign: "center" }}>
+    <div style={{ textAlign: "center" }}>
       <div style={{
         width: 56, height: 56, borderRadius: 14, background: "var(--tt-mint)",
         display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px",
@@ -6237,11 +6394,11 @@ function ReportPaywall() {
       <h3 style={{ fontSize: 22, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 10px" }}>
         Send a Report, Not a Wall of Text
       </h3>
-      <p style={{ fontSize: 14, color: "var(--tt-grey05)", lineHeight: 1.6, maxWidth: 460, margin: "0 auto 28px" }}>
+      <p style={{ fontSize: 14, color: "var(--tt-grey05)", lineHeight: 1.6, margin: "0 0 28px" }}>
         Generate a ready-to-share report from your activity log in seconds. Photos, progress, and notes — all in one place.
       </p>
 
-      <div style={{ background: "var(--tt-grey02)", borderRadius: 12, padding: "20px 24px", textAlign: "left", maxWidth: 440, margin: "0 auto 24px" }}>
+      <div style={{ background: "var(--tt-grey02)", borderRadius: 12, padding: "20px 24px", textAlign: "left", margin: "0 0 24px" }}>
         <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 12px" }}>What you unlock:</p>
         {unlockItems.map((t, i) => (
           <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: i === unlockItems.length - 1 ? 0 : 10 }}>
@@ -6253,7 +6410,7 @@ function ReportPaywall() {
 
       <button
         style={{
-          width: "100%", maxWidth: 440, height: 44, border: "none", borderRadius: 10,
+          width: "100%", height: 44, border: "none", borderRadius: 10,
           background: "var(--tt-text-1)", color: "white", fontSize: 14, fontWeight: 600,
           cursor: "pointer", transition: "opacity 0.15s",
         }}
@@ -6262,6 +6419,34 @@ function ReportPaywall() {
       >
         Upgrade to Team Plan
       </button>
+    </div>
+  );
+}
+
+// Modal shell around ReportPaywall — same chrome every other modal in this
+// file uses (dark scrim, centered white card, close X top-right,
+// backdrop-click-to-close), just without a title row (the crown badge and
+// headline inside ReportPaywall already read as the modal's own header).
+function PaywallModal({ onClose }) {
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 4000, background: "rgba(10,22,41,0.45)", display: "flex", alignItems: "center", justifyContent: "center" }}
+      onClick={onClose}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ position: "relative", width: 440, maxWidth: "calc(100vw - 32px)", background: "white", borderRadius: 16, padding: "32px 28px 28px", boxShadow: "0 16px 48px rgba(10,22,41,0.25)" }}
+      >
+        <button
+          onClick={onClose}
+          style={{ position: "absolute", top: 16, right: 16, background: "none", border: "none", cursor: "pointer", color: "var(--tt-grey06)", padding: 4, display: "flex", borderRadius: 6, transition: "background 0.15s" }}
+          onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+          onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+        >
+          <X size={18} strokeWidth={SW} />
+        </button>
+        <ReportPaywall />
+      </div>
     </div>
   );
 }
@@ -6834,7 +7019,13 @@ export default function ProjectDetail() {
 
         <TabsContent value="tasks"     className="mt-0 px-4" style={{ paddingTop: 16 }} />
         <TabsContent value="reports"   className="mt-0 px-4" style={{ paddingTop: 16 }}>
-          {demoCase === "paywall" ? <ReportPaywall /> : <ReportsTab key={demoCase} demoCase={demoCase} />}
+          {/* "Paywall" no longer swaps out the whole tab for a static
+              mockup — ReportsTab itself now simulates the free-tier gate
+              inline (empty-state copy, and the PaywallModal that
+              handleDownload/handleCopy open) whenever demoCase is
+              "paywall", so the real table/Generate flow stays usable
+              right alongside it. */}
+          <ReportsTab key={demoCase} demoCase={demoCase} />
         </TabsContent>
         <TabsContent value="checklist" className="mt-0 px-4" style={{ paddingTop: 16 }}></TabsContent>
         <TabsContent value="files"     className="mt-0 px-4" style={{ paddingTop: 16 }} />
