@@ -4598,9 +4598,14 @@ function ReportsTab({ demoCase }) {
           // needs a real DOM node to scope its post-add focus query to
           // this task's own checklist, not any other task's.
           <div data-checklist-list={entryKey}>
-            <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", margin: "16px 0 8px" }}>
+            <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-text-2)", margin: "16px 0 8px" }}>
               Checklist items completed as of this update
             </p>
+            {!previewSaved && checklistItems.length >= 10 && (
+              <p style={{ margin: "-4px 0 8px", color: "var(--tt-grey05)", fontSize: 11, fontWeight: 400 }}>
+                Up to 10 items
+              </p>
+            )}
             {visibleChecklistItems.map((item, idx) => {
               const checklistFieldId = `checklist_${entryKey}_${idx}`;
               // Same "is this field actually live" condition EditableField
@@ -4725,8 +4730,8 @@ function ReportsTab({ demoCase }) {
               </button>
             )}
             {/* Capped at 10 items total — once the list is already at that
-                cap, Add item just doesn't render (no disabled state to
-                explain, it simply isn't there to click). */}
+                cap, Add item just doesn't render (the "Up to 10 items"
+                note under the header above already explains why). */}
             {!previewSaved && checklistItems.length < 10 && (
               <button
                 onClick={ev => {
