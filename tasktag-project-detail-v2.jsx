@@ -729,7 +729,7 @@ function isHiddenByChrome(rect) {
 // pressing Enter — Shift+Enter still inserts a newline) just blurs the
 // field, which is what triggers the flip to plain text. No X here — there's
 // no deferred draft to discard, only the click-to-edit fields below get
-// that. `aboveWhenEditing` (Summary's "Summary"/"Optional" label row) only
+// that. `aboveWhenEditing` (Additional Information's "Additional Information"/"Optional" label row) only
 // renders alongside the live textarea/input — it disappears the moment the
 // field flips to plain text, same as once the whole report locks.
 // `disabled` still wins over all of this (a saved/locked report shows
@@ -763,7 +763,7 @@ function focusAtEnd(el) {
 // non-boxed field's own wrapper carries that as marginBottom, multiline's
 // check/cancel row sits 8px under the textarea, and the error message (if
 // any) sits 8px under that.
-function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPlaceholder, filterInput, onSave, onCancel, multiline, disabled, boxed, required, validate, errorMessage, textStyle, inputStyle, as: Tag = "p", alwaysEditing, popover, popoverAlign = "left", aboveWhenEditing }) {
+function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPlaceholder, filterInput, onSave, onCancel, multiline, disabled, boxed, required, validate, errorMessage, textStyle, inputStyle, as: Tag = "p", alwaysEditing, popover, popoverAlign = "left", aboveWhenEditing, counter, maxLength, rows = 2 }) {
   const { activeField, setActiveField } = useContext(ActiveEditContext);
   const [draft, setDraft] = useState(value || "");
   const [error, setError] = useState(false);
@@ -1016,8 +1016,8 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
     // hasn't clicked into on its own. `el !== document.activeElement` then
     // keeps that from re-firing (and re-snapping the caret to the end) on
     // every keystroke's re-render, once the field is already focused — see
-    // focusAtEnd. `aboveWhenEditing` (Summary's "Summary"/"Optional" label
-    // row) only makes sense while the field is actually live — it
+    // focusAtEnd. `aboveWhenEditing` (Additional Information's "Additional
+    // Information"/"Optional" label row) only makes sense while the field is actually live — it
     // disappears along with the textarea once the value flips to plain
     // text above.
     return multiline ? (
@@ -1025,9 +1025,24 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
         {aboveWhenEditing}
         <div style={{ position: "relative" }}>
           <Textarea
-            ref={el => { alwaysEditingRef.current = el; if (el && !isEmpty && el !== document.activeElement) focusAtEnd(el); }}
+            // Same two-job ref callback the photo caption's own textarea
+            // uses (see PhotoLightbox) — focusAtEnd only once, on mount,
+            // guarded by `el !== document.activeElement` so it doesn't
+            // yank the caret back to the end on every keystroke's
+            // re-render; the height auto-grow below is the opposite,
+            // meant to rerun on every one of those re-renders, since
+            // that's what keeps the box's height tracking its content.
+            // Resetting to "auto" first is what lets scrollHeight shrink
+            // back down too, not just grow.
+            ref={el => {
+              alwaysEditingRef.current = el;
+              if (!el) return;
+              if (!isEmpty && el !== document.activeElement) focusAtEnd(el);
+              el.style.height = "auto";
+              el.style.height = el.scrollHeight + "px";
+            }}
             value={draft}
-            onChange={ev => setDraft(ev.target.value)}
+            onChange={ev => setDraft(maxLength ? ev.target.value.slice(0, maxLength) : ev.target.value)}
             onFocus={() => setActiveField(fieldId)}
             // Only clears if this field is still the active one — a plain
             // unconditional null would risk wiping out whichever OTHER
@@ -1043,15 +1058,26 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
               if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); cancelEdit(); }
             }}
             placeholder={placeholder}
-            rows={2}
-            // overflowY:"auto" (not "hidden") — content past this
-            // fixed-rows box's own height needs to actually be
-            // reachable by scrolling, not just clipped away.
-            // .tt-no-scrollbar keeps that scrolling from showing any
-            // scrollbar chrome, purely cosmetic (see its own definition).
-            className="tt-no-scrollbar"
-            style={{ fontFamily: "inherit", paddingRight: buttonReserve, overflowY: "auto", ...inputStyle }}
+            rows={rows}
+            maxLength={maxLength}
+            // resize:"none" — height is the ref callback's job now, not a
+            // manual drag handle fighting it on the next keystroke.
+            // overflow:"hidden" — there's nothing to scroll once the box
+            // itself always grows to fit its content.
+            // paddingBottom reserves room for the counter below (same
+            // "controls live inside the textarea" idea as buttonReserve
+            // does for Check/X on the right) so typed text never runs
+            // under it.
+            style={{ fontFamily: "inherit", paddingRight: buttonReserve, paddingBottom: counter ? 22 : undefined, resize: "none", overflow: "hidden", ...inputStyle }}
           />
+          {/* Remaining count, not "used/max" — starts at maxLength and
+              counts down as you type, same bottom-left corner/style the
+              photo caption's own counter uses in PhotoLightbox. */}
+          {counter && maxLength && (
+            <span style={{ position: "absolute", left: 12, bottom: 9, fontSize: 11, fontWeight: 500, color: draft.length >= maxLength ? "var(--tt-red)" : "var(--tt-grey05)" }}>
+              {maxLength - draft.length}
+            </span>
+          )}
           <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>{showCancel && cancelButton}{showConfirm && confirmButton}</div>
         </div>
       </div>
@@ -2942,6 +2968,11 @@ const PER_ENTRY_PHOTO_LIMIT = 15;
 // already-saved caption short later.
 const CAPTION_MAX_LEN = 250;
 
+// Summary and Additional Information's own caps (EditableField's
+// maxLength) — same "enforced at the source" idea as CAPTION_MAX_LEN above.
+const SUMMARY_MAX_LEN = 1000;
+const ADDITIONAL_INFO_MAX_LEN = 50;
+
 // Marks everything past the first PER_ENTRY_PHOTO_LIMIT photos in each entry
 // as excluded by default, using the exact same excludedPhotos shape (and
 // `${entryKey}_${photoIndex}` keys) that applyPhotoExclusions/the results
@@ -4756,47 +4787,15 @@ function ReportsTab({ demoCase }) {
     );
   };
 
-  // Progress — entries logged this period vs. total on record, gated by
-  // the same "Task summary" checkbox the HTML export uses.
-  const renderProgressBlock = () => (
-    <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24, background: "var(--tt-grey02)", borderRadius: 8, padding: 16 }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 8px" }}>
-          {previewData.completed} of {previewData.total} tasks complete
-        </p>
-        <div style={{ height: 6, background: "var(--tt-grey03)", borderRadius: 99, overflow: "hidden" }}>
-          <div style={{ width: `${previewData.pct}%`, height: "100%", background: "var(--tt-secondary)", borderRadius: 99 }} />
-        </div>
-      </div>
-      <span style={{ fontSize: 28, fontWeight: 700, fontStyle: "italic", color: "var(--tt-text-1)", flexShrink: 0, lineHeight: 1 }}>
-        {previewData.pct}%
-      </span>
-    </div>
-  );
 
   // Summary — plain content, no box/background/padding of its own (flat,
-  // matching the rest of this flat-card design — see cardStyle). Unlike
-  // every other alwaysEditing field's label, "Summary" is a permanent
-  // heading here, not passed as aboveWhenEditing — this field's own value
-  // is expected to be long/prose, so it still needs its label once
-  // filled, rather than reading fine on its own the way a short value
-  // (a name, an address, ...) does. "Optional" stays contextual though,
-  // next to it only while the field is actually live (empty, or the
-  // shared activeField) — same "is this field live" check the Cover
-  // Header icons use, just read from the parent instead of internal to
-  // EditableField. Always present regardless of the "Task summary"
-  // toggle — that only ever gates renderProgressBlock, shown right above
-  // it.
+  // matching the rest of this flat-card design — see cardStyle). The
+  // "Summary" label lives on the section heading right above it (see
+  // groupHeading in sectionCards) and there's no "Optional" tag at all
+  // anymore, so this is just the field itself now.
   const renderSummaryBlock = () => {
-    const summaryEditing = !previewSaved && (!preview.summary || activeEditField === "summary");
     return (
       <div>
-        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 8 }}>
-          <p style={{ fontSize: 14, fontWeight: 500, color: "var(--tt-text-1)", margin: 0 }}>Summary</p>
-          {summaryEditing && (
-            <span style={{ fontSize: 10, fontWeight: 400, color: "var(--tt-grey05)", lineHeight: 1 }}>Optional</span>
-          )}
-        </div>
         <EditableField
           fieldId="summary"
           value={preview.summary}
@@ -4804,9 +4803,12 @@ function ReportsTab({ demoCase }) {
           disabled={previewSaved}
           alwaysEditing
           multiline
+          counter
+          maxLength={SUMMARY_MAX_LEN}
+          rows={5}
           onSave={v => setPreview(p => ({ ...p, summary: v }))}
           textStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, margin: 0 }}
-          inputStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, resize: "vertical" }}
+          inputStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6 }}
         />
       </div>
     );
@@ -5120,6 +5122,8 @@ function ReportsTab({ demoCase }) {
           disabled={previewSaved}
           alwaysEditing
           multiline
+          counter
+          maxLength={ADDITIONAL_INFO_MAX_LEN}
           aboveWhenEditing={
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 8 }}>
               <p style={{ fontSize: 14, fontWeight: 500, color: "var(--tt-text-1)", margin: 0 }}>Additional Information</p>
@@ -5128,7 +5132,7 @@ function ReportsTab({ demoCase }) {
           }
           onSave={v => setPreview(p => ({ ...p, additionalInfo: v }))}
           textStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, margin: 0 }}
-          inputStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, resize: "vertical" }}
+          inputStyle={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6 }}
         />
       </div>
     );
@@ -5179,17 +5183,17 @@ function ReportsTab({ demoCase }) {
   // itself is covered separately by handleModalScroll.
   useEffect(() => { updateActiveSection(); }, [sections.length]);
 
-  // Group label + icon shown once above the first card of each group —
-  // mirrors navGroups' own grouping (Cover/Summary/Task List/Footer)
-  // below, so the document reads with the same section structure the
-  // sidebar nav does, instead of a flat stack of unlabeled cards.
-  // coverContent continues the "Cover" group coverHeader already
-  // labeled, so it's deliberately left out here.
+  // Group label shown once above the first card of each group — mirrors
+  // navGroups' own grouping (Cover/Summary/Task List/Footer) below, so
+  // the document reads with the same section structure the sidebar nav
+  // does, instead of a flat stack of unlabeled cards. coverContent
+  // continues the "Cover" group coverHeader already labeled, so it's
+  // deliberately left out here.
   const SECTION_GROUP = {
-    coverHeader: { label: "Cover", Icon: FileText },
-    summary:     { label: "Summary", Icon: AlignJustify },
-    task:        { label: "Task List", Icon: Hash },
-    footer:      { label: "Footer", Icon: IdCard },
+    coverHeader: { label: "Cover" },
+    summary:     { label: "Summary" },
+    task:        { label: "Task List" },
+    footer:      { label: "Footer" },
   };
   const sectionCards = (!preview || !previewData) ? null : sections.map((section, si) => {
     const isFirst = si === 0;
@@ -5215,12 +5219,36 @@ function ReportsTab({ demoCase }) {
       borderRadius: 12,
       display: "flex", flexDirection: "column",
     };
-    const groupHeading = showGroupHeading ? (
-      <div style={{ display: "flex", alignItems: "center", gap: 8, margin: isFirst ? "0 0 12px" : "40px 0 12px" }}>
-        <group.Icon size={16} strokeWidth={SW} color="var(--tt-text-1)" />
-        <p style={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: 0 }}>{group.label}</p>
+    // "Task List" also carries the progress indicator (X of Y tasks
+    // complete + bar + percentage) — moved here from its old spot above
+    // Summary (see the removed renderProgressBlock call) since it's
+    // about the task list itself, not the summary text.
+    const groupHeadingStyle = { fontSize: 22, fontWeight: 700, color: "var(--tt-text-1)", margin: isFirst ? "0 0 12px" : "40px 0 12px" };
+    const groupHeading = !showGroupHeading ? null : (section.type === "task" && preview.includeSummary) ? (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, margin: groupHeadingStyle.margin }}>
+        <p style={{ ...groupHeadingStyle, margin: 0 }}>{group.label}</p>
+        {/* One row — text, bar, and percentage side by side, not the bar
+            sitting on its own line under the text. flex:1 on the bar
+            itself is what lets it fill whatever space is actually left
+            between the text and the percentage, rather than a fixed
+            width guessed to fit both. maxWidth caps how long that ends
+            up being — wide enough to read as a bar, not so wide it
+            dominates the row. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, maxWidth: 260 }}>
+          <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: 0, whiteSpace: "nowrap", flexShrink: 0 }}>
+            {previewData.completed} of {previewData.total} complete
+          </p>
+          <div style={{ flex: 1, minWidth: 0, height: 6, background: "var(--tt-grey03)", borderRadius: 99, overflow: "hidden" }}>
+            <div style={{ width: `${previewData.pct}%`, height: "100%", background: "var(--tt-secondary)", borderRadius: 99 }} />
+          </div>
+          <span style={{ fontSize: 28, fontWeight: 700, fontStyle: "italic", color: "var(--tt-text-1)", flexShrink: 0, lineHeight: 1 }}>
+            {previewData.pct}%
+          </span>
+        </div>
       </div>
-    ) : null;
+    ) : (
+      <p style={groupHeadingStyle}>{group.label}</p>
+    );
     // Natural height on every section — no fixed Letter-page minHeight
     // forcing any of them taller than their own content. No running
     // header/footer repeated per section either — that was a print-page
@@ -5266,7 +5294,6 @@ function ReportsTab({ demoCase }) {
                 borrowing it here made this padding only accidentally equal
                 to the cover's, not guaranteed to stay that way). */}
             <div style={{ padding: PAGE_PAD }}>
-              {preview.includeSummary && renderProgressBlock()}
               {renderSummaryBlock()}
               {/* Only reachable when there's no activity at all for the
                   period — every real task otherwise gets its own Task N
@@ -6187,12 +6214,29 @@ function ReportsTab({ demoCase }) {
                     const group = SECTION_GROUP[section.type];
                     const showGroupHeading = !!group && (section.type !== "task" || sections[si - 1]?.type !== "task");
                     const skeletonCardStyle = { width: PAGE_W, margin: si === 0 || showGroupHeading ? 0 : "24px 0 0", boxSizing: "border-box", background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 12 };
-                    const groupHeading = showGroupHeading ? (
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, margin: si === 0 ? "0 0 12px" : "40px 0 12px" }}>
-                        <group.Icon size={16} strokeWidth={SW} color="var(--tt-text-1)" />
-                        <p style={{ fontSize: 14, fontWeight: 700, color: "var(--tt-text-1)", margin: 0 }}>{group.label}</p>
+                    // Same real progress values as sectionCards' own
+                    // groupHeading (not a shimmer bar) — previewData is
+                    // already known synchronously too, per this block's
+                    // own comment above.
+                    const skeletonGroupHeadingStyle = { fontSize: 22, fontWeight: 700, color: "var(--tt-text-1)", margin: si === 0 ? "0 0 12px" : "40px 0 12px" };
+                    const groupHeading = !showGroupHeading ? null : (section.type === "task" && preview.includeSummary) ? (
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, margin: skeletonGroupHeadingStyle.margin }}>
+                        <p style={{ ...skeletonGroupHeadingStyle, margin: 0 }}>{group.label}</p>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, maxWidth: 260 }}>
+                          <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: 0, whiteSpace: "nowrap", flexShrink: 0 }}>
+                            {previewData.completed} of {previewData.total} complete
+                          </p>
+                          <div style={{ flex: 1, minWidth: 0, height: 6, background: "var(--tt-grey03)", borderRadius: 99, overflow: "hidden" }}>
+                            <div style={{ width: `${previewData.pct}%`, height: "100%", background: "var(--tt-secondary)", borderRadius: 99 }} />
+                          </div>
+                          <span style={{ fontSize: 28, fontWeight: 700, fontStyle: "italic", color: "var(--tt-text-1)", flexShrink: 0, lineHeight: 1 }}>
+                            {previewData.pct}%
+                          </span>
+                        </div>
                       </div>
-                    ) : null;
+                    ) : (
+                      <p style={skeletonGroupHeadingStyle}>{group.label}</p>
+                    );
                     if (section.type === "coverHeader") {
                       return (
                         <Fragment key={section.key}>
@@ -6237,12 +6281,6 @@ function ReportsTab({ demoCase }) {
                           {groupHeading}
                           <div style={skeletonCardStyle}>
                             <div style={{ padding: PAGE_PAD }}>
-                              {preview.includeSummary && (
-                                <div style={{ background: "var(--tt-grey02)", borderRadius: 8, padding: 16, marginBottom: 24 }}>
-                                  <div className="tt-skeleton" style={{ width: 140, height: 16, marginBottom: 8 }} />
-                                  <div className="tt-skeleton" style={{ width: "100%", height: 6, borderRadius: 99 }} />
-                                </div>
-                              )}
                               <div className="tt-skeleton" style={{ width: 90, height: 14, marginBottom: 8 }} />
                               <div className="tt-skeleton" style={{ width: "100%", height: 70, borderRadius: 8 }} />
                             </div>
