@@ -661,7 +661,7 @@ function ReportCheckbox({ active, label, onClick }) {
       }}
     >
       <span style={{
-        width: 18, height: 18, borderRadius: 4, flexShrink: 0,
+        width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
         display: "flex", alignItems: "center", justifyContent: "center",
         lineHeight: 0, boxSizing: "border-box",
         background: active ? "var(--tt-secondary)" : "white",
@@ -4792,7 +4792,7 @@ function ReportsTab({ demoCase }) {
     return (
       <div>
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 8 }}>
-          <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-2)", margin: 0 }}>Summary</p>
+          <p style={{ fontSize: 14, fontWeight: 500, color: "var(--tt-text-1)", margin: 0 }}>Summary</p>
           {summaryEditing && (
             <span style={{ fontSize: 10, fontWeight: 400, color: "var(--tt-grey05)", lineHeight: 1 }}>Optional</span>
           )}
@@ -4822,7 +4822,7 @@ function ReportsTab({ demoCase }) {
   // Name, Address, Email/Phone.
   // Also reused by the Footer section's own Name/Role labels, for the
   // same "shared form-field convention" reasoning as before.
-  const FIELD_LABEL_STYLE = { fontSize: 12, fontWeight: 600, color: "var(--tt-grey05)", margin: "0 0 6px" };
+  const FIELD_LABEL_STYLE = { fontSize: 14, fontWeight: 500, color: "var(--tt-text-1)", margin: "0 0 6px" };
   const renderCoverHeader = () => (
     // No flex `gap` here on purpose — `gap` and each field's own margin
     // below would just add together (a 20px gap plus a 4px margin reads
@@ -5122,7 +5122,7 @@ function ReportsTab({ demoCase }) {
           multiline
           aboveWhenEditing={
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 8 }}>
-              <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-2)", margin: 0 }}>Additional Information</p>
+              <p style={{ fontSize: 14, fontWeight: 500, color: "var(--tt-text-1)", margin: 0 }}>Additional Information</p>
               <span style={{ fontSize: 10, fontWeight: 400, color: "var(--tt-grey05)", lineHeight: 1 }}>Optional</span>
             </div>
           }
