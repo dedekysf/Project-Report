@@ -263,25 +263,41 @@ const PAGE_PAD = 40;
 // Draft nav sidebar's fixed width — wide enough that a typical task title
 // doesn't truncate immediately (see the sidebar in the modal body).
 const NAV_W = 280;
+// Uniform gap around the document card on every side (top, right, bottom,
+// left) — matches the exported document's own outer margin (see
+// buildReportHTML's `body{padding:${PAGE_GUTTER}px}`), so the card reads
+// as the same "floating in a light grey frame" page in draft mode and in
+// Preview/Download/Copy link alike.
+const PAGE_GUTTER = 24;
+// A real (non-overlay) vertical scrollbar eats into whatever box it
+// scrolls — draft mode's mainScrollRef, Preview's iframe, and a
+// downloaded file's own browser window all do this identically — so a
+// plain PAGE_GUTTER right padding actually renders thinner than the
+// other three sides once a scrollbar shows up, part of it silently eaten
+// instead of staying clear space. Padding on the RIGHT side specifically
+// (see the content wrapper below and buildReportHTML's own body css)
+// adds this on top of PAGE_GUTTER so the visible gap still comes out to
+// a clean PAGE_GUTTER no matter which of those three scrollbars is
+// actually present. A plain constant, not a measured value (same spirit
+// as every other size here) — most desktop browsers' classic scrollbars
+// land close to this, and on an overlay-scrollbar system (nothing to
+// compensate for) this just reads as a few extra px of breathing room
+// instead of a shortfall.
+const SCROLLBAR_W = 17;
 // Extra width budget on top of NAV_W + PAGE_W for the document column's
-// own right-side padding/scrollbar room (see the content wrapper below) —
+// own left+right padding/scrollbar room (see the content wrapper below) —
 // without it, that column would be sized to exactly PAGE_W with nowhere
 // left to fit padding, forcing the fixed-width document card to overflow
 // it and triggering an unwanted horizontal scrollbar on the whole modal.
 // Chrome bar and body share this same total width (and center within it
 // the same way), so their content lines up and any leftover space on a
 // wide screen balances evenly on both sides instead of the whole unit
-// piling up against one edge.
-// Set to 24, matching Preview's own VISIBLE right-hand gap — not
-// ReportPreviewChrome's PREVIEW_CONTENT_BUFFER (48) directly, which
-// budgets the iframe's whole fixed width (PAGE_W + 48) and is mostly
-// spent inside the iframe itself: the exported document's own
-// `body{padding:32px 24px}` (see buildReportHTML) splits that into 24px
-// on each side of the 800px card, so the gap actually visible next to
-// the card in Preview is 24, not 48. Matching this constant to 24 (rather
-// than 48) is what makes draft and Preview's right-hand gap look
-// identical side by side.
-const CONTENT_BUFFER = 24;
+// piling up against one edge. PAGE_GUTTER×2 (left+right) + SCROLLBAR_W
+// (the right side's own extra allowance) — matches
+// ReportPreviewChrome's own PREVIEW_CONTENT_BUFFER exactly (it reuses
+// this same constant), so draft and Preview reserve the exact same total
+// gutter.
+const CONTENT_BUFFER = PAGE_GUTTER * 2 + SCROLLBAR_W;
 const ROW_W = NAV_W + PAGE_W + CONTENT_BUFFER;
 // Two jobs: (1) reserved on top of the footer's own measured height when
 // deciding what still fits on a page, so the pagination pass leaves this
@@ -3559,7 +3575,7 @@ const buildReportHTML = async (report) => {
   // fills the .card's full min-height, not just its own content's
   // height) and the inner one (so justify-content:center has real free
   // space to center the content block within).
-  const coverHTML = h("div", { id: "report-cover", class: "card", style: "box-shadow:0 1px 3px rgba(10,22,41,0.08);" },
+  const coverHTML = h("div", { id: "report-cover", class: "card" },
     h("div", { style: `padding:${PAGE_PAD}px;display:flex;flex-direction:column;flex:1;` },
       coverHeaderHTML,
       h("div", { style: "flex:1;display:flex;flex-direction:column;justify-content:center;" },
@@ -3713,7 +3729,19 @@ const buildReportHTML = async (report) => {
   // card__body's paddingBottom (PAGE_BOTTOM_BUFFER) guarantees the gap to
   // the footer directly via the box model — see PAGE_BOTTOM_BUFFER's own
   // comment for why relying on flex:1 alone isn't reliable enough.
-  const css = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:${SERIF};background:#f7f8fa;min-height:100vh;padding:32px 24px}.card{background:white;border:1px solid #e8e8e6;border-radius:12px;overflow:hidden;width:${PAGE_W}px;min-height:${PAGE_H}px;margin:0 auto;display:flex;flex-direction:column}.card+.card{margin-top:24px}.card__body{padding:0 ${PAGE_PAD}px ${PAGE_BOTTOM_BUFFER}px;flex:1}`;
+  // body padding is PAGE_GUTTER on every side, plus SCROLLBAR_W more on
+  // the right (see that constant's own comment — a real scrollbar, be it
+  // this iframe's own or a standalone tab's, eats into the right edge
+  // otherwise) — matches draft mode's own frame around the card (see the
+  // draft modal's content wrapper), so the page floats identically
+  // whether it's this export, the live Preview tab, or a Copy link
+  // recipient's own browser. `.card`'s own `margin:0 auto` means this
+  // asymmetry only actually shows up when something outside (like
+  // ReportPreviewChrome's fixed-width iframe) constrains the body to
+  // exactly PAGE_W + CONTENT_BUFFER, leaving no slack for auto-centering
+  // to override it — on a full, wide-open standalone tab there's ample
+  // margin either way and centering dominates regardless.
+  const css = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:${SERIF};background:#f7f8fa;min-height:100vh;padding:${PAGE_GUTTER}px ${PAGE_GUTTER + SCROLLBAR_W}px ${PAGE_GUTTER}px ${PAGE_GUTTER}px}.card{background:white;border:1px solid #e8e8e6;border-radius:12px;overflow:hidden;width:${PAGE_W}px;min-height:${PAGE_H}px;margin:0 auto;display:flex;flex-direction:column}.card+.card{margin-top:24px}.card__body{padding:0 ${PAGE_PAD}px ${PAGE_BOTTOM_BUFFER}px;flex:1}`;
 
   // Page numbers: the cover is excluded from the count entirely (it
   // carries no footer/number of its own anyway — see coverHTML), so the
@@ -3723,7 +3751,7 @@ const buildReportHTML = async (report) => {
   // pages.
   const totalPages = (hasSummaryPage ? 1 : 0) + contentPages.length;
   summaryPageHTML = hasSummaryPage
-    ? h("div", { id: "report-summary", class: "card", style: "box-shadow:0 1px 3px rgba(10,22,41,0.08);" },
+    ? h("div", { id: "report-summary", class: "card" },
         runningHeaderHTML,
         h("div", { class: "card__body" },
           h("p", { style: `font-family:${SANS};font-size:22px;font-weight:600;color:#0a1629;text-align:center;margin:0 0 12px;` }, "Summary"),
@@ -3734,7 +3762,7 @@ const buildReportHTML = async (report) => {
     : "";
   const firstContentPageNum = 1 + (hasSummaryPage ? 1 : 0);
   const contentPagesHTML = contentPages.map((pageBlocks, i) =>
-    h("div", { class: "card", style: "box-shadow:0 1px 3px rgba(10,22,41,0.08);" },
+    h("div", { class: "card" },
       runningHeaderHTML,
       h("div", { class: "card__body" }, pageBlocks.join("")),
       footerHTML(firstContentPageNum + i, totalPages)
@@ -4975,13 +5003,17 @@ function ReportsTab({ demoCase }) {
 
   const sectionCards = (!preview || !previewData) ? null : sections.map((section, si) => {
     const isFirst = si === 0;
-    // No border, no radius, no shadow — flat white blocks against the
-    // grey02 body (see previewPanelRef) reading as one continuous
-    // document rather than a stack of individually "lifted" cards.
+    // border/radius/no-shadow and the 24px gap between cards both match
+    // Preview/Download/Copy link's own `.card`/`.card+.card` exactly (see
+    // buildReportHTML's css) — grey03 border, 12px radius, no shadow, so
+    // each section reads as the same page whether it's this live draft or
+    // the exported document.
     const cardStyle = {
-      width: PAGE_W, margin: isFirst ? 0 : "64px 0 0",
+      width: PAGE_W, margin: isFirst ? 0 : "24px 0 0",
       boxSizing: "border-box",
       background: "white",
+      border: "1px solid var(--tt-grey03)",
+      borderRadius: 12,
       display: "flex", flexDirection: "column",
     };
     // Natural height on every section — no fixed Letter-page minHeight
@@ -5852,20 +5884,23 @@ function ReportsTab({ demoCase }) {
                   in addition to that fixed width was shrinking the actual
                   available space below PAGE_W, which pushed the card past
                   this container's right edge and forced an unwanted
-                  horizontal scrollbar on the whole modal. Its own right
-                  padding below (CONTENT_BUFFER) is what actually reserves
-                  room for a real scrollbar (when content is tall enough for
-                  one) instead. */}
+                  horizontal scrollbar on the whole modal. Its own padding
+                  below (PAGE_GUTTER, plus SCROLLBAR_W more on the right —
+                  see both constants' own comments) is what actually
+                  reserves room for a real scrollbar (when content is tall
+                  enough for one) instead — CONTENT_BUFFER is what's
+                  budgeted into this column's own width for that. */}
               <div ref={mainScrollRef} style={{ overflowY: "auto", flex: 1 }} onScroll={handleModalScroll}>
-              {/* No left padding (touches the sidebar directly) or top
-                  padding (touches the chrome bar directly — see the "no
-                  space before the first section" requirement); right/
-                  bottom keep their own breathing room. Right padding is
-                  CONTENT_BUFFER, not a separate guess — same value Preview
-                  reserves (see CONTENT_BUFFER's own comment), so draft and
-                  Preview's outer gutter feel identical when switching
-                  between them. */}
-              <div style={{ padding: `0 ${CONTENT_BUFFER}px 24px 0` }}>
+              {/* PAGE_GUTTER on all four sides — the card floats inside
+                  this light-grey frame the same way it does in
+                  Preview/Download/Copy link (see buildReportHTML's own
+                  body css) — except the right side also carries
+                  SCROLLBAR_W on top, so the real scrollbar this container
+                  renders (when content overflows) eats into that extra
+                  allowance instead of the visible gap, leaving a clean
+                  PAGE_GUTTER next to the card on every side, scrollbar or
+                  not. */}
+              <div style={{ padding: `${PAGE_GUTTER}px ${PAGE_GUTTER + SCROLLBAR_W}px ${PAGE_GUTTER}px ${PAGE_GUTTER}px` }}>
               <div style={{ maxWidth: PAGE_W }}>
                 {previewLoading ? (
                   // One skeleton card per real section — same cardStyle
@@ -5879,7 +5914,7 @@ function ReportsTab({ demoCase }) {
                   // gated behind this fake delay, so every skeleton below
                   // is sized off the real data instead of a generic guess.
                   sections.map((section, si) => {
-                    const skeletonCardStyle = { width: PAGE_W, margin: si === 0 ? 0 : "64px 0 0", boxSizing: "border-box", background: "white" };
+                    const skeletonCardStyle = { width: PAGE_W, margin: si === 0 ? 0 : "24px 0 0", boxSizing: "border-box", background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 12 };
                     if (section.type === "coverHeader") {
                       return (
                         <div key={section.key} style={skeletonCardStyle}>
@@ -5998,7 +6033,7 @@ function ReportsTab({ demoCase }) {
 
                     {/* Infinite scroll: one skeleton item while the next batch "loads" */}
                     {loadingMore && (
-                      <div style={{ width: PAGE_W, margin: "64px 0 0" }}>
+                      <div style={{ width: PAGE_W, margin: "24px 0 0" }}>
                         <div className="tt-skeleton" style={{ width: "85%", height: 16, marginBottom: 10 }} />
                         {nextEntry && nextEntry.photos.length > 0 && (
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8 }}>
@@ -6459,14 +6494,14 @@ function ReportPreviewChrome({ reportPageProps, period, dateLabel }) {
   const btnStyle = { height: 40, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "0 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s" };
 
   // Same NAV_W as the draft modal (the chrome bar centers to sidebar +
-  // document width combined). The buffer here
-  // is 48, not draft mode's 24 — it has to exactly match the iframe's own
-  // fixed width below (PAGE_W + 48, the export's own 24px body padding
-  // on each side), or the content column's flex-allotted share of
-  // previewRowW would come out narrower than the iframe actually needs
-  // and the iframe would overflow it instead of fitting exactly flush.
-  const PREVIEW_CONTENT_BUFFER = 48;
-  const previewRowW = NAV_W + PAGE_W + PREVIEW_CONTENT_BUFFER;
+  // document width combined), and the same module-level CONTENT_BUFFER
+  // draft mode's own row uses — it has to exactly match the iframe's own
+  // fixed width below (PAGE_W + CONTENT_BUFFER, the export's own
+  // PAGE_GUTTER/SCROLLBAR_W body padding — see buildReportHTML's css), or
+  // the content column's flex-allotted share of previewRowW would come
+  // out narrower than the iframe actually needs and the iframe would
+  // overflow it instead of fitting exactly flush.
+  const previewRowW = NAV_W + PAGE_W + CONTENT_BUFFER;
 
   // navItems' shape (string icon names, id) mapped to what the shared
   // NavSidebar takes (icon components, key) — the same component the draft
@@ -6537,21 +6572,22 @@ function ReportPreviewChrome({ reportPageProps, period, dateLabel }) {
               <Loader size={24} strokeWidth={SW} color="var(--tt-grey05)" style={{ display: "block", animation: "tt-spin 0.75s linear infinite" }} />
             </div>
           ) : (
-            // Fixed width (PAGE_W + the export's own 24px body padding on
-            // each side — see buildReportHTML's own `body{padding:32px
-            // 24px}`), not width:"100%" — the exported document centers
-            // its own 800px card within whatever width the iframe gives
-            // it, so a full-width iframe here left a wide gap between the
-            // sidebar and the card instead of sitting flush against it
-            // the way draft mode's own document does. Flush left by
-            // default (no margin), same "extra space bleeds off to the
-            // right, not split evenly" layout draft mode uses.
+            // Fixed width (PAGE_W + the export's own PAGE_GUTTER body
+            // padding on each side — see buildReportHTML's own
+            // `body{padding:${PAGE_GUTTER}px}`), not width:"100%" — the
+            // exported document centers its own 800px card within
+            // whatever width the iframe gives it, so a full-width iframe
+            // here left a wide gap between the sidebar and the card
+            // instead of floating it in the same PAGE_GUTTER frame draft
+            // mode's own document uses. Flush left by default (no
+            // margin) — the card's own left gutter comes from the
+            // iframe's internal body padding, not from margin out here.
             <iframe
               ref={iframeRef}
               srcDoc={html}
               onLoad={handleIframeLoad}
               title="Report"
-              style={{ border: "none", width: PAGE_W + 48, height: "100%", display: "block" }}
+              style={{ border: "none", width: PAGE_W + CONTENT_BUFFER, height: "100%", display: "block" }}
             />
           )}
         </div>
