@@ -3239,6 +3239,17 @@ const desanitizePeriodFromUrl = (period) => period.replace(/_/g, " ").replace(/-
 // shows (no "+N more" cap, since there's no interaction left to expand it)
 // and nothing here is editable (no placeholder prompts for fields the
 // user left blank; those rows are just omitted instead).
+
+// Cached 2D context for estimateCaptionHeight (packMasonryColumns, below)
+// — one canvas element reused across every build instead of a fresh one
+// created per call.
+let _measureCtx = null;
+const measureTextWidth = (text, font) => {
+  if (!_measureCtx) _measureCtx = document.createElement("canvas").getContext("2d");
+  _measureCtx.font = font;
+  return _measureCtx.measureText(text).width;
+};
+
 const buildReportHTML = async (report) => {
   const { groups, grouping, completed, total, pct } =
     report.data || buildReportData("custom", report.period, null, report.includeNoPhotoTasks);
@@ -3365,9 +3376,16 @@ const buildReportHTML = async (report) => {
     const cellH = Math.round(row.height);
     const cells = row.photos.map(p => {
       const w = Math.round(row.height * (p.width / p.height));
-      return h("div", { style: `flex-shrink:0;width:${w}px;` },
+      // min-width:0 — a flex item's default min-width is auto, which
+      // floors it at its content's own intrinsic minimum; a caption with
+      // one long unbroken run of characters (no spaces to wrap on)
+      // otherwise forces this cell wider than its own width:w, throwing
+      // the whole row out of alignment instead of wrapping inside it (see
+      // the caption's own overflow-wrap below, same reasoning paired
+      // together as EditableField's own long-caption handling).
+      return h("div", { style: `flex-shrink:0;width:${w}px;min-width:0;` },
         selfClose("img", { src: p.src, style: `display:block;width:${w}px;height:${cellH}px;border-radius:4px;` }),
-        p.caption ? h("p", { style: `font-size:14px;line-height:1.6;font-style:italic;color:#828282;font-family:${SERIF};text-align:center;margin:6px 0 0;` }, p.caption) : ""
+        p.caption ? h("p", { style: `font-size:12px;line-height:1.6;font-style:italic;color:#828282;font-family:${SERIF};text-align:center;margin:6px 0 0;overflow-wrap:break-word;` }, p.caption) : ""
       );
     }).join("");
     return h("div", { style: `display:flex;gap:${gap}px;align-items:flex-start;margin-top:${marginTop}px;margin-bottom:${marginBottom}px;` }, cells);
@@ -3432,6 +3450,36 @@ const buildReportHTML = async (report) => {
   // shorter one still gets placed purely by "which column is shortest
   // right now," keeps the actual column heights much closer to each
   // other without changing that placement rule at all.
+  // A photo WITH a caption takes more total vertical space in its column
+  // than one without, even though the image itself renders at the same
+  // height either way (renderHeight, below, stays pure image height —
+  // it's also what sets the <img>'s own height in masonryHTML). Without
+  // this, "which column is shortest" was blind to captions, so a column
+  // that happened to collect more/longer captions than the others could
+  // end up visibly taller despite the algorithm intending them balanced.
+  // Word-wrapped like the real caption would be (measureTextWidth, using
+  // the same italic 12px/SERIF the caption itself renders in — see
+  // photoRowHTML/masonryHTML's own caption style); a single word wider
+  // than columnWidth on its own (overflow-wrap:break-word's territory,
+  // e.g. this app's long-unbroken-string demo captions) is approximated
+  // by how many columnWidth-wide "lines" its own width would take.
+  const CAPTION_FONT = `italic 12px ${SERIF}`;
+  const CAPTION_LINE_HEIGHT = 12 * 1.6;
+  const estimateCaptionHeight = (caption, maxWidth) => {
+    if (!caption) return 0;
+    const words = caption.split(/\s+/).filter(Boolean);
+    if (words.length === 0) return 0;
+    const spaceWidth = measureTextWidth(" ", CAPTION_FONT);
+    let lines = 1, lineWidth = 0;
+    words.forEach(word => {
+      let wordWidth = measureTextWidth(word, CAPTION_FONT);
+      if (wordWidth > maxWidth) { lines += Math.ceil(wordWidth / maxWidth) - 1; wordWidth = maxWidth; }
+      const next = lineWidth === 0 ? wordWidth : lineWidth + spaceWidth + wordWidth;
+      if (next > maxWidth && lineWidth > 0) { lines += 1; lineWidth = wordWidth; }
+      else { lineWidth = next; }
+    });
+    return lines * CAPTION_LINE_HEIGHT + 6; // + the caption <p>'s own margin-top
+  };
   const packMasonryColumns = (photos, columnWidth, gap) => {
     const ordered = [...photos].sort((a, b) => (b.height / b.width) - (a.height / a.width));
     const columns = Array.from({ length: MASONRY_COLUMNS }, () => ({ photos: [], height: 0 }));
@@ -3440,7 +3488,7 @@ const buildReportHTML = async (report) => {
       const renderHeight = photo.height * (columnWidth / photo.width);
       if (col.photos.length > 0) col.height += gap;
       col.photos.push({ ...photo, renderHeight });
-      col.height += renderHeight;
+      col.height += renderHeight + estimateCaptionHeight(photo.caption, columnWidth);
     });
     return columns;
   };
@@ -3452,7 +3500,11 @@ const buildReportHTML = async (report) => {
           const cellH = Math.round(p.renderHeight);
           return h("div", { style: "margin-bottom:8px;" },
             selfClose("img", { src: p.src, style: `display:block;width:${Math.round(columnWidth)}px;height:${cellH}px;border-radius:4px;` }),
-            p.caption ? h("p", { style: `font-size:14px;line-height:1.6;font-style:italic;color:#828282;font-family:${SERIF};text-align:center;margin:6px 0 0;` }, p.caption) : ""
+            // overflow-wrap:break-word — same reasoning as photoRowHTML's
+            // own caption (a long unbroken run of characters otherwise
+            // overflows past this column's own width instead of wrapping
+            // inside it).
+            p.caption ? h("p", { style: `font-size:12px;line-height:1.6;font-style:italic;color:#828282;font-family:${SERIF};text-align:center;margin:6px 0 0;overflow-wrap:break-word;` }, p.caption) : ""
           );
         }).join("")
       )
