@@ -27,11 +27,34 @@ body {
    relative to the true device viewport, not affected by any element's
    own min-width (see body's own comment) — same reasoning as why
    previewPanelRef's minWidth had to move off the fixed element itself. */
+/* min-width:0 + overflow-wrap — both boxes are flex items (their parent
+   is display:flex;justify-content:center, to center them under the
+   photo). A flex item's default min-width is auto, which floors it at
+   its content's own intrinsic minimum — for text, that's the width of
+   its single longest unbreakable run of characters. A normal caption
+   (ordinary words, natural spaces) never comes close to that floor, but
+   one long unbroken string (no spaces at all) does: without min-width:0
+   overriding that floor, the box ignores its own `width` entirely and
+   grows to fit that one "word", however wide — overflow-wrap then makes
+   the text itself break mid-word once it must, so it wraps inside the
+   intended width instead of forcing the box wider. */
 .tt-caption-box {
   width: 30vw;
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 @media (max-width: 768px) {
   .tt-caption-box {
     width: 90vw;
   }
+}
+
+/* Saved caption text specifically (not the "Add caption" button or the
+   editing textarea, which stay .tt-caption-box above) — wider once it's
+   just centered read-only text with nothing else competing for space
+   next to it. */
+.tt-caption-saved {
+  width: 50vw;
+  min-width: 0;
+  overflow-wrap: break-word;
 }

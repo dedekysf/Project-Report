@@ -1619,7 +1619,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, onDeletePhoto, ca
             {deleteTooltipIdx === i && createPortal(
               <div style={{ position: "fixed", top: deleteTooltipPos.top, left: deleteTooltipPos.left, zIndex: 5300, maxWidth: 200, pointerEvents: "none" }}>
                 <div style={{ background: "var(--tt-text-1)", color: "white", fontSize: 11, fontWeight: 500, lineHeight: 1.4, padding: "6px 10px", borderRadius: 6, boxShadow: "0 8px 24px rgba(10,22,41,0.24)" }}>
-                  The original photo won't be deleted — only removed from this report.
+                  Only removed from this report.
                 </div>
               </div>,
               document.body
@@ -1934,8 +1934,25 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
   const moreMenuRef = useRef(null);
   const [captionEditing, setCaptionEditing] = useState(false); // caption input overlaid on the image
   const captionStartRef = useRef(""); // caption text when editing was opened, for the "Escape reverts" behavior
+  // Shared by both delete actions below (the filmstrip's bulk "Delete"
+  // pill and the "..." menu's own Delete item) — same reassurance text
+  // PhotoGrid's own per-photo trash button already shows, just also
+  // surfaced here since both of these delete more than one photo's worth
+  // of confidence-checking at once. Holds the tooltip's own position
+  // (computed fresh off whichever trigger it opened from — see each
+  // button's onMouseEnter) rather than a plain boolean, since the two
+  // triggers sit in different parts of the screen and need different
+  // anchoring (see each one's own comment).
+  const [deleteActionTooltip, setDeleteActionTooltip] = useState(null);
 
-  useEffect(() => { setRotation(0); setZoom(100); setShowFileDetails(false); setImgDims(null); setShowMoreMenu(false); setCaptionEditing(false); }, [index]);
+  // photos[index] (the actual photo key shown), not just index — deleting
+  // a photo shifts every later one down to fill the gap, so the numeric
+  // index can stay exactly the same while the photo actually displayed
+  // there changes underneath it (see onDeleteSelected's own clamping).
+  // Keying off index alone would then skip this reset, leaving whatever
+  // rotation/zoom/etc. was mid-edit on the deleted photo applied to its
+  // replacement instead.
+  useEffect(() => { setRotation(0); setZoom(100); setShowFileDetails(false); setImgDims(null); setShowMoreMenu(false); setCaptionEditing(false); }, [photos[index]]);
 
   useEffect(() => {
     if (!showMoreMenu) return;
@@ -1954,6 +1971,16 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
 
   const handleDeleteSelectedFilmstrip = () => {
     onDeleteSelected && onDeleteSelected(Object.keys(selectedFilmstrip).map(Number));
+    // The pill this tooltip is anchored to disappears the moment the
+    // selection it's tied to is cleared (no native mouse movement to
+    // trigger its own onMouseLeave), so this has to clear it explicitly.
+    setDeleteActionTooltip(null);
+    // The positions just deleted no longer mean anything once onDeleteSelected
+    // above shrinks the photos/originalIndices arrays (every later photo
+    // shifts down to fill the gap) — leaving the old selection around
+    // would have it pointing at whatever new photos happen to have
+    // slid into those same positions.
+    setSelectedFilmstrip({});
   };
 
   useEffect(() => {
@@ -2083,9 +2110,13 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
                 </button>
                 <div style={{ height: 1, background: "rgba(255,255,255,0.1)", margin: "4px 0" }} />
                 <button
-                  onClick={() => { setShowMoreMenu(false); onDeleteSelected && onDeleteSelected([index]); }}
-                  onMouseEnter={e => e.currentTarget.style.background = "rgba(229,72,77,0.12)"}
-                  onMouseLeave={e => e.currentTarget.style.background = "none"}
+                  onClick={() => { setShowMoreMenu(false); setDeleteActionTooltip(null); onDeleteSelected && onDeleteSelected([index]); }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = "rgba(229,72,77,0.12)";
+                    const r = e.currentTarget.getBoundingClientRect();
+                    setDeleteActionTooltip({ top: r.bottom + 6, left: r.left });
+                  }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "none"; setDeleteActionTooltip(null); }}
                   style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "9px 10px", background: "none", border: "none", borderRadius: 6, color: "var(--tt-red)", fontSize: 14, fontWeight: 500, cursor: "pointer", textAlign: "left" }}
                 >
                   <Trash2 size={16} strokeWidth={SW} /> Delete
@@ -2105,7 +2136,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
           <Folder size={11} strokeWidth={2} /> {truncateLabel(PROJECT_NAME)}
         </span>
         <span style={{
-          display: "inline-flex", alignItems: "center", gap: 4, height: 22, padding: "0 10px",
+          display: "inline-flex", alignItems: "center", gap: 6, height: 22, padding: "0 10px",
           borderRadius: 4, background: "var(--tt-text-1)", color: "white", fontSize: 10, fontWeight: 600,
         }}>
           <Hash size={11} strokeWidth={2} /> {truncateLabel(taskName)}
@@ -2155,10 +2186,21 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
           <div style={{ position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 10 }}>
             <button
               onClick={handleDeleteSelectedFilmstrip}
+              // Anchored above (bottom, not top) — this pill already sits
+              // near the bottom of the screen (bottom:16), right above
+              // the filmstrip; a tooltip opening downward from here would
+              // just run straight into it instead of having room to show.
+              onMouseEnter={e => {
+                e.currentTarget.style.background = "rgba(10,22,41,1)";
+                const r = e.currentTarget.getBoundingClientRect();
+                setDeleteActionTooltip({ bottom: window.innerHeight - r.top + 6, left: r.left });
+              }}
+              onMouseLeave={e => { e.currentTarget.style.background = "rgba(10,22,41,0.75)"; setDeleteActionTooltip(null); }}
               style={{
                 display: "flex", alignItems: "center", gap: 8, background: "rgba(10,22,41,0.75)",
                 border: "1px solid rgba(255,255,255,0.2)", borderRadius: 999, padding: "10px 16px",
                 color: "white", fontSize: 14, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
+                transition: "background 0.15s",
               }}
             >
               <Trash2 size={16} strokeWidth={SW} /> Delete
@@ -2172,7 +2214,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
             </button>
             <button
               onClick={() => setSelectedFilmstrip({})}
-              onMouseEnter={e => e.currentTarget.style.background = "rgba(10,22,41,0.9)"}
+              onMouseEnter={e => e.currentTarget.style.background = "rgba(10,22,41,1)"}
               onMouseLeave={e => e.currentTarget.style.background = "rgba(10,22,41,0.75)"}
               style={{
                 width: 44, height: 44, borderRadius: "50%", background: "rgba(10,22,41,0.75)",
@@ -2184,6 +2226,21 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
               <X size={18} strokeWidth={SW} />
             </button>
           </div>
+        )}
+
+        {/* Shared by both delete triggers above (the bulk pill and the
+            "..." menu's own Delete item) — see deleteActionTooltip's own
+            comment. Portaled to <body>, same as PhotoGrid's identical
+            per-photo delete tooltip in draft mode, at a higher zIndex
+            (5600, not that one's 5300) since this lightbox itself
+            already sits at 5500. */}
+        {deleteActionTooltip && createPortal(
+          <div style={{ position: "fixed", ...deleteActionTooltip, zIndex: 5600, maxWidth: 200, pointerEvents: "none" }}>
+            <div style={{ background: "var(--tt-text-1)", color: "white", fontSize: 11, fontWeight: 500, lineHeight: 1.4, padding: "6px 10px", borderRadius: 6, boxShadow: "0 8px 24px rgba(10,22,41,0.24)" }}>
+              Only removed from this report.
+            </div>
+          </div>,
+          document.body
         )}
 
         {/* Caption — overlaid directly on the image, three states:
@@ -2206,7 +2263,13 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
               height, clickable to re-edit. Bound directly to the
               `caption` prop (no separate draft/commit step) — every
               keystroke while editing calls onCaptionChange immediately;
-              Escape is what reverts to captionStartRef instead. */}
+              Escape is what reverts to captionStartRef instead. Hidden
+              entirely (all three states, caption or not) while the
+              filmstrip's own bulk-select bar is up — that bar sits in
+              this same bottom area (see selectedFilmstrip above), and a
+              caption prompt/box/text down here at the same time just
+              clutters into it. */}
+        {Object.keys(selectedFilmstrip).length === 0 && (
         <div style={{
           position: "absolute", left: 0, right: 0, bottom: 0, display: "flex", justifyContent: "center",
           padding: "20px 24px 18px", background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent)",
@@ -2280,7 +2343,9 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
           ) : caption ? (
             <p
               onClick={() => { captionStartRef.current = caption || ""; setCaptionEditing(true); }}
-              className="tt-caption-box"
+              // 50vw, not .tt-caption-box's 30/90 — see .tt-caption-saved
+              // in index.css.
+              className="tt-caption-saved"
               // underline only on hover — the "this text is clickable"
               // signal, without permanently making a saved caption look
               // like a link/placeholder at rest.
@@ -2296,17 +2361,16 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
               variant="ghost"
               size="default"
               onClick={() => { captionStartRef.current = ""; setCaptionEditing(true); }}
-              // The ghost variant's own hover (a light gray-100 fill,
-              // see buttonVariants) reads fine on this app's own white/
-              // grey02 chrome, but disappears (or looks like a stray grey
-              // box) over an arbitrary photo. Swapping it for this app's
-              // own "black" button fill (var(--tt-text-1), the same dark
-              // background every other primary button here uses — Check/
-              // Confirm/Save Report/Upgrade to Team Plan) instead reads
-              // clearly regardless of what's behind it; text stays white
-              // in both states so it doesn't need to change on hover too.
-              onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-text-1)"}
-              onMouseLeave={ev => ev.currentTarget.style.background = "transparent"}
+              // The ghost variant's own hover (a light gray-100 fill, see
+              // buttonVariants) is a CSS class (:hover in the
+              // stylesheet) — it doesn't go away just because these
+              // handlers stop setting a background of their own, it has
+              // to be explicitly cancelled back to transparent here too.
+              // Underline instead is the actual "this is clickable"
+              // signal, same one the saved-caption text's own hover
+              // uses, which reads clearly regardless of what's behind it.
+              onMouseEnter={ev => { ev.currentTarget.style.textDecoration = "underline"; ev.currentTarget.style.background = "transparent"; }}
+              onMouseLeave={ev => { ev.currentTarget.style.textDecoration = "none"; ev.currentTarget.style.background = "transparent"; }}
               // Native <button> elements default to cursor:default (an
               // arrow, not a hand) in most browsers unless told otherwise
               // — the Button component's own buttonVariants classes don't
@@ -2317,6 +2381,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
             </Button>
           ) : null}
         </div>
+        )}
       </div>
 
       {/* Filmstrip — shown even for a single photo, not just when there's
@@ -6425,15 +6490,34 @@ function ReportsTab({ demoCase }) {
             // originalIndices map filmstrip position -> this entry's real
             // photo index, so the exclusion lands on the same keys the
             // panel's own photo-select/delete already uses.
-            const originalIndices = indices.map(i => lightbox.originalIndices[i]);
+            const deletedOriginalIndices = indices.map(i => lightbox.originalIndices[i]);
             setPreview(p => ({
               ...p,
               excludedPhotos: {
                 ...p.excludedPhotos,
-                ...Object.fromEntries(originalIndices.map(i => [`${lightbox.entryKey}_${i}`, true])),
+                ...Object.fromEntries(deletedOriginalIndices.map(i => [`${lightbox.entryKey}_${i}`, true])),
               },
             }));
-            setLightbox(null);
+            // Deleting shouldn't close the whole lightbox out from under
+            // the viewer — just drop the deleted photo(s) from its own
+            // filmstrip and land on whichever neighbor slides into the
+            // same position (clamped to the new last photo if the
+            // deleted one was at the end), same "delete and move to the
+            // next item" a photo manager is expected to do. Only actually
+            // closes once every photo is gone.
+            const deletedSet = new Set(indices);
+            const remainingPhotos = lightbox.photos.filter((_, i) => !deletedSet.has(i));
+            if (remainingPhotos.length === 0) {
+              setLightbox(null);
+            } else {
+              const remainingOriginalIndices = lightbox.originalIndices.filter((_, i) => !deletedSet.has(i));
+              setLightbox(lb => ({
+                ...lb,
+                photos: remainingPhotos,
+                originalIndices: remainingOriginalIndices,
+                index: Math.min(lb.index, remainingPhotos.length - 1),
+              }));
+            }
           }}
         />
       )}
