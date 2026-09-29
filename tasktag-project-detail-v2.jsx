@@ -224,8 +224,21 @@ const PROJECT_ADDRESS = "11 North Raintree Hollow Court, Sienna Plantation, Miss
 const POINT_OF_CONTACT_NAME = "Maria Jose";
 const POINT_OF_CONTACT_ROLE = "Project Manager";
 const initialsOf = (name) => name.split(" ").map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
-// TODO(BE): replace with the actual report ID from the API
-const REPORT_ID = `TX-1520-${APP_TODAY.getFullYear()}-${String(APP_TODAY.getMonth() + 1).padStart(2, "0")}`;
+// TODO(BE): replace with the actual report ID from the API. A function of
+// the report's own generation date (not a fixed constant) — every report
+// needs its OWN id reflecting when THAT report was actually generated, not
+// a single value frozen at whenever the app happened to load (APP_TODAY).
+// dateStr is each report's own `date` (see pushReport's toLocaleString
+// call) — parseable by Date since it's produced by that same call — or
+// missing entirely for a link built before this existed, where APP_TODAY
+// is the closest fallback available.
+const reportIdFor = (dateStr) => {
+  const d = dateStr ? new Date(dateStr) : APP_TODAY;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `TX-1520-${y}-${m}-${day}`;
+};
 
 // Cover header's companyEmail/companyPhone (see EditableField's `validate`
 // prop) — companyPhone is specifically a US office number: optional
@@ -263,6 +276,12 @@ const PAGE_PAD = 40;
 // Draft nav sidebar's fixed width — wide enough that a typical task title
 // doesn't truncate immediately (see the sidebar in the modal body).
 const NAV_W = 280;
+// NavSidebar's own outer padding (16) + a top-level row's own left padding
+// (12, see topStyle) — the distance from the sidebar's left edge to where
+// its icons actually start. Reused by the chrome bar's logo (draft-chrome/
+// ReportPreviewChrome) so the logo lines up with that icon column instead
+// of just centering somewhere inside the sidebar's width.
+const NAV_SIDEBAR_ICON_INSET = 28;
 // Uniform gap around the document card on every side (top, right, bottom,
 // left) — matches the exported document's own outer margin (see
 // buildReportHTML's `body{padding:${PAGE_GUTTER}px}`), so the card reads
@@ -1377,10 +1396,19 @@ function LogoUploadBox({ src, onChange, disabled, width = 180 }) {
 // bold text-1 with an icon; group children sit in a left-bordered rail,
 // smaller and lighter, with an optional week/month divider above a child.
 const NAV_CHILD_LIMIT = 10;
-function NavSidebar({ items, activeKey, onSelect }) {
+function NavSidebar({ items, activeKey, onSelect, footer }) {
   const [expanded, setExpanded] = useState({});
   return (
-    <div style={{ width: NAV_W, flexShrink: 0, borderRight: "1px solid var(--tt-grey03)", background: "white", overflowY: "auto", padding: 16 }}>
+    // A flex column spanning the sidebar's full height (a stretched flex
+    // item in its own row — see this component's own callers) split into
+    // a scrollable nav list and an optional fixed footer (draft mode's own
+    // Photo Limit widget — see its caller) pinned below it — the footer
+    // stays put as the list scrolls past it instead of scrolling away too.
+    // The logo itself lives in the chrome bar above (see draft-chrome/
+    // ReportPreviewChrome), not here — centered over this same NAV_W
+    // column from up there instead.
+    <div style={{ width: NAV_W, flexShrink: 0, borderRight: "1px solid var(--tt-grey03)", background: "white", display: "flex", flexDirection: "column", minHeight: 0 }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16 }}>
       {items.map((group, gi) => {
         const topStyle = active => ({
           display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left",
@@ -1456,6 +1484,17 @@ function NavSidebar({ items, activeKey, onSelect }) {
           </div>
         );
       })}
+      </div>
+      {footer && (
+        // Horizontal padding matches NAV_SIDEBAR_ICON_INSET, not the list's
+        // own 16 — a nav row's actual content (icon/text) sits inset that
+        // far from the sidebar's edges (container padding + the row's own
+        // left/right padding, see topStyle), so this lines the footer's
+        // content up with that same edge instead of the container's own.
+        <div style={{ flexShrink: 0, padding: `16px ${NAV_SIDEBAR_ICON_INSET}px`, borderTop: "1px solid var(--tt-grey03)" }}>
+          {footer}
+        </div>
+      )}
     </div>
   );
 }
@@ -3834,7 +3873,7 @@ const buildReportHTML = async (report) => {
       h("div", { style: `font-family:${SANS};font-size:11px;color:#828282;line-height:1;align-self:center;white-space:nowrap;` }, `Page ${pageNum} of ${totalPages}`),
       h("div", { style: "text-align:right;" },
         h("p", { style: `font-family:${SANS};font-size:11px;color:#828282;line-height:1;margin:0 0 6px;` }, "Generated via TaskTag"),
-        h("p", { style: `font-family:${SANS};font-size:11px;color:#828282;line-height:1;margin:0;` }, `Report ID: ${REPORT_ID}`)
+        h("p", { style: `font-family:${SANS};font-size:11px;color:#828282;line-height:1;margin:0;` }, `Report ID: ${reportIdFor(report.date)}`)
       )
     )
   );
@@ -4336,6 +4375,35 @@ function ReportsTab({ demoCase }) {
   // previewFinalGroups (already exclusion-filtered) rather than
   // recomputing against excludedPhotos separately.
   const previewPhotoCount = previewFinalGroups.reduce((s, g) => s + g.entries.reduce((es, e) => es + (e.isNote ? 0 : e.photos.length), 0), 0);
+
+  // TODO(BE): replace with the account's actual per-report photo cap and
+  // usage from the API. Lives in the sidebar's own fixed footer (see
+  // NavSidebar's `footer` prop below), not the chrome bar — it needs to
+  // stay in view as the section list scrolls past it, same reasoning as
+  // that footer slot's own comment. Built once here rather than inline at
+  // each call site since both the real sidebar and its loading-skeleton
+  // stand-in show it identically (previewPhotoCount is already known
+  // synchronously, same as every other "real, not skeleton'd" bit of chrome
+  // during the fake generate delay). Clicking it opens the report-wide
+  // Manage Photos modal — the single entry point for curating which photos
+  // count toward PHOTO_LIMIT. Hovering just previews the affordance by
+  // tinting the text/icon secondary green.
+  const photoLimitWidget = (
+    <div
+      onClick={() => setPhotoManager(true)}
+      onMouseEnter={e => { e.currentTarget.firstElementChild.style.color = "var(--tt-secondary)"; }}
+      onMouseLeave={e => { e.currentTarget.firstElementChild.style.color = "var(--tt-text-1)"; }}
+      style={{ display: "flex", flexDirection: "column", gap: 6, cursor: "pointer" }}
+    >
+      <p style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", margin: 0, whiteSpace: "nowrap", transition: "color 0.15s" }}>
+        Photo Limit {previewPhotoCount} of {PHOTO_LIMIT}
+        <ExternalLink size={14} strokeWidth={SW} style={{ flexShrink: 0 }} />
+      </p>
+      <div style={{ width: "100%", height: 6, borderRadius: 99, background: "var(--tt-grey03)", overflow: "hidden" }}>
+        <div style={{ width: `${Math.min(100, (previewPhotoCount / PHOTO_LIMIT) * 100)}%`, height: "100%", borderRadius: 99, background: "var(--tt-secondary)" }} />
+      </div>
+    </div>
+  );
 
   // Infinite scroll over the *displayed* groups (not previewFinalGroups —
   // manual notes are only spliced in for real output, not the live modal).
@@ -5653,13 +5721,15 @@ function ReportsTab({ demoCase }) {
     if (companyIdentity.logo) missingImages.push("logo");
     if (report.coverImage && !IMG_MAP[report.coverImage]) missingImages.push("cover");
     if (missingImages.length > 0) params.set("missing", missingImages.join(","));
+    // date rides along unconditionally now (not just for preview) — the
+    // document's own footer Report ID (see buildReportHTML's footerHTML/
+    // reportIdFor) needs the report's real generation date to be correct
+    // wherever this link is opened, not only in the owner's own Preview tab.
+    if (report.date) params.set("date", report.date);
     // preview=1 (see handlePreviewOpen) is what tells the root component
-    // to wrap ReportPage in ReportPreviewChrome instead of rendering it
-    // bare — date rides along only for that chrome's own "Generation
-    // date" line, a plain display string ReportPage itself never reads.
+    // to wrap ReportPage in ReportPreviewChrome instead of rendering it bare.
     if (preview) {
       params.set("preview", "1");
-      if (report.date) params.set("date", report.date);
     }
     return `${window.location.href.split("?")[0]}?${params.toString()}`;
   };
@@ -6039,46 +6109,38 @@ function ReportsTab({ demoCase }) {
               }}
             >
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: ROW_W, width: "100%", margin: "0 auto" }}>
-              {previewSaved ? (
-                <div style={{ display: "flex", alignItems: "center" }}>
-                  <button
-                    onClick={closePreview}
-                    onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
-                    onMouseLeave={e => e.currentTarget.style.background = "white"}
-                    style={{ width: 40, height: 40, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, cursor: "pointer", color: "var(--tt-text-2)", transition: "background 0.15s", marginRight: 8 }}
-                  >
-                    <ChevronLeft size={18} strokeWidth={SW} />
-                  </button>
-                  <div style={{
-                    display: "flex", alignItems: "center",
-                    background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8,
-                    height: 40, padding: "0 12px",
-                    fontSize: 13, fontWeight: 500, color: "var(--tt-text-1)",
-                  }}>
-                    <span>{preview.period}</span>
-                  </div>
+              {/* Photo Limit lives in the sidebar's own fixed footer now
+                  (see NavSidebar) — this slot is the logo, left-aligned to
+                  match the sidebar's own icon column below (NAV_SIDEBAR_ICON_INSET
+                  — this bar and the body row below share the same ROW_W/
+                  margin:auto centering, so a plain fixed-width cell here
+                  lands exactly over the sidebar), plus the back+period chip
+                  once saved. */}
+              <div style={{ display: "flex", alignItems: "center" }}>
+                <div style={{ width: NAV_W, flexShrink: 0, display: "flex", paddingLeft: NAV_SIDEBAR_ICON_INSET }}>
+                  <img src={IMG_MAP_LOGO} alt="TaskTag" style={{ height: 40, width: "auto" }} />
                 </div>
-              ) : (
-                // TODO(BE): replace with the account's actual per-report photo cap and usage from the API
-                // Clicking this label opens the report-wide Manage Photos
-                // modal — the single entry point for curating which photos
-                // count toward PHOTO_LIMIT. Hovering just previews the
-                // affordance by tinting the text/icon secondary green.
-                <div
-                  onClick={() => setPhotoManager(true)}
-                  onMouseEnter={e => { e.currentTarget.firstElementChild.style.color = "var(--tt-secondary)"; }}
-                  onMouseLeave={e => { e.currentTarget.firstElementChild.style.color = "var(--tt-text-1)"; }}
-                  style={{ display: "flex", flexDirection: "column", gap: 6, width: "fit-content", cursor: "pointer" }}
-                >
-                  <p style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", margin: 0, whiteSpace: "nowrap", transition: "color 0.15s" }}>
-                    Photo Limit {previewPhotoCount} of {PHOTO_LIMIT}
-                    <ExternalLink size={14} strokeWidth={SW} style={{ flexShrink: 0 }} />
-                  </p>
-                  <div style={{ width: "90%", height: 6, borderRadius: 99, background: "var(--tt-grey03)", overflow: "hidden" }}>
-                    <div style={{ width: `${Math.min(100, (previewPhotoCount / PHOTO_LIMIT) * 100)}%`, height: "100%", borderRadius: 99, background: "var(--tt-secondary)" }} />
+                {previewSaved && (
+                  <div style={{ display: "flex", alignItems: "center" }}>
+                    <button
+                      onClick={closePreview}
+                      onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+                      onMouseLeave={e => e.currentTarget.style.background = "white"}
+                      style={{ width: 40, height: 40, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, cursor: "pointer", color: "var(--tt-text-2)", transition: "background 0.15s", marginRight: 8 }}
+                    >
+                      <ChevronLeft size={18} strokeWidth={SW} />
+                    </button>
+                    <div style={{
+                      display: "flex", alignItems: "center",
+                      background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8,
+                      height: 40, padding: "0 12px",
+                      fontSize: 13, fontWeight: 500, color: "var(--tt-text-1)",
+                    }}>
+                      <span>{preview.period}</span>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 {previewSaved ? (
@@ -6180,7 +6242,11 @@ function ReportsTab({ demoCase }) {
                   grouping and indentation match the real nav exactly —
                   just skeleton bars instead of real labels. */}
               {isWide && previewLoading && navGroups.length > 0 && (
-                <div style={{ width: NAV_W, flexShrink: 0, borderRight: "1px solid var(--tt-grey03)", background: "white", overflowY: "auto", padding: 16 }}>
+                // Same scrollable list + fixed Photo Limit footer split as
+                // the real NavSidebar below (not skeleton'd — previewPhotoCount
+                // is already known synchronously, nothing about it is loading).
+                <div style={{ width: NAV_W, flexShrink: 0, borderRight: "1px solid var(--tt-grey03)", background: "white", display: "flex", flexDirection: "column", minHeight: 0 }}>
+                  <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16 }}>
                   {navGroups.map((group, gi) => (
                     <div key={group.key || group.label} style={{ marginTop: gi === 0 ? 0 : 14 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px" }}>
@@ -6205,10 +6271,16 @@ function ReportsTab({ demoCase }) {
                       )}
                     </div>
                   ))}
+                  </div>
+                  {!previewSaved && (
+                    <div style={{ flexShrink: 0, padding: `16px ${NAV_SIDEBAR_ICON_INSET}px`, borderTop: "1px solid var(--tt-grey03)" }}>
+                      {photoLimitWidget}
+                    </div>
+                  )}
                 </div>
               )}
               {isWide && !previewLoading && sections.length > 0 && (
-                <NavSidebar items={navGroups} activeKey={activeSectionKey} onSelect={scrollToSection} />
+                <NavSidebar items={navGroups} activeKey={activeSectionKey} onSelect={scrollToSection} footer={!previewSaved && photoLimitWidget} />
               )}
               {/* No scrollbarGutter reservation here (unlike elsewhere in
                   this modal) — this column is flex:1 with no width cap of
@@ -6706,7 +6778,7 @@ function PaywallModal({ onClose }) {
 // from ReportPage below so ReportPreviewChrome's own Download button can
 // build the exact same HTML on demand (e.g. for a fresh preview tab)
 // without duplicating this reconstruction logic a second time.
-async function buildReportHTMLFromParams({ dateRange, period, version, includeSummary, includeNoPhotoTasks, notesParam, excludedParam, titlesParam, checklistsParam, captionsParam, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, contactName, contactRole, contactPhoto, summaryText, clientName, additionalInfo, coverImage, missingImages }) {
+async function buildReportHTMLFromParams({ dateRange, period, version, includeSummary, includeNoPhotoTasks, notesParam, excludedParam, titlesParam, checklistsParam, captionsParam, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, contactName, contactRole, contactPhoto, summaryText, clientName, additionalInfo, coverImage, missingImages, date }) {
   let data = buildReportData(dateRange, period, null, includeNoPhotoTasks);
   let groups = data.groups;
   // Always runs (even with nothing excluded) — this is what embeds each
@@ -6778,7 +6850,7 @@ async function buildReportHTMLFromParams({ dateRange, period, version, includeSu
     });
   });
   if (taskChildren.length > 0) navItems.push({ type: "group", label: "Task List", icon: "task", children: taskChildren });
-  const html = await buildReportHTML({ includeSummary, period, version, data, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, contactName, contactRole, contactPhoto, summary: summaryText, clientName, additionalInfo, coverImage, missingImages, photoCaptions });
+  const html = await buildReportHTML({ includeSummary, period, version, data, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, contactName, contactRole, contactPhoto, summary: summaryText, clientName, additionalInfo, coverImage, missingImages, photoCaptions, date });
   return { html, navItems };
 }
 
@@ -6946,11 +7018,15 @@ function ReportPreviewChrome({ reportPageProps, period, dateLabel }) {
     <div className="font-sans text-[var(--tt-text-1)] text-[14px] leading-[1.5]" style={{ display: "flex", flexDirection: "column", height: "100vh", background: "var(--tt-grey02)" }}>
       <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--tt-grey03)", background: "white", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: previewRowW, width: "100%", margin: "0 auto" }}>
-          <div>
-            <p style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 2px" }}>{period}</p>
-            {dateLabel && (
-              <p style={{ fontSize: 12, fontWeight: 500, color: "var(--tt-grey05)", margin: 0 }}>Generated {dateLabel}</p>
-            )}
+          {/* Logo only now — the period/"Generated ..." line that used to
+              sit beside it was removed from this chrome. Still left-aligned
+              to match the sidebar's own icon column below
+              (NAV_SIDEBAR_ICON_INSET — its own padding + each row's own
+              left padding, see NavSidebar) rather than centered over the
+              NAV_W column — reads as lining up with the nav rail's content,
+              not just sitting somewhere inside its width. */}
+          <div style={{ width: NAV_W, flexShrink: 0, display: "flex", paddingLeft: NAV_SIDEBAR_ICON_INSET }}>
+            <img src={IMG_MAP_LOGO} alt="TaskTag" style={{ height: 40, width: "auto" }} />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <button
@@ -7068,6 +7144,7 @@ export default function ProjectDetail() {
       additionalInfo: params.get("additionalInfo"),
       coverImage: handedOff.coverImage || params.get("coverImage"),
       missingImages: (params.get("missing") || "").split(",").filter(Boolean),
+      date: params.get("date"),
     };
     // preview=1 (see handlePreviewOpen) — only ever set by the report's
     // own owner opening the Preview action, never present on a link
