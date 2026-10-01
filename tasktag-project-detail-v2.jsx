@@ -1182,7 +1182,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
           )}
         </div>
         {liveError && (
-          <p style={{ color: "var(--tt-red)", fontSize: 10, fontWeight: 500, margin: "2px 0 0", textAlign: "left" }}>{liveError}</p>
+          <p style={{ color: "var(--tt-red)", fontSize: 10, fontWeight: 500, margin: "4px 0 0", textAlign: "left" }}>{liveError}</p>
         )}
       </div>
     ) : (
@@ -1210,7 +1210,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
             }}
             placeholder={placeholder}
             maxLength={maxLength}
-            style={{ fontFamily: "inherit", paddingLeft: leadingIcon ? 34 : 12, paddingRight: counter && maxLength ? 44 : 12, ...(liveError ? { borderColor: "var(--tt-red)" } : {}), ...inputStyle }}
+            style={{ fontFamily: "inherit", paddingLeft: leadingIcon ? 34 : 12, paddingRight: counter && maxLength ? 44 : 12, ...(liveError ? { borderColor: "var(--tt-red)" } : {}), ...inputStyle, ...(liveError ? { marginBottom: 0 } : {}) }}
           />
           {counter && maxLength && (
             <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", fontSize: 11, fontWeight: 500, color: current.length >= maxLength ? "var(--tt-red)" : "var(--tt-grey05)" }}>
@@ -1219,7 +1219,12 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
           )}
         </div>
         {liveError && (
-          <p style={{ color: "var(--tt-red)", fontSize: 10, fontWeight: 500, margin: "2px 0 0", textAlign: "left" }}>{liveError}</p>
+          // marginBottom:16 here takes over the "gap to next field" job
+          // inputStyle's own margin would normally do — that margin gets
+          // zeroed above whenever an error shows, so the two don't stack
+          // into a much bigger gap than the 4px actually wanted above the
+          // error text itself.
+          <p style={{ color: "var(--tt-red)", fontSize: 10, fontWeight: 500, margin: "4px 0 16px", textAlign: "left" }}>{liveError}</p>
         )}
       </div>
     );
@@ -1310,7 +1315,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
                 </button>
               </div>
               {error && (
-                <p style={{ color: "var(--tt-red)", fontSize: 10, fontWeight: 500, margin: "2px 0 0", textAlign: "left" }}>
+                <p style={{ color: "var(--tt-red)", fontSize: 10, fontWeight: 500, margin: "4px 0 0", textAlign: "left" }}>
                   {errorMessage || "That doesn't look right."}
                 </p>
               )}
@@ -1502,7 +1507,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
           <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>{showConfirm && confirmButton}</div>
         </div>
         {error && (
-          <p style={{ color: "var(--tt-red)", fontSize: 10, fontWeight: 500, margin: "2px 0 0", textAlign: "left" }}>
+          <p style={{ color: "var(--tt-red)", fontSize: 10, fontWeight: 500, margin: "4px 0 0", textAlign: "left" }}>
             {errorMessage || "That doesn't look right."}
           </p>
         )}
@@ -5517,7 +5522,7 @@ function ReportsTab({ demoCase }) {
           between them, so the two together reach the same full width
           Address above fills, instead of a fixed width stopping short of
           it and leaving the rest of the row empty. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <EditableField
             fieldId="companyEmail"
@@ -6155,7 +6160,6 @@ function ReportsTab({ demoCase }) {
     setFormErrors(errs);
     const firstErrorId = Object.keys(errs)[0];
     if (firstErrorId) {
-      showToast("error", "Fix the highlighted fields");
       setTimeout(() => document.querySelector(`[data-field="${firstErrorId}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" }), 0);
       return;
     }
