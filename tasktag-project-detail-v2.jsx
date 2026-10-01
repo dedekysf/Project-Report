@@ -202,6 +202,106 @@ style.textContent = `
   .tt-split-idcard circle,
   .tt-split-idcard path { stroke-width: 1.4; }
 
+  /* Download — tray (path) containing the drop-in arrow (polyline + line). */
+  .tt-split-download path { stroke-width: 1.6; }
+  .tt-split-download polyline,
+  .tt-split-download line { stroke-width: 1.4; }
+
+  /* Forward — open shelf (path) containing the arrow popping out of it (polyline). */
+  .tt-split-forward path { stroke-width: 1.6; }
+  .tt-split-forward polyline { stroke-width: 1.4; }
+
+  /* Upload — tray (path) containing the lift-out arrow (polyline + line). */
+  .tt-split-upload path { stroke-width: 1.6; }
+  .tt-split-upload polyline,
+  .tt-split-upload line { stroke-width: 1.4; }
+
+  /* X — 2 crossing diagonals, 1st stroke outline / 2nd stroke inner. */
+  .tt-split-x path:nth-of-type(1) { stroke-width: 1.6; }
+  .tt-split-x path:nth-of-type(2) { stroke-width: 1.4; }
+
+  /* MoreVertical — top dot outline, other 2 dots inner. */
+  .tt-split-morevertical circle:nth-of-type(1) { stroke-width: 1.6; }
+  .tt-split-morevertical circle:nth-of-type(2),
+  .tt-split-morevertical circle:nth-of-type(3) { stroke-width: 1.4; }
+
+  /* Link — 2 mirrored chain-link halves, 1st outline / 2nd inner. */
+  .tt-split-link path:nth-of-type(1) { stroke-width: 1.6; }
+  .tt-split-link path:nth-of-type(2) { stroke-width: 1.4; }
+
+  /* ArrowLeft/ArrowRight — bold arrowhead (outline) with a thinner shaft (inner). */
+  .tt-split-arrowleft path:nth-of-type(1) { stroke-width: 1.6; }
+  .tt-split-arrowleft path:nth-of-type(2) { stroke-width: 1.4; }
+  .tt-split-arrowright path:nth-of-type(2) { stroke-width: 1.6; }
+  .tt-split-arrowright path:nth-of-type(1) { stroke-width: 1.4; }
+
+  /* GripVertical — left column of dots outline, right column inner. */
+  .tt-split-gripvertical circle:nth-of-type(-n+3) { stroke-width: 1.6; }
+  .tt-split-gripvertical circle:nth-of-type(n+4) { stroke-width: 1.4; }
+
+  /* Plus — horizontal stroke outline, vertical stroke inner. */
+  .tt-split-plus line:nth-of-type(1) { stroke-width: 1.6; }
+  .tt-split-plus line:nth-of-type(2) { stroke-width: 1.4; }
+
+  /* Loader — first half of the rays outline, second half inner. */
+  .tt-split-loader path:nth-of-type(-n+4) { stroke-width: 1.6; }
+  .tt-split-loader path:nth-of-type(n+5) { stroke-width: 1.4; }
+
+  /* BarChart2 — tallest/center bar outline, the 2 shorter bars inner. */
+  .tt-split-barchart2 line:nth-of-type(2) { stroke-width: 1.6; }
+  .tt-split-barchart2 line:nth-of-type(1),
+  .tt-split-barchart2 line:nth-of-type(3) { stroke-width: 1.4; }
+
+  /* Crown — crown shape outline, base line inner. */
+  .tt-split-crown path:nth-of-type(1) { stroke-width: 1.6; }
+  .tt-split-crown path:nth-of-type(2) { stroke-width: 1.4; }
+
+  /* LayoutGrid — top row outline, bottom row inner. */
+  .tt-split-layoutgrid rect:nth-of-type(1),
+  .tt-split-layoutgrid rect:nth-of-type(2) { stroke-width: 1.6; }
+  .tt-split-layoutgrid rect:nth-of-type(3),
+  .tt-split-layoutgrid rect:nth-of-type(4) { stroke-width: 1.4; }
+
+  /* Search — lens outline, handle inner. */
+  .tt-split-search circle { stroke-width: 1.6; }
+  .tt-split-search path { stroke-width: 1.4; }
+
+  /* UserPlus — person silhouette outline, "+" badge inner. */
+  .tt-split-userplus path:nth-of-type(1),
+  .tt-split-userplus circle { stroke-width: 1.6; }
+  .tt-split-userplus line { stroke-width: 1.4; }
+
+  /* SlidersHorizontal — 3 horizontal tracks outline, 3 knob ticks inner. */
+  .tt-split-slidershorizontal line:nth-of-type(-n+6) { stroke-width: 1.6; }
+  .tt-split-slidershorizontal line:nth-of-type(n+7) { stroke-width: 1.4; }
+
+  /* ArrowUpDown — both arrowheads outline, both shafts inner. */
+  .tt-split-arrowupdown path:nth-of-type(1),
+  .tt-split-arrowupdown path:nth-of-type(3) { stroke-width: 1.6; }
+  .tt-split-arrowupdown path:nth-of-type(2),
+  .tt-split-arrowupdown path:nth-of-type(4) { stroke-width: 1.4; }
+
+  /* Calendar — body outline, binder rings + divider line inner. */
+  .tt-split-calendar rect { stroke-width: 1.6; }
+  .tt-split-calendar path { stroke-width: 1.4; }
+
+  /* AlignJustify — top line outline, other 2 lines inner. */
+  .tt-split-alignjustify path:nth-of-type(1) { stroke-width: 1.6; }
+  .tt-split-alignjustify path:nth-of-type(2),
+  .tt-split-alignjustify path:nth-of-type(3) { stroke-width: 1.4; }
+
+  /* Hash — 2 horizontal bars outline, 2 vertical bars inner. */
+  .tt-split-hash line:nth-of-type(1),
+  .tt-split-hash line:nth-of-type(2) { stroke-width: 1.6; }
+  .tt-split-hash line:nth-of-type(3),
+  .tt-split-hash line:nth-of-type(4) { stroke-width: 1.4; }
+
+  /* Users — front person (body+head) outline, back person inner. */
+  .tt-split-users path:nth-of-type(1),
+  .tt-split-users circle { stroke-width: 1.6; }
+  .tt-split-users path:nth-of-type(2),
+  .tt-split-users path:nth-of-type(3) { stroke-width: 1.4; }
+
   .tt-radio-card {
     display: flex; align-items: center; gap: 16px;
     padding: 16px 20px;
@@ -325,7 +425,7 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-const SW = 1.2;
+const SW = 1.6;
 
 // Maps an icon COMPONENT (not its name — these are passed around as bare
 // component references, e.g. navGroups' own `icon` field, or iconFor's
@@ -352,7 +452,29 @@ const ICON_SPLIT_CLASSES = new Map([
   [Eye, "tt-split-eye"],
   [Pencil, "tt-split-pencil"],
   [ExternalLink, "tt-split-externallink"],
+  [Download, "tt-split-download"],
+  [Forward, "tt-split-forward"],
   [IdCard, "tt-split-idcard"],
+  [Upload, "tt-split-upload"],
+  [X, "tt-split-x"],
+  [MoreVertical, "tt-split-morevertical"],
+  [Link, "tt-split-link"],
+  [ArrowLeft, "tt-split-arrowleft"],
+  [ArrowRight, "tt-split-arrowright"],
+  [GripVertical, "tt-split-gripvertical"],
+  [Plus, "tt-split-plus"],
+  [Loader, "tt-split-loader"],
+  [BarChart2, "tt-split-barchart2"],
+  [Crown, "tt-split-crown"],
+  [LayoutGrid, "tt-split-layoutgrid"],
+  [Search, "tt-split-search"],
+  [UserPlus, "tt-split-userplus"],
+  [SlidersHorizontal, "tt-split-slidershorizontal"],
+  [ArrowUpDown, "tt-split-arrowupdown"],
+  [Calendar, "tt-split-calendar"],
+  [AlignJustify, "tt-split-alignjustify"],
+  [Hash, "tt-split-hash"],
+  [Users, "tt-split-users"],
 ]);
 const iconSplitClassFor = Icon => ICON_SPLIT_CLASSES.get(Icon);
 
@@ -765,7 +887,7 @@ function TasksTab() {
         ].map(({ Icon, label }) => (
           <Button key={label} variant="outline" size="sm"
             className="gap-2 text-[13px] font-normal text-[var(--tt-text-2)] border-[var(--tt-grey03)]">
-            <Icon size={14} strokeWidth={SW} /> {label}
+            <Icon size={14} strokeWidth={SW} className={iconSplitClassFor(Icon)} /> {label}
           </Button>
         ))}
       </div>
@@ -1596,7 +1718,7 @@ function LogoUploadBox({ src, onChange, disabled, size = 120, resizeTo = 360, hi
       }}
     >
       {loading ? (
-        <Loader size={18} strokeWidth={SW} color="var(--tt-text-2)" style={{ display: "block", animation: "tt-spin 0.75s linear infinite, tt-fade-in 0.15s ease-out" }} />
+        <Loader size={18} strokeWidth={SW} color="var(--tt-text-2)" className="tt-split-loader" style={{ display: "block", animation: "tt-spin 0.75s linear infinite, tt-fade-in 0.15s ease-out" }} />
       ) : src ? (
         <>
           <img src={src} alt="Company logo" style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }} />
@@ -1632,7 +1754,7 @@ function LogoUploadBox({ src, onChange, disabled, size = 120, resizeTo = 360, hi
         </>
       ) : (
         <>
-          <Upload size={40} strokeWidth={SW} color="var(--tt-grey06)" style={{ flexShrink: 0 }} />
+          <Upload size={40} strokeWidth={SW} color="var(--tt-grey05)" className="tt-split-upload" style={{ flexShrink: 0 }} />
           <span style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-2)", marginTop: 6 }}>Company Logo</span>
           {hint && !disabled && (
             <span style={{ fontSize: 12, fontWeight: 400, lineHeight: 1.4, color: "var(--tt-grey05)", textAlign: "center", padding: "0 12px", marginTop: 2 }}>{hint}</span>
@@ -2099,7 +2221,7 @@ function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoE
               onMouseLeave={e => e.currentTarget.style.background = "transparent"}
               style={{ background: "none", border: "none", cursor: "pointer", color: "var(--tt-text-1)", padding: 4, display: "flex", borderRadius: 6, transition: "background 0.15s" }}
             >
-              <X size={20} strokeWidth={SW} />
+              <X size={20} strokeWidth={SW} className="tt-split-x" />
             </button>
           </div>
           <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-2)", margin: "4px 0 0" }}>
@@ -2377,7 +2499,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, justifySelf: "start" }}>
           <button onClick={onClose} style={iconBtnStyle} onMouseEnter={onIconEnter} onMouseLeave={onIconLeave}>
-            <ChevronLeft size={18} strokeWidth={SW} />
+            <ChevronLeft size={20} strokeWidth={SW} />
           </button>
           <div style={{
             width: 32, height: 32, borderRadius: "50%", background: "var(--tt-pastel-magenta)",
@@ -2394,35 +2516,35 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
         <div style={{ display: "flex", alignItems: "center", gap: 4, minWidth: 0, justifySelf: "center" }}>
           <span style={{ fontSize: 13, fontWeight: 500, color: "white", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{fileName}</span>
           <LightboxIconBtn label="Rename">
-            <Pencil size={13} strokeWidth={SW} className="tt-split-pencil" />
+            <Pencil size={16} strokeWidth={SW} className="tt-split-pencil" />
           </LightboxIconBtn>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0, justifySelf: "end" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, justifySelf: "end" }}>
           <LightboxIconBtn label="Download" disabled={actionsDisabled} onClick={onDownload}>
-            <Download size={16} strokeWidth={SW} />
+            <Download size={20} strokeWidth={SW} className="tt-split-download" />
           </LightboxIconBtn>
           <LightboxIconBtn label="Share">
-            <Forward size={16} strokeWidth={SW} />
+            <Forward size={20} strokeWidth={SW} className="tt-split-forward" />
           </LightboxIconBtn>
           <LightboxIconBtn label={linkCopied ? "Link copied" : "Copy link to share"} disabled={actionsDisabled} onClick={onCopyLink}>
-            {linkCopied ? <Check size={16} strokeWidth={SW} /> : <Link size={16} strokeWidth={SW} />}
+            {linkCopied ? <Check size={20} strokeWidth={SW} /> : <Link size={20} strokeWidth={SW} className="tt-split-link" />}
           </LightboxIconBtn>
           <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.15)", margin: "0 6px" }} />
           <LightboxIconBtn label="Rotate" onClick={() => setRotation(r => (r + 90) % 360)}>
-            <RotateCw size={16} strokeWidth={SW} />
+            <RotateCw size={20} strokeWidth={SW} />
           </LightboxIconBtn>
           <LightboxIconBtn label="Zoom out" disabled={zoom <= 25} onClick={() => setZoom(z => Math.max(25, z - 25))}>
-            <ZoomOut size={16} strokeWidth={SW} className="tt-split-zoomout" />
+            <ZoomOut size={20} strokeWidth={SW} className="tt-split-zoomout" />
           </LightboxIconBtn>
-          <span style={{ fontSize: 12, fontWeight: 500, color: "white", width: 40, textAlign: "center" }}>{zoom}%</span>
+          <span style={{ fontSize: 14, fontWeight: 500, color: "white", width: 40, textAlign: "center" }}>{zoom}%</span>
           <LightboxIconBtn label="Zoom in" disabled={zoom >= 200} onClick={() => setZoom(z => Math.min(200, z + 25))}>
-            <ZoomIn size={16} strokeWidth={SW} className="tt-split-zoomin" />
+            <ZoomIn size={20} strokeWidth={SW} className="tt-split-zoomin" />
           </LightboxIconBtn>
           <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.15)", margin: "0 6px" }} />
           <div ref={moreMenuRef} style={{ position: "relative" }}>
             <LightboxIconBtn label="More" onClick={() => setShowMoreMenu(o => !o)}>
-              <MoreVertical size={16} strokeWidth={SW} />
+              <MoreVertical size={20} strokeWidth={SW} className="tt-split-morevertical" />
             </LightboxIconBtn>
             {showMoreMenu && (
               <div style={{
@@ -2480,14 +2602,14 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
             onClick={() => onIndexChange(index - 1)}
             style={{
               position: "absolute", left: 24, top: "50%", transform: "translateY(-50%)",
-              width: 40, height: 40, borderRadius: "50%", border: "1.5px solid rgba(255,255,255,0.6)",
+              width: 40, height: 40, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.6)",
               background: "rgba(10,22,41,0.4)", color: "white", cursor: "pointer",
               display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s",
             }}
             onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}
             onMouseLeave={e => e.currentTarget.style.background = "rgba(10,22,41,0.4)"}
           >
-            <ArrowLeft size={18} strokeWidth={SW} />
+            <ArrowLeft size={18} strokeWidth={SW} className="tt-split-arrowleft" />
           </button>
         )}
         <img
@@ -2501,14 +2623,14 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
             onClick={() => onIndexChange(index + 1)}
             style={{
               position: "absolute", right: 24, top: "50%", transform: "translateY(-50%)",
-              width: 40, height: 40, borderRadius: "50%", border: "1.5px solid rgba(255,255,255,0.6)",
+              width: 40, height: 40, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.6)",
               background: "rgba(10,22,41,0.4)", color: "white", cursor: "pointer",
               display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.15s",
             }}
             onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}
             onMouseLeave={e => e.currentTarget.style.background = "rgba(10,22,41,0.4)"}
           >
-            <ArrowRight size={18} strokeWidth={SW} />
+            <ArrowRight size={18} strokeWidth={SW} className="tt-split-arrowright" />
           </button>
         )}
 
@@ -2553,7 +2675,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
                 transition: "background 0.15s",
               }}
             >
-              <X size={18} strokeWidth={SW} />
+              <X size={18} strokeWidth={SW} className="tt-split-x" />
             </button>
           </div>
         )}
@@ -2775,7 +2897,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
                 onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
                 onMouseLeave={e => e.currentTarget.style.background = "transparent"}
               >
-                <X size={20} strokeWidth={SW} />
+                <X size={20} strokeWidth={SW} className="tt-split-x" />
               </button>
             </div>
             {[
@@ -5118,7 +5240,7 @@ function ReportsTab({ demoCase }) {
                           onDragEnd={() => setDraggedChecklist(null)}
                           style={{ flexShrink: 0, width: 14, height: 14, display: "flex", alignItems: "center", justifyContent: "center", cursor: "grab", color: "var(--tt-grey06)" }}
                         >
-                          <GripVertical size={13} strokeWidth={SW} />
+                          <GripVertical size={13} strokeWidth={SW} className="tt-split-gripvertical" />
                         </div>
                         {/* Deletes immediately — no confirmation, same as
                             everywhere else in this draft (photos, notes). */}
@@ -5200,7 +5322,7 @@ function ReportsTab({ demoCase }) {
                 }}
                 style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 6, border: "none", background: "none", padding: 0, cursor: "pointer", color: "var(--tt-secondary)", fontSize: 12, fontWeight: 500 }}
               >
-                <Plus size={14} strokeWidth={SW} /> Add item
+                <Plus size={14} strokeWidth={SW} className="tt-split-plus" /> Add item
               </button>
             )}
           </div>
@@ -5354,7 +5476,7 @@ function ReportsTab({ demoCase }) {
       <EditableField
         fieldId="companyName"
         value={preview.companyName}
-        placeholder="e.g. Acme Construction Co."
+        placeholder="E.g. Acme Construction Co."
         disabled={previewSaved}
         live
         required
@@ -5367,7 +5489,7 @@ function ReportsTab({ demoCase }) {
       <EditableField
         fieldId="companyAddress"
         value={preview.companyAddress}
-        placeholder="e.g. 123 Main St, Austin, TX"
+        placeholder="E.g. 123 Main St, Austin, TX"
         disabled={previewSaved}
         live
         required
@@ -5392,7 +5514,7 @@ function ReportsTab({ demoCase }) {
           <EditableField
             fieldId="companyEmail"
             value={preview.companyEmail}
-            placeholder="e.g. hello@acme.com"
+            placeholder="E.g. hello@acme.com"
             disabled={previewSaved}
             live
             aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Email</p>}
@@ -5412,7 +5534,7 @@ function ReportsTab({ demoCase }) {
           <EditableField
             fieldId="companyPhone"
             value={preview.companyPhone}
-            placeholder="e.g. (212) 555-0100"
+            placeholder="E.g. (212) 555-0100"
             filterInput={formatUSPhone}
             disabled={previewSaved}
             live
@@ -5474,9 +5596,9 @@ function ReportsTab({ demoCase }) {
               style={{ width: "100%", height: 240, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", border: "none", background: "none", padding: 0, cursor: previewSaved ? "default" : "pointer" }}
             >
               {coverImageUploading ? (
-                <Loader size={40} strokeWidth={SW} color="var(--tt-grey05)" style={{ display: "block", flexShrink: 0, animation: "tt-spin 0.75s linear infinite, tt-fade-in 0.15s ease-out" }} />
+                <Loader size={40} strokeWidth={SW} color="var(--tt-grey05)" className="tt-split-loader" style={{ display: "block", flexShrink: 0, animation: "tt-spin 0.75s linear infinite, tt-fade-in 0.15s ease-out" }} />
               ) : (
-                <Upload size={40} strokeWidth={SW} color="var(--tt-grey06)" style={{ flexShrink: 0 }} />
+                <Upload size={40} strokeWidth={SW} color="var(--tt-grey05)" className="tt-split-upload" style={{ flexShrink: 0 }} />
               )}
               {!previewSaved && (
                 <span style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-2)", marginTop: 6 }}>Highlight Photo</span>
@@ -5886,7 +6008,7 @@ function ReportsTab({ demoCase }) {
           >
             {contactPhotoUploading ? (
               <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Loader size={20} strokeWidth={SW} color="var(--tt-grey05)" style={{ display: "block", animation: "tt-spin 0.75s linear infinite, tt-fade-in 0.15s ease-out" }} />
+                <Loader size={20} strokeWidth={SW} color="var(--tt-grey05)" className="tt-split-loader" style={{ display: "block", animation: "tt-spin 0.75s linear infinite, tt-fade-in 0.15s ease-out" }} />
               </div>
             ) : contactPhotoSrc ? (
               <img src={contactPhotoSrc} alt="" style={{ display: "block", width: "100%", height: "100%", objectFit: "cover" }} />
@@ -5930,7 +6052,7 @@ function ReportsTab({ demoCase }) {
             <EditableField
               fieldId="contactName"
               value={preview.contactName}
-              placeholder="e.g. Maria Jose"
+              placeholder="E.g. Maria Jose"
               disabled={previewSaved}
               live
               onSave={v => setPreview(p => ({ ...p, contactName: v }))}
@@ -5940,7 +6062,7 @@ function ReportsTab({ demoCase }) {
             <EditableField
               fieldId="contactRole"
               value={preview.contactRole}
-              placeholder="e.g. Project Manager"
+              placeholder="E.g. Project Manager"
               disabled={previewSaved}
               live
               onSave={v => setPreview(p => ({ ...p, contactRole: v }))}
@@ -6400,7 +6522,7 @@ function ReportsTab({ demoCase }) {
                 // long as the animation runs, silently dropping the
                 // centering and leaving the icon offset by half its own
                 // size (see the keyframe's own comment).
-                <Loader size={14} strokeWidth={SW} color="white" style={{ display: "block", position: "absolute", top: "50%", left: "50%", animation: "tt-spin-centered 0.75s linear infinite" }} />
+                <Loader size={14} strokeWidth={SW} color="white" className="tt-split-loader" style={{ display: "block", position: "absolute", top: "50%", left: "50%", animation: "tt-spin-centered 0.75s linear infinite" }} />
               )}
             </button>
           </div>
@@ -6452,7 +6574,7 @@ function ReportsTab({ demoCase }) {
               <tr>
                 <td colSpan={4} style={{ padding: "48px 24px", textAlign: "center" }}>
                   <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--tt-grey02)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}>
-                    <BarChart2 size={32} color="var(--tt-grey06)" strokeWidth={SW} />
+                    <BarChart2 size={32} color="var(--tt-grey06)" strokeWidth={SW} className="tt-split-barchart2" />
                   </div>
                   <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", marginBottom: 4 }}>No reports yet</p>
                   <p style={{ fontSize: 13, color: "var(--tt-grey05)", lineHeight: "20px", marginTop: 4 }}>
@@ -6480,13 +6602,13 @@ function ReportsTab({ demoCase }) {
                     {r.status === "in_progress" ? (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--tt-text-2)" }}>
                         In progress
-                        <Loader size={14} strokeWidth={SW} color="var(--tt-grey05)" style={{ display: "block", animation: "tt-spin 0.75s linear infinite" }} />
+                        <Loader size={14} strokeWidth={SW} color="var(--tt-grey05)" className="tt-split-loader" style={{ display: "block", animation: "tt-spin 0.75s linear infinite" }} />
                       </span>
                     ) : (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                         <FixedTooltipBtn label="Preview" onAction={() => handlePreviewOpen(r)}><Eye size={16} strokeWidth={SW} color="var(--tt-grey06)" className="tt-split-eye" /></FixedTooltipBtn>
-                        <FixedTooltipBtn label="Download" onAction={async () => { const ok = await handleDownload(r); if (ok) showToast("success", "Downloaded"); }}><Download size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
-                        <FixedTooltipBtn label="Copy link to share" onAction={async () => { const ok = await handleCopy(r); if (ok) showToast("success", "Link copied"); }}><Link size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
+                        <FixedTooltipBtn label="Download" onAction={async () => { const ok = await handleDownload(r); if (ok) showToast("success", "Downloaded"); }}><Download size={16} strokeWidth={SW} color="var(--tt-grey06)" className="tt-split-download" /></FixedTooltipBtn>
+                        <FixedTooltipBtn label="Copy link to share" onAction={async () => { const ok = await handleCopy(r); if (ok) showToast("success", "Link copied"); }}><Link size={16} strokeWidth={SW} color="var(--tt-grey06)" className="tt-split-link" /></FixedTooltipBtn>
                         {/* Free tier's one report is a one-time allowance
                             (see handleGenerate) — Delete stays hidden while
                             paywalled so there's no way to clear it and
@@ -6630,7 +6752,7 @@ function ReportsTab({ demoCase }) {
                       onMouseLeave={e => e.currentTarget.style.background = "white"}
                       style={{ height: 40, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "0 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "background 0.15s" }}
                     >
-                      <Download size={14} strokeWidth={SW} /> Download
+                      <Download size={14} strokeWidth={SW} className="tt-split-download" /> Download
                     </button>
                     <button
                       disabled={previewLoading}
@@ -6641,7 +6763,7 @@ function ReportsTab({ demoCase }) {
                     >
                       {previewCopied
                         ? <><Check size={14} strokeWidth={SW} /> Link copied</>
-                        : <><Link size={14} strokeWidth={SW} /> Copy link</>}
+                        : <><Link size={14} strokeWidth={SW} className="tt-split-link" /> Copy link</>}
                     </button>
                   </>
                 ) : (
@@ -6686,8 +6808,8 @@ function ReportsTab({ demoCase }) {
                       {saving && (
                         // tt-spin-centered — see Generate's own identical
                         // fix/comment above.
-                        <Loader size={14} strokeWidth={SW} color="white" style={{ display: "block", position: "absolute", top: "50%", left: "50%", animation: "tt-spin-centered 0.75s linear infinite" }} />
-                      )}
+                        <Loader size={14} strokeWidth={SW} color="white" className="tt-split-loader" style={{ display: "block", position: "absolute", top: "50%", left: "50%", animation: "tt-spin-centered 0.75s linear infinite" }} />
+)}
                     </button>
                   </>
                 )}
@@ -7098,7 +7220,7 @@ function ReportsTab({ demoCase }) {
                 onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
                 onMouseLeave={e => e.currentTarget.style.background = "transparent"}
               >
-                <X size={20} strokeWidth={SW} />
+                <X size={20} strokeWidth={SW} className="tt-split-x" />
               </button>
             </div>
             {/* Same layout as the Save Report confirmation: project name,
@@ -7147,7 +7269,7 @@ function ReportsTab({ demoCase }) {
                 onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
                 onMouseLeave={e => e.currentTarget.style.background = "transparent"}
               >
-                <X size={20} strokeWidth={SW} />
+                <X size={20} strokeWidth={SW} className="tt-split-x" />
               </button>
             </div>
             <p style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: 1.6, margin: "0 0 4px" }}>
@@ -7269,7 +7391,7 @@ function ReportPaywall() {
         width: 56, height: 56, borderRadius: 14, background: "var(--tt-mint)",
         display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px",
       }}>
-        <Crown size={26} color="var(--tt-secondary)" strokeWidth={SW} />
+        <Crown size={26} color="var(--tt-secondary)" strokeWidth={SW} className="tt-split-crown" />
       </div>
       <h3 style={{ fontSize: 22, fontWeight: 700, color: "var(--tt-text-1)", margin: "0 0 10px" }}>
         Send a Report, Not a Wall of Text
@@ -7323,7 +7445,7 @@ function PaywallModal({ onClose }) {
           onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
           onMouseLeave={e => e.currentTarget.style.background = "transparent"}
         >
-          <X size={18} strokeWidth={SW} />
+          <X size={18} strokeWidth={SW} className="tt-split-x" />
         </button>
         <ReportPaywall />
       </div>
@@ -7439,7 +7561,7 @@ function ReportPage(props) {
   if (html === null) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "var(--tt-grey02)" }}>
-        <Loader size={24} strokeWidth={SW} color="var(--tt-grey05)" style={{ display: "block", animation: "tt-spin 0.75s linear infinite" }} />
+        <Loader size={24} strokeWidth={SW} color="var(--tt-grey05)" className="tt-split-loader" style={{ display: "block", animation: "tt-spin 0.75s linear infinite" }} />
       </div>
     );
   }
@@ -7598,7 +7720,7 @@ function ReportPreviewChrome({ reportPageProps, period, dateLabel }) {
               onMouseLeave={e => e.currentTarget.style.background = "white"}
               style={{ ...btnStyle, cursor: downloading ? "not-allowed" : "pointer", opacity: downloading ? 0.5 : 1 }}
             >
-              <Download size={14} strokeWidth={SW} /> Download
+              <Download size={14} strokeWidth={SW} className="tt-split-download" /> Download
             </button>
             <button
               onClick={handleCopyLink}
@@ -7638,7 +7760,7 @@ function ReportPreviewChrome({ reportPageProps, period, dateLabel }) {
         <div style={{ flex: 1, minWidth: 0, background: "var(--tt-grey02)" }}>
           {html === null ? (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-              <Loader size={24} strokeWidth={SW} color="var(--tt-grey05)" style={{ display: "block", animation: "tt-spin 0.75s linear infinite" }} />
+              <Loader size={24} strokeWidth={SW} color="var(--tt-grey05)" className="tt-split-loader" style={{ display: "block", animation: "tt-spin 0.75s linear infinite" }} />
             </div>
           ) : (
             // Fixed width (PAGE_W + the export's own PAGE_GUTTER body
@@ -7780,12 +7902,12 @@ export default function ProjectDetail() {
                 {PROJECT_NAME}
               </p>
               <Button variant="ghost" size="icon" className="w-6 h-6 shrink-0 text-[var(--tt-text-2)] hover:bg-[var(--tt-grey02)]" style={{ borderRadius: 12 }}>
-                <MoreVertical size={16} strokeWidth={SW} />
+                <MoreVertical size={16} strokeWidth={SW} className="tt-split-morevertical" />
               </Button>
             </div>
             <div className="flex items-center gap-3 mt-[2px]">
               <span className="flex items-center gap-1 text-[12px] text-[var(--tt-grey05)]">
-                <LayoutGrid size={11} strokeWidth={SW} /> Personal Projects
+                <LayoutGrid size={11} strokeWidth={SW} className="tt-split-layoutgrid" /> Personal Projects
               </span>
               <span className="flex items-center gap-1 text-[12px] text-[var(--tt-grey05)]">
                 <MapPin size={11} strokeWidth={SW} className="tt-split-mappin" /> {PROJECT_ADDRESS}
@@ -7795,10 +7917,10 @@ export default function ProjectDetail() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Button variant="ghost" size="icon" className="w-8 h-8 text-[var(--tt-text-2)] hover:bg-[var(--tt-grey02)]" style={{ borderRadius: 12 }}>
-            <Search size={16} strokeWidth={SW} />
+            <Search size={16} strokeWidth={SW} className="tt-split-search" />
           </Button>
           <Button className="gap-2 bg-[var(--tt-text-1)] hover:bg-black text-white text-[14px] font-medium h-9 px-4 !rounded-xl">
-            <Plus size={16} strokeWidth={SW} /> New Task
+            <Plus size={16} strokeWidth={SW} className="tt-split-plus" /> New Task
           </Button>
         </div>
       </div>
@@ -7895,14 +8017,14 @@ export default function ProjectDetail() {
               className="w-8 h-8 hover:bg-[var(--tt-grey02)]"
               style={{ color: "var(--tt-grey06)" }}
             >
-              <Link size={16} strokeWidth={SW} />
+              <Link size={16} strokeWidth={SW} className="tt-split-link" />
             </Button>
             <Button
               variant="outline" size="sm"
               className="gap-2 h-8 px-4 text-[13px] font-medium bg-white"
               style={{ color: "var(--tt-text-1)", borderColor: "var(--tt-text-1)", borderWidth: "1.5px", borderRadius: "9999px" }}
             >
-              <UserPlus size={14} strokeWidth={SW} />
+              <UserPlus size={14} strokeWidth={SW} className="tt-split-userplus" />
               Invite
             </Button>
           </div>
