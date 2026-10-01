@@ -1176,7 +1176,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
             style={{ fontFamily: "inherit", paddingBottom: counter ? 22 : undefined, resize: "none", overflow: "hidden", ...(liveError ? { borderColor: "var(--tt-red)" } : {}), ...inputStyle }}
           />
           {counter && maxLength && (
-            <span style={{ position: "absolute", left: 12, bottom: 9, fontSize: 11, fontWeight: 500, color: current.length >= maxLength ? "var(--tt-red)" : "var(--tt-grey05)" }}>
+            <span style={{ position: "absolute", right: 12, bottom: 9, fontSize: 11, fontWeight: 500, color: current.length >= maxLength ? "var(--tt-red)" : "var(--tt-grey05)" }}>
               {maxLength - current.length}
             </span>
           )}
@@ -1209,8 +1209,14 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
               if (ev.key === "Escape") { ev.stopPropagation(); ev.currentTarget.blur(); }
             }}
             placeholder={placeholder}
-            style={{ fontFamily: "inherit", padding: leadingIcon ? "0 12px 0 34px" : "0 12px", ...(liveError ? { borderColor: "var(--tt-red)" } : {}), ...inputStyle }}
+            maxLength={maxLength}
+            style={{ fontFamily: "inherit", paddingLeft: leadingIcon ? 34 : 12, paddingRight: counter && maxLength ? 44 : 12, ...(liveError ? { borderColor: "var(--tt-red)" } : {}), ...inputStyle }}
           />
+          {counter && maxLength && (
+            <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", fontSize: 11, fontWeight: 500, color: current.length >= maxLength ? "var(--tt-red)" : "var(--tt-grey05)" }}>
+              {maxLength - current.length}
+            </span>
+          )}
         </div>
         {liveError && (
           <p style={{ color: "var(--tt-red)", fontSize: 10, fontWeight: 500, margin: "2px 0 0", textAlign: "left" }}>{liveError}</p>
@@ -1461,7 +1467,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
               counts down as you type, same bottom-left corner/style the
               photo caption's own counter uses in PhotoLightbox. */}
           {counter && maxLength && (
-            <span style={{ position: "absolute", left: 12, bottom: 9, fontSize: 11, fontWeight: 500, color: draft.length >= maxLength ? "var(--tt-red)" : "var(--tt-grey05)" }}>
+            <span style={{ position: "absolute", right: showConfirm ? 40 : 12, bottom: 9, fontSize: 11, fontWeight: 500, color: draft.length >= maxLength ? "var(--tt-red)" : "var(--tt-grey05)" }}>
               {maxLength - draft.length}
             </span>
           )}
@@ -5058,6 +5064,8 @@ function ReportsTab({ demoCase }) {
           placeholder="Describe the note for this task"
           aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Note</p>}
           live
+          counter
+          maxLength={250}
           onSave={v => {
             setPreview(p => {
               const next = { ...p.extraNotes };
@@ -5764,6 +5772,7 @@ function ReportsTab({ demoCase }) {
           disabled={previewSaved}
           live
           multiline
+          rows={3}
           counter
           maxLength={ADDITIONAL_INFO_MAX_LEN}
           aboveWhenEditing={
@@ -7023,9 +7032,9 @@ function ReportsTab({ demoCase }) {
                       // label (FIELD_LABEL_STYLE, 14px/6px margin) above a
                       // 40px input, same rhythm as Cover Header's own
                       // skeleton; Additional Information is its own label
-                      // row + a 2-row textarea (2×14×1.6=39.2 content +
+                      // row + a 3-row textarea (3×14×1.6=67.2 content +
                       // 8px top padding + 22px bottom padding reserved for
-                      // its counter ≈ 70).
+                      // its counter ≈ 97).
                       return (
                         <div key={section.key} style={skeletonCardStyle}>
                           <div style={{ padding: DRAFT_PAD }}>
@@ -7044,7 +7053,7 @@ function ReportsTab({ demoCase }) {
                               </div>
                             </div>
                             <div className="tt-skeleton" style={{ width: 160, height: 14, marginBottom: 8 }} />
-                            <div className="tt-skeleton" style={{ width: "100%", height: 70, borderRadius: 8 }} />
+                            <div className="tt-skeleton" style={{ width: "100%", height: 97, borderRadius: 8 }} />
                           </div>
                         </div>
                       );
