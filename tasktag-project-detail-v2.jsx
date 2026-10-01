@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect, useEffect, useMemo, useContext, createContext, Fragment } from "react";
+import { useState, useRef, useLayoutEffect, useEffect, useMemo, useCallback, useContext, createContext, Fragment } from "react";
 import { createPortal } from "react-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -68,26 +68,139 @@ style.textContent = `
 
   [data-radix-collection-item] {
     color: var(--tt-text-2) !important;
-    border-bottom: 2px solid transparent;
-    border-radius: 0 !important;
+    border-bottom: none !important;
+    border-radius: 8px !important;
     padding: 12px 12px;
     font-size: 14px;
     font-weight: 400 !important;
     background: transparent !important;
     box-shadow: none !important;
-    transition: color 0.15s;
-    margin-bottom: -1px;
+    transition: background-color 0.15s, color 0.2s ease;
     position: relative;
-    z-index: 1;
+    isolation: isolate;
+    cursor: pointer;
   }
+  /* The active fill is a gradient, which CSS can't transition directly
+     (background-image doesn't interpolate), so it lives on a ::before
+     whose opacity fades in/out, so tab-to-tab switches animate smoothly. isolation:isolate on the tab
+     keeps the z-index:-1 layer behind the label/icon but above whatever
+     sits behind the tab. */
+  [data-radix-collection-item]::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: linear-gradient(to bottom, color-mix(in srgb, var(--tt-mint) 25%, transparent), color-mix(in srgb, var(--tt-mint) 85%, transparent));
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+  [data-radix-collection-item][data-state="active"]::before { opacity: 1; }
+  [data-radix-collection-item]:disabled { cursor: not-allowed; }
   [data-radix-collection-item]:hover { color: var(--tt-text-1) !important; }
+  /* Active tab — light green fill, no underline (this used to be a
+     border-bottom indicator; the inactive rule above carried a matching
+     transparent border-bottom + -1px margin + z-index just to keep that
+     border from shifting layout when it toggled on, none of which is
+     needed anymore now that "active" is a background fill instead). */
   [data-radix-collection-item][data-state="active"] {
     color: var(--tt-secondary) !important;
     font-weight: 400 !important;
-    border-bottom: 2px solid var(--tt-secondary) !important;
-    background: transparent !important;
+    border-bottom: none !important;
+    border-radius: 0 !important;
     box-shadow: none !important;
   }
+
+  /* For icons built from an outer shape plus an inner glyph (e.g.
+     FileImage's file outline vs. its sun-and-mountain photo glyph) —
+     Lucide sets a single strokeWidth on the root <svg>, inherited by
+     every child path/circle/etc. alike, so getting the outer shape and
+     the inner glyph onto two different weights (1.6 outer / 1.4 inner)
+     needs a CSS override per icon instead of the strokeWidth prop alone.
+     One block per icon below, each keyed to that icon's own specific
+     __iconNode shape (checked against lucide-react's actual source, not
+     guessed) — nth-of-type counts only same-tag siblings, so these still
+     work regardless of other tag types sitting between them in source
+     order. Every other icon used in this file is either a single shape
+     or several equal/peer shapes with no real "frame containing a
+     glyph" relationship (e.g. Trash2's lid+body+handle are peers, not
+     a frame; Users' two people are peers, not nested) — splitting
+     those wouldn't correspond to anything actually nested, so only the
+     icons below (plus FileImage, already split pre-this-pass) get a
+     class at all. */
+
+  /* FileImage — file outline (2 paths) containing a sun-and-mountain
+     photo glyph (circle + 1 path). */
+  .tt-split-fileimage path:nth-of-type(1),
+  .tt-split-fileimage path:nth-of-type(2) { stroke-width: 1.6; }
+  .tt-split-fileimage circle,
+  .tt-split-fileimage path:nth-of-type(3) { stroke-width: 1.4; }
+
+  /* MapPin — pin body (path) containing its hole/dot (circle). */
+  .tt-split-mappin path { stroke-width: 1.6; }
+  .tt-split-mappin circle { stroke-width: 1.4; }
+
+  /* FileText — file outline (2 paths) containing 3 lines of text. */
+  .tt-split-filetext path:nth-of-type(1),
+  .tt-split-filetext path:nth-of-type(2) { stroke-width: 1.6; }
+  .tt-split-filetext path:nth-of-type(3),
+  .tt-split-filetext path:nth-of-type(4),
+  .tt-split-filetext path:nth-of-type(5) { stroke-width: 1.4; }
+
+  /* Clock — face (circle) containing its hands (polyline). */
+  .tt-split-clock circle { stroke-width: 1.6; }
+  .tt-split-clock polyline { stroke-width: 1.4; }
+
+  /* Trash2 — lid-top/body/handle (3 paths) containing 2 ridge lines. */
+  .tt-split-trash2 path { stroke-width: 1.6; }
+  .tt-split-trash2 line { stroke-width: 1.4; }
+
+  /* AlertTriangle — triangle outline (1 path) containing the
+     exclamation mark (stem + dot, 2 paths). */
+  .tt-split-alerttriangle path:nth-of-type(1) { stroke-width: 1.6; }
+  .tt-split-alerttriangle path:nth-of-type(2),
+  .tt-split-alerttriangle path:nth-of-type(3) { stroke-width: 1.4; }
+
+  /* ZoomIn — lens + handle (circle + 1st line) containing a "+" made of
+     2 more lines. */
+  .tt-split-zoomin circle,
+  .tt-split-zoomin line:nth-of-type(1) { stroke-width: 1.6; }
+  .tt-split-zoomin line:nth-of-type(2),
+  .tt-split-zoomin line:nth-of-type(3) { stroke-width: 1.4; }
+
+  /* ZoomOut — lens + handle (circle + 1st line) containing a single
+     "−" line. */
+  .tt-split-zoomout circle,
+  .tt-split-zoomout line:nth-of-type(1) { stroke-width: 1.6; }
+  .tt-split-zoomout line:nth-of-type(2) { stroke-width: 1.4; }
+
+  /* Info — badge (circle) containing the "i" (stem + dot, 2 paths). */
+  .tt-split-info circle { stroke-width: 1.6; }
+  .tt-split-info path { stroke-width: 1.4; }
+
+  /* Mail — envelope (rect) containing its V-flap line (path). */
+  .tt-split-mail rect { stroke-width: 1.6; }
+  .tt-split-mail path { stroke-width: 1.4; }
+
+  /* Eye — outline (path) containing the pupil (circle). */
+  .tt-split-eye path { stroke-width: 1.6; }
+  .tt-split-eye circle { stroke-width: 1.4; }
+
+  /* Pencil — body (1st path) with its tip-highlight detail (2nd path). */
+  .tt-split-pencil path:nth-of-type(1) { stroke-width: 1.6; }
+  .tt-split-pencil path:nth-of-type(2) { stroke-width: 1.4; }
+
+  /* ExternalLink — box frame (1st + 3rd paths) with the diagonal arrow
+     drawn through it (2nd path). */
+  .tt-split-externallink path:nth-of-type(1),
+  .tt-split-externallink path:nth-of-type(3) { stroke-width: 1.6; }
+  .tt-split-externallink path:nth-of-type(2) { stroke-width: 1.4; }
+
+  /* IdCard — card frame (rect) containing the mini portrait (circle +
+     shoulders path) and the 2 text lines. */
+  .tt-split-idcard rect { stroke-width: 1.6; }
+  .tt-split-idcard circle,
+  .tt-split-idcard path { stroke-width: 1.4; }
 
   .tt-radio-card {
     display: flex; align-items: center; gap: 16px;
@@ -214,6 +327,35 @@ document.head.appendChild(style);
 
 const SW = 1.2;
 
+// Maps an icon COMPONENT (not its name — these are passed around as bare
+// component references, e.g. navGroups' own `icon` field, or iconFor's
+// return value) to its .tt-split-* class (see those classes' own
+// definitions in the <style> above) for icons built from an outer shape
+// plus an inner glyph. Centralized here rather than duplicated per call
+// site, since the same icon component can reach a render spot through
+// several different generic "whatever icon this group/tab happens to
+// use" paths (NavSidebar, the tabs array, ReportPreviewChrome's iconFor).
+// Every icon NOT in this map is a single shape or equal/peer shapes with
+// nothing to split, so iconSplitClassFor returns undefined for it — a
+// no-op className.
+const ICON_SPLIT_CLASSES = new Map([
+  [FileImage, "tt-split-fileimage"],
+  [MapPin, "tt-split-mappin"],
+  [FileText, "tt-split-filetext"],
+  [Clock, "tt-split-clock"],
+  [Trash2, "tt-split-trash2"],
+  [AlertTriangle, "tt-split-alerttriangle"],
+  [ZoomIn, "tt-split-zoomin"],
+  [ZoomOut, "tt-split-zoomout"],
+  [Info, "tt-split-info"],
+  [Mail, "tt-split-mail"],
+  [Eye, "tt-split-eye"],
+  [Pencil, "tt-split-pencil"],
+  [ExternalLink, "tt-split-externallink"],
+  [IdCard, "tt-split-idcard"],
+]);
+const iconSplitClassFor = Icon => ICON_SPLIT_CLASSES.get(Icon);
+
 // The app's fixed "today" — all mock data (DUMMY_ENTRIES, last-N-days
 // ranges) is anchored to this date rather than the real device clock.
 const APP_TODAY = new Date(2026, 8, 10); // Sep 10, 2026
@@ -273,6 +415,10 @@ const formatUSPhone = (raw) => {
 const PAGE_W   = 800;
 const PAGE_H   = Math.round(PAGE_W * 11 / 8.5);
 const PAGE_PAD = 40;
+// Inner padding of each section card in the live draft/preview. Separate
+// from PAGE_PAD (the exported document's own page padding, used by
+// buildReportHTML and its pagination math), which stays 40.
+const DRAFT_PAD = 24;
 // Draft nav sidebar's fixed width — wide enough that a typical task title
 // doesn't truncate immediately (see the sidebar in the modal body).
 const NAV_W = 280;
@@ -704,6 +850,13 @@ function ReportCheckbox({ active, label, onClick }) {
 // with each field identified by its own fieldId string.
 const ActiveEditContext = createContext({ activeField: null, setActiveField: () => {} });
 
+// Draft-mode form validation. Fields marked `live` (see EditableField) write
+// straight into the draft state as you type — there is no per-field save —
+// so nothing is checked until Save Report is clicked. That handler fills
+// `errors` ({ [fieldId]: message }) and each live field reads its own entry
+// from here, clearing it (`clearError`) as soon as that field is edited.
+const FormErrorsContext = createContext({ errors: {}, clearError: () => {} });
+
 // A caret popover has to sit right against its trigger to read as
 // "attached" to it — clamping its position to hover below the draft
 // modal's fixed chrome bar (Photo Limit / Cancel / Save) instead just made
@@ -782,8 +935,18 @@ function focusAtEnd(el) {
 // non-boxed field's own wrapper carries that as marginBottom, multiline's
 // check/cancel row sits 8px under the textarea, and the error message (if
 // any) sits 8px under that.
-function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPlaceholder, filterInput, onSave, onCancel, multiline, disabled, boxed, required, validate, errorMessage, textStyle, inputStyle, as: Tag = "p", alwaysEditing, popover, popoverAlign = "left", aboveWhenEditing, counter, maxLength, rows = 2 }) {
+//
+// `live` (the draft's form fields — everything except the checklist, whose
+// rows keep the confirm-button flow above) is a plain controlled form
+// field: always an input/textarea while the report is a draft, `onSave`
+// fires on every change, and there is no confirm button, blur-revert or
+// click-to-edit text. Committing is Save Report's job (see
+// handleSaveReportClick, which also runs the required/format checks that
+// `required`/`validate` describe here). Once the report is saved the
+// `disabled` branch below shows it as plain text, as before.
+function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPlaceholder, filterInput, onSave, onCancel, multiline, disabled, boxed, required, validate, errorMessage, textStyle, inputStyle, as: Tag = "p", alwaysEditing, live, popover, popoverAlign = "left", aboveWhenEditing, counter, maxLength, rows = 2, leadingIcon }) {
   const { activeField, setActiveField } = useContext(ActiveEditContext);
+  const { errors: formErrors, clearError: clearFormError } = useContext(FormErrorsContext);
   const [draft, setDraft] = useState(value || "");
   const [error, setError] = useState(false);
   const alwaysEditingRef = useRef(null);
@@ -852,6 +1015,86 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
     // them, not collapse to one line.
     if (value) return <div style={boxStyle}><Tag style={{ display: "block", whiteSpace: multiline ? "pre-wrap" : "normal", ...textStyle }}>{value}</Tag></div>;
     return placeholder ? <div style={boxStyle}><Tag style={{ display: "block", ...textStyle, color: "var(--tt-grey05)" }}>{placeholder}</Tag></div> : null;
+  }
+
+  if (live) {
+    const liveError = formErrors[fieldId];
+    const current = value || "";
+    const handleChange = ev => {
+      let next = ev.target.value;
+      if (filterInput) next = filterInput(next);
+      if (maxLength) next = next.slice(0, maxLength);
+      if (liveError) clearFormError(fieldId);
+      onSave(next);
+    };
+    const handleFocus = () => setActiveField(fieldId);
+    const handleBlur = () => setActiveField(prev => prev === fieldId ? null : prev);
+    return multiline ? (
+      <div data-field={fieldId} style={boxStyle}>
+        {aboveWhenEditing}
+        <div style={{ position: "relative" }}>
+          <Textarea
+            // Auto-grow on every render (see the alwaysEditing textarea
+            // below for the same reasoning) — no focusAtEnd here, the
+            // field is always mounted so there's no text-to-input swap to
+            // re-seat the caret after.
+            ref={el => {
+              if (!el) return;
+              el.style.height = "auto";
+              el.style.height = el.scrollHeight + "px";
+            }}
+            value={current}
+            onChange={handleChange}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
+            onKeyDown={ev => { if (ev.key === "Escape") { ev.stopPropagation(); ev.currentTarget.blur(); } }}
+            placeholder={placeholder}
+            rows={rows}
+            maxLength={maxLength}
+            style={{ fontFamily: "inherit", paddingBottom: counter ? 22 : undefined, resize: "none", overflow: "hidden", ...(liveError ? { borderColor: "var(--tt-red)" } : {}), ...inputStyle }}
+          />
+          {counter && maxLength && (
+            <span style={{ position: "absolute", left: 12, bottom: 9, fontSize: 11, fontWeight: 500, color: current.length >= maxLength ? "var(--tt-red)" : "var(--tt-grey05)" }}>
+              {maxLength - current.length}
+            </span>
+          )}
+        </div>
+        {liveError && (
+          <p style={{ color: "var(--tt-red)", fontSize: 10, fontWeight: 500, margin: "2px 0 0", textAlign: "left" }}>{liveError}</p>
+        )}
+      </div>
+    ) : (
+      <div data-field={fieldId}>
+        {aboveWhenEditing}
+        <div style={{ position: "relative" }}>
+          {/* leadingIcon sits inside the input itself (absolutely
+              positioned over its own left padding), not as a sibling
+              beside it — paddingLeft below reserves exactly enough room
+              so typed text never runs under it. */}
+          {leadingIcon && (
+            <div style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", display: "flex" }}>
+              {leadingIcon}
+            </div>
+          )}
+          <Input
+            type="text"
+            value={current}
+            onChange={handleChange}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
+            onKeyDown={ev => {
+              if (ev.key === "Enter") { ev.preventDefault(); ev.currentTarget.blur(); }
+              if (ev.key === "Escape") { ev.stopPropagation(); ev.currentTarget.blur(); }
+            }}
+            placeholder={placeholder}
+            style={{ fontFamily: "inherit", padding: leadingIcon ? "0 12px 0 34px" : "0 12px", ...(liveError ? { borderColor: "var(--tt-red)" } : {}), ...inputStyle }}
+          />
+        </div>
+        {liveError && (
+          <p style={{ color: "var(--tt-red)", fontSize: 10, fontWeight: 500, margin: "2px 0 0", textAlign: "left" }}>{liveError}</p>
+        )}
+      </div>
+    );
   }
 
   if (popover) {
@@ -1300,7 +1543,7 @@ const resizeImageToDataURL = (file, maxDim = 64, mimeType = "image/png", quality
 // image itself (max-width 80px, height auto) so a wide logo isn't
 // squeezed into a small square. While the file is being read, a small
 // spinner replaces the placeholder/image.
-function LogoUploadBox({ src, onChange, disabled, width = 180 }) {
+function LogoUploadBox({ src, onChange, disabled, size = 120, resizeTo = 360, hint }) {
   const inputRef = useRef(null);
   const [loading, setLoading] = useState(false);
 
@@ -1309,10 +1552,12 @@ function LogoUploadBox({ src, onChange, disabled, width = 180 }) {
     ev.target.value = "";
     if (!file) return;
     setLoading(true);
-    // 2x `width` — comfortably sharp even on a retina display at this
-    // box's own fixed display size, without the flat 64px default (tuned
-    // for a since-grown ~80px display) showing up as visible blur.
-    resizeImageToDataURL(file, width * 2)
+    // resizeTo — comfortably sharp at any real on-screen size this box
+    // ends up rendered at (its own display size is dynamic, driven by the
+    // caller's `size` prop — see renderCoverHeader's own ResizeObserver —
+    // not a fixed pixel width), without the flat 64px default (tuned for
+    // a since-grown ~80px display) showing up as visible blur.
+    resizeImageToDataURL(file, resizeTo)
       .then(url => { onChange(url); setLoading(false); })
       .catch(() => setLoading(false));
   };
@@ -1322,28 +1567,39 @@ function LogoUploadBox({ src, onChange, disabled, width = 180 }) {
       className={`tt-editable-wrap${src ? " group" : ""}`}
       onClick={() => !disabled && !loading && inputRef.current?.click()}
       style={{
-        position: "relative", flexShrink: 0, display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+        position: "relative", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
         cursor: disabled || loading ? "default" : "pointer",
-        // A fixed width (not max-width) — as a flex item, a max-width-only
-        // box's actual rendered width depends on how its flex-basis
-        // resolves, which isn't reliably "as wide as the cap allows" (it
-        // rendered far narrower than 180 in practice). An explicit width
-        // sidesteps that entirely: this box is always exactly `width`
-        // wide, full stop. Height stays auto either way — empty, it fills
-        // to match the content column beside it (via the parent row's
-        // alignItems:stretch, see renderCoverHeader); with a real logo,
-        // it follows the image's own natural aspect ratio instead.
-        width,
+        // Explicit width AND height from `size` (a measured pixel value
+        // the caller passes down, not CSS alone) — align-items:stretch +
+        // aspect-ratio looks like it should keep this box an exact square
+        // matching its sibling's height on its own, but doesn't: a flex
+        // item's main-axis size (width, in a row) is resolved BEFORE
+        // align-items:stretch assigns its cross-axis (height) size, so
+        // aspect-ratio never actually sees a resolved height to derive a
+        // width from — it only ever sees this box's own tiny intrinsic
+        // content width, leaving it tall and narrow instead of square.
+        // object-fit:contain below centers a real logo within this square
+        // instead of cropping it to fill (object-fit:cover would), so an
+        // uploaded logo's own full image — whatever its real aspect ratio
+        // — always stays entirely visible.
+        width: size, height: size,
+        // border-box — once uploaded, this box also gets a 12px inner
+        // padding on every side (so the logo doesn't touch its own
+        // frame); border-box is what keeps that padding (and the border
+        // itself) from pushing the box past size×size, same squared
+        // dimensions the empty/dashed state already has without either.
+        boxSizing: "border-box",
+        borderRadius: 8, overflow: "hidden",
         ...(src
-          ? { height: "auto" }
-          : { minHeight: 64, borderRadius: 8, overflow: "hidden", border: "1px dashed var(--tt-grey04)", background: "var(--tt-grey01)" }),
+          ? { border: "1px solid var(--tt-grey03)", background: "white", padding: 12 }
+          : { border: "1px dashed var(--tt-grey04)", background: "var(--tt-grey01)" }),
       }}
     >
       {loading ? (
         <Loader size={18} strokeWidth={SW} color="var(--tt-text-2)" style={{ display: "block", animation: "tt-spin 0.75s linear infinite, tt-fade-in 0.15s ease-out" }} />
       ) : src ? (
         <>
-          <img src={src} alt="Company logo" style={{ display: "block", width: "100%", height: "auto" }} />
+          <img src={src} alt="Company logo" style={{ display: "block", width: "100%", height: "100%", objectFit: "contain" }} />
           {/* Same darkening overlay a task's own PhotoGrid thumbnail shows
               on hover (rgba(10,22,41,0.25) over the whole image) — this
               box didn't have one before, just the corner button, which
@@ -1376,8 +1632,11 @@ function LogoUploadBox({ src, onChange, disabled, width = 180 }) {
         </>
       ) : (
         <>
-          <Upload size={24} strokeWidth={SW} color="var(--tt-grey06)" />
-          <span style={{ fontSize: 20, fontWeight: 600, color: "var(--tt-text-2)" }}>Logo</span>
+          <Upload size={40} strokeWidth={SW} color="var(--tt-grey06)" style={{ flexShrink: 0 }} />
+          <span style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-2)", marginTop: 6 }}>Company Logo</span>
+          {hint && !disabled && (
+            <span style={{ fontSize: 12, fontWeight: 400, lineHeight: 1.4, color: "var(--tt-grey05)", textAlign: "center", padding: "0 12px", marginTop: 2 }}>{hint}</span>
+          )}
         </>
       )}
       {!disabled && (
@@ -1434,7 +1693,7 @@ function NavSidebar({ items, activeKey, onSelect, footer }) {
               onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
               style={topStyle(active)}
             >
-              <Icon size={16} strokeWidth={SW} color="var(--tt-text-1)" style={{ flexShrink: 0 }} />
+              <Icon size={16} strokeWidth={SW} color="var(--tt-text-1)" className={iconSplitClassFor(Icon)} style={{ flexShrink: 0 }} />
               <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.label}</span>
             </button>
           );
@@ -1444,7 +1703,7 @@ function NavSidebar({ items, activeKey, onSelect, footer }) {
         return (
           <div key={group.label}>
             <div style={topStyle(false)}>
-              <Icon size={16} strokeWidth={SW} color="var(--tt-text-1)" style={{ flexShrink: 0 }} />
+              <Icon size={16} strokeWidth={SW} color="var(--tt-text-1)" className={iconSplitClassFor(Icon)} style={{ flexShrink: 0 }} />
               <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.label}</span>
             </div>
             <div style={{ marginLeft: 21, paddingLeft: 12, borderLeft: "2px solid var(--tt-grey03)" }}>
@@ -1850,7 +2109,7 @@ function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoE
         <div style={{ overflowY: "auto", padding: 24 }}>
         {limitWarning && (
           <p style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500, color: "var(--tt-red)", background: "rgba(229,72,77,0.08)", borderRadius: 6, padding: "8px 10px", margin: "0 0 16px" }}>
-            <AlertTriangle size={13} strokeWidth={SW} style={{ flexShrink: 0 }} />
+            <AlertTriangle size={13} strokeWidth={SW} className="tt-split-alerttriangle" style={{ flexShrink: 0 }} />
             You can select up to {PHOTO_LIMIT} photos — uncheck one first.
           </p>
         )}
@@ -2135,7 +2394,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
         <div style={{ display: "flex", alignItems: "center", gap: 4, minWidth: 0, justifySelf: "center" }}>
           <span style={{ fontSize: 13, fontWeight: 500, color: "white", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{fileName}</span>
           <LightboxIconBtn label="Rename">
-            <Pencil size={13} strokeWidth={SW} />
+            <Pencil size={13} strokeWidth={SW} className="tt-split-pencil" />
           </LightboxIconBtn>
         </div>
 
@@ -2154,11 +2413,11 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
             <RotateCw size={16} strokeWidth={SW} />
           </LightboxIconBtn>
           <LightboxIconBtn label="Zoom out" disabled={zoom <= 25} onClick={() => setZoom(z => Math.max(25, z - 25))}>
-            <ZoomOut size={16} strokeWidth={SW} />
+            <ZoomOut size={16} strokeWidth={SW} className="tt-split-zoomout" />
           </LightboxIconBtn>
           <span style={{ fontSize: 12, fontWeight: 500, color: "white", width: 40, textAlign: "center" }}>{zoom}%</span>
           <LightboxIconBtn label="Zoom in" disabled={zoom >= 200} onClick={() => setZoom(z => Math.min(200, z + 25))}>
-            <ZoomIn size={16} strokeWidth={SW} />
+            <ZoomIn size={16} strokeWidth={SW} className="tt-split-zoomin" />
           </LightboxIconBtn>
           <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.15)", margin: "0 6px" }} />
           <div ref={moreMenuRef} style={{ position: "relative" }}>
@@ -2177,7 +2436,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
                   onMouseLeave={e => e.currentTarget.style.background = "none"}
                   style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "9px 10px", background: "none", border: "none", borderRadius: 6, color: "white", fontSize: 14, fontWeight: 500, cursor: "pointer", textAlign: "left" }}
                 >
-                  <Info size={16} strokeWidth={SW} /> Information
+                  <Info size={16} strokeWidth={SW} className="tt-split-info" /> Information
                 </button>
                 <div style={{ height: 1, background: "rgba(255,255,255,0.1)", margin: "4px 0" }} />
                 <button
@@ -2190,7 +2449,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
                   onMouseLeave={e => { e.currentTarget.style.background = "none"; setDeleteActionTooltip(null); }}
                   style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "9px 10px", background: "none", border: "none", borderRadius: 6, color: "var(--tt-red)", fontSize: 14, fontWeight: 500, cursor: "pointer", textAlign: "left" }}
                 >
-                  <Trash2 size={16} strokeWidth={SW} /> Delete
+                  <Trash2 size={16} strokeWidth={SW} className="tt-split-trash2" /> Delete
                 </button>
               </div>
             )}
@@ -2274,7 +2533,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
                 transition: "background 0.15s",
               }}
             >
-              <Trash2 size={16} strokeWidth={SW} /> Delete
+              <Trash2 size={16} strokeWidth={SW} className="tt-split-trash2" /> Delete
               <span style={{
                 background: "var(--tt-secondary)", color: "white", borderRadius: "50%",
                 width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center",
@@ -3856,7 +4115,7 @@ const buildReportHTML = async (report) => {
         )
       : "",
     h("div", { style: "display:flex;align-items:baseline;gap:4px;" },
-      h("span", { style: `font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;` }, "By"),
+      h("span", { style: `font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#828282;` }, "Project Owner"),
       h("span", { style: `font-family:${SANS};font-size:12px;font-weight:600;text-transform:uppercase;color:#303742;` }, contactName)
     )
   );
@@ -4206,6 +4465,17 @@ function ReportsTab({ demoCase }) {
   // function's props.
   const [activeEditField, setActiveEditField] = useState(null);
   const activeEditCtxValue = useMemo(() => ({ activeField: activeEditField, setActiveField: setActiveEditField }), [activeEditField]);
+  // Save Report validation errors for the draft's live form fields, keyed
+  // by fieldId (see FormErrorsContext). Filled by handleSaveReportClick,
+  // cleared per field as it's edited.
+  const [formErrors, setFormErrors] = useState({});
+  const formErrorsCtxValue = useMemo(() => ({
+    errors: formErrors,
+    clearError: (id) => setFormErrors(prev => {
+      if (!(id in prev)) return prev;
+      const next = { ...prev }; delete next[id]; return next;
+    }),
+  }), [formErrors]);
 
   useEffect(() => {
     if (!openPeriod) return;
@@ -4371,6 +4641,7 @@ function ReportsTab({ demoCase }) {
         coverImage: null,
       });
       setActiveEditField(null);
+      setFormErrors({});
       setTitleOverrides({});
       setChecklistOverrides({});
       setVisibleCount(Infinity);
@@ -4384,6 +4655,7 @@ function ReportsTab({ demoCase }) {
   const closePreview = () => {
     setPreview(null);
     setActiveEditField(null);
+    setFormErrors({});
     setTitleOverrides({});
     setChecklistOverrides({});
     setPreviewSaved(false);
@@ -4473,7 +4745,7 @@ function ReportsTab({ demoCase }) {
     >
       <p style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", margin: 0, whiteSpace: "nowrap", transition: "color 0.15s" }}>
         Photo Limit {previewPhotoCount} of {PHOTO_LIMIT}
-        <ExternalLink size={14} strokeWidth={SW} style={{ flexShrink: 0 }} />
+        <ExternalLink size={14} strokeWidth={SW} className="tt-split-externallink" style={{ flexShrink: 0 }} />
       </p>
       <div style={{ width: "100%", height: 6, borderRadius: 99, background: "var(--tt-grey03)", overflow: "hidden" }}>
         <div style={{ width: `${Math.min(100, (previewPhotoCount / PHOTO_LIMIT) * 100)}%`, height: "100%", borderRadius: 99, background: "var(--tt-secondary)" }} />
@@ -4522,6 +4794,7 @@ function ReportsTab({ demoCase }) {
   const sections = [];
   if (previewData) {
     sections.push({ key: "coverHeader", type: "coverHeader", navLabel: "Cover Header" });
+    sections.push({ key: "coverPhoto", type: "coverPhoto", navLabel: "Highlight Photo" });
     sections.push({ key: "coverContent", type: "coverContent", navLabel: "Cover Content" });
     sections.push({ key: "summary", type: "summary", navLabel: "Summary" });
     visibleGroups.forEach(g => {
@@ -4550,6 +4823,8 @@ function ReportsTab({ demoCase }) {
   sections.forEach(s => {
     if (s.type === "coverHeader") {
       navGroups.push({ type: "group", label: "Cover", icon: FileText, children: [{ key: s.key, label: "Header" }] });
+    } else if (s.type === "coverPhoto") {
+      navGroups[navGroups.length - 1].children.push({ key: s.key, label: "Highlight Photo" });
     } else if (s.type === "coverContent") {
       navGroups[navGroups.length - 1].children.push({ key: s.key, label: "Content" });
     } else if (s.type === "summary") {
@@ -4650,25 +4925,17 @@ function ReportsTab({ demoCase }) {
     }
 
     const noteFieldId = `note_${key}`;
-    // "Note" label only once there's an actual saved value to label — an
-    // empty, still-unused slot just shows the bare placeholder input, same
-    // as before this label existed.
-    const hasNote = !!(preview.extraNotes[key] && preview.extraNotes[key].trim());
-    // Same "is this field actually live" condition EditableField uses
-    // internally (isEmpty, or it's the shared activeField) — the label and
-    // the wider 24px-above/12px-below gaps only make sense once the note
-    // has actually settled into plain text; while it's still a live input
-    // (empty, or being actively retyped), none of that applies and the
-    // gaps stay 16px, same as every other field mid-edit.
-    const isText = hasNote && activeEditField !== noteFieldId;
+    // A plain form field while drafting (label + input, always visible) —
+    // the small 12px "Note" label + plain text only exists in the saved
+    // view above.
     return (
-      <div style={{ marginTop: isText ? 24 : 16, marginBottom: isText ? 12 : 16 }}>
-        {isText && <p style={noteLabelStyle}>Note</p>}
+      <div style={{ marginTop: 16, marginBottom: 16 }}>
         <EditableField
           fieldId={noteFieldId}
           value={preview.extraNotes[key] || ""}
           placeholder="Describe the note for this task"
-          alwaysEditing
+          aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Note</p>}
+          live
           onSave={v => {
             setPreview(p => {
               const next = { ...p.extraNotes };
@@ -4731,6 +4998,10 @@ function ReportsTab({ demoCase }) {
           fieldId={`title_${entryKey}`}
           value={displayTitle}
           disabled={previewSaved}
+          // Same independent-save flow as a checklist item (plain text →
+          // click to edit → confirm button commits), not a live form field
+          // like the rest of the draft.
+          alwaysEditing
           onSave={v => {
             setTitleOverrides(prev => {
               if (v && v.trim()) return { ...prev, [entryKey]: v.trim() };
@@ -4856,7 +5127,7 @@ function ReportsTab({ demoCase }) {
                           onClick={() => deleteChecklistItem(entryKey, e, idx)}
                           style={{ flexShrink: 0, width: 14, height: 14, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "none", padding: 0, cursor: "pointer", color: "var(--tt-grey06)" }}
                         >
-                          <Trash2 size={13} strokeWidth={SW} />
+                          <Trash2 size={13} strokeWidth={SW} className="tt-split-trash2" />
                         </button>
                       </div>
                     </div>
@@ -4981,7 +5252,7 @@ function ReportsTab({ demoCase }) {
           value={preview.summary}
           placeholder="Add a high-level overview of the progress made during this period..."
           disabled={previewSaved}
-          alwaysEditing
+          live
           multiline
           counter
           maxLength={SUMMARY_MAX_LEN}
@@ -5004,23 +5275,67 @@ function ReportsTab({ demoCase }) {
   // Name, Address, Email/Phone.
   // Also reused by the Footer section's own Name/Role labels, for the
   // same "shared form-field convention" reasoning as before.
-  const FIELD_LABEL_STYLE = { fontSize: 14, fontWeight: 500, color: "var(--tt-text-1)", margin: "0 0 6px" };
+  const FIELD_LABEL_STYLE = { fontSize: 14, fontWeight: 500, color: "var(--tt-text-2)", margin: "0 0 6px" };
+  // Measures the form column's actual rendered height (it changes as
+  // labels/errors show and hide while editing) so the logo box beside it
+  // can be kept an exact square matching that height. Pure CSS
+  // (align-items:stretch + aspect-ratio on the box itself) looks like it
+  // should handle this on its own, but doesn't: a flex item's main-axis
+  // size (width, in this row) is resolved BEFORE align-items:stretch
+  // assigns its cross-axis (height) size, so aspect-ratio never actually
+  // sees a resolved height to derive a width from — it only ever sees
+  // the box's own tiny intrinsic content width, leaving it tall and
+  // narrow instead of square. A ResizeObserver sidesteps that circular
+  // dependency entirely by measuring the real height after layout and
+  // setting both of LogoUploadBox's dimensions explicitly from it.
+  const [coverLogoSize, setCoverLogoSize] = useState(120);
+  const coverFormRoRef = useRef(null);
+  // A CALLBACK ref (not useRef + useLayoutEffect with a [] dependency
+  // array) — this section mounts behind the preview's own fake-generate
+  // loading delay (previewLoading), well after ReportsTab's own first
+  // render, so a plain useLayoutEffect(..., []) tied to THAT render
+  // already ran — and bailed out on a still-null ref — long before this
+  // div actually existed, and an empty dependency array meant it never
+  // got a second chance once the div finally mounted. That's exactly
+  // the "stuck at the 120 default forever" symptom this replaces: a
+  // callback ref instead fires exactly when THIS element attaches,
+  // however late that happens to be, so the measurement always runs
+  // against the real, already-rendered form. getBoundingClientRect() for
+  // the immediate reading (synchronous, no async "first callback" lag),
+  // then a ResizeObserver stays attached for any later resize (an error
+  // message appearing, a label toggling, etc.).
+  const coverFormRef = useCallback(el => {
+    coverFormRoRef.current?.disconnect();
+    coverFormRoRef.current = null;
+    if (!el) return;
+    setCoverLogoSize(el.getBoundingClientRect().height);
+    const ro = new ResizeObserver(entries => {
+      const h = entries[0]?.contentRect?.height;
+      if (h) setCoverLogoSize(h);
+    });
+    ro.observe(el);
+    coverFormRoRef.current = ro;
+  }, []);
   const renderCoverHeader = () => (
-    // No flex `gap` here on purpose — `gap` and each field's own margin
-    // below would just add together (a 20px gap plus a 4px margin reads
-    // as 24px, not 4px), which is why the 4/8px rhythm below wasn't
-    // actually showing up. Logo→Name spacing is a plain wrapper margin
-    // instead, and Name/Address/Email-Phone now space themselves purely
-    // off their own margins.
-    <div style={{ display: "flex", flexDirection: "column" }}>
-      <div style={{ marginBottom: 24 }}>
-        <LogoUploadBox
-          src={preview.logo}
-          onChange={url => setPreview(p => ({ ...p, logo: url }))}
-          disabled={previewSaved}
-          width={180}
-        />
-      </div>
+    // Logo (left) and the form fields (right), side by side — the logo's
+    // size comes from coverLogoSize (see the ResizeObserver above this
+    // function, measuring the form column's own ref below) rather than
+    // CSS alone, so it stays an exact square matching the form's real
+    // height. No flex `gap` on the form column itself on purpose — `gap`
+    // and each field's own margin below would just add together (a 20px
+    // gap plus a 4px margin reads as 24px, not 4px), which is why the
+    // 4/8px rhythm below wasn't actually showing up; Name/Address/
+    // Email-Phone space themselves purely off their own margins instead.
+    <>
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 24 }}>
+      <LogoUploadBox
+        src={preview.logo}
+        onChange={url => setPreview(p => ({ ...p, logo: url }))}
+        disabled={previewSaved}
+        size={coverLogoSize}
+        hint="PNG or JPG · up to 5 MB"
+      />
+      <div ref={coverFormRef} style={{ flex: 1, minWidth: 0 }}>
       {/* TODO(BE): replace with the firm's actual name from the API */}
       {/* alwaysEditing — same edit mode as the task note input and
           project name/address above the fold (see renderNoteSlot):
@@ -5041,7 +5356,7 @@ function ReportsTab({ demoCase }) {
         value={preview.companyName}
         placeholder="e.g. Acme Construction Co."
         disabled={previewSaved}
-        alwaysEditing
+        live
         required
         errorMessage="Company name can't be empty."
         aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Company Name</p>}
@@ -5054,7 +5369,7 @@ function ReportsTab({ demoCase }) {
         value={preview.companyAddress}
         placeholder="e.g. 123 Main St, Austin, TX"
         disabled={previewSaved}
-        alwaysEditing
+        live
         required
         errorMessage="Address can't be empty."
         aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Address</p>}
@@ -5067,64 +5382,61 @@ function ReportsTab({ demoCase }) {
           committed value) — unlike the vertical margins above, this
           horizontal gap doesn't switch per state. Each field keeps its own
           label/validate/filterInput and is still independently
-          click-to-edit. Explicit pixel `width` on each input (rather than
-          the Input component's own default w-full) — without it, an
-          unconstrained flex item wrapping a 100%-wide input has no real
-          basis to size itself against and collapses down to near nothing. */}
+          click-to-edit. flex:1/minWidth:0 on each wrapper (rather than a
+          fixed pixel `width` on the input itself) splits the row evenly
+          between them, so the two together reach the same full width
+          Address above fills, instead of a fixed width stopping short of
+          it and leaving the rest of the row empty. */}
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          {/* Icon only in value mode, same "not editing this field" check
-              activeEditField already exposes to this component (it's the
-              same shared state EditableField itself reads via
-              ActiveEditContext) — a live input showing its own label above
-              it doesn't need a redundant icon next to it too. */}
-          {preview.companyEmail && activeEditField !== "companyEmail" && (
-            <Mail size={14} strokeWidth={SW} color="var(--tt-grey05)" style={{ flexShrink: 0 }} />
-          )}
+        <div style={{ flex: 1, minWidth: 0 }}>
           <EditableField
             fieldId="companyEmail"
             value={preview.companyEmail}
             placeholder="e.g. hello@acme.com"
             disabled={previewSaved}
-            alwaysEditing
+            live
             aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Email</p>}
+            // Inside the input itself (see EditableField's own
+            // leadingIcon — absolutely positioned over its left padding),
+            // not a sibling beside it — always shown, not just once
+            // saved/committed, same idea as the label above the input.
+            leadingIcon={<Mail size={14} strokeWidth={SW} color="var(--tt-grey05)" className="tt-split-mail" />}
             validate={v => EMAIL_PATTERN.test(v)}
             errorMessage="Enter a valid email address."
             onSave={v => setPreview(p => ({ ...p, companyEmail: v }))}
             textStyle={{ fontSize: 14, fontWeight: 400, color: "var(--tt-text-2)", margin: 0 }}
-            inputStyle={{ fontSize: 14, height: 40, width: 220 }}
+            inputStyle={{ fontSize: 14, height: 40, width: "100%" }}
           />
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          {preview.companyPhone && activeEditField !== "companyPhone" && (
-            <Phone size={14} strokeWidth={SW} color="var(--tt-grey05)" style={{ flexShrink: 0 }} />
-          )}
+        <div style={{ flex: 1, minWidth: 0 }}>
           <EditableField
             fieldId="companyPhone"
             value={preview.companyPhone}
             placeholder="e.g. (212) 555-0100"
             filterInput={formatUSPhone}
             disabled={previewSaved}
-            alwaysEditing
+            live
             aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Phone</p>}
+            // Same "inside the input, via leadingIcon" reasoning as Email
+            // above.
+            leadingIcon={<Phone size={14} strokeWidth={SW} color="var(--tt-grey05)" />}
             validate={v => US_PHONE_PATTERN.test(v)}
             errorMessage="Enter a valid US phone number."
             onSave={v => setPreview(p => ({ ...p, companyPhone: v }))}
             textStyle={{ fontSize: 14, fontWeight: 400, color: "var(--tt-text-2)", margin: 0 }}
-            inputStyle={{ fontSize: 14, height: 40, width: 160 }}
+            inputStyle={{ fontSize: 14, height: 40, width: "100%" }}
           />
         </div>
       </div>
+      </div>
     </div>
+    </>
   );
 
-  // Cover content — project name/address, Prepared For + By <owner>
-  // (preview.contactName — the same person edited in the Footer section;
-  // every project has exactly one owner, so this reads that same value
-  // rather than being its own separate editable field), and one photo —
-  // starts empty (see renderCoverContent's empty-state branch below)
+  // Highlight photo — its own section between the Cover Header and Cover
+  // Content. Starts empty (upload prompt, see the empty-state branch below)
   // until the user uploads one via coverImageInputRef/handleCoverImageUpload.
-  const renderCoverContent = () => {
+  const renderCoverPhoto = () => {
     // Resolves either form preview.coverImage can hold: an IMG_MAP key
     // (a bundled/demo photo) or a full data URL (an upload, via
     // handleCoverImageUpload — not in IMG_MAP, so falls through to itself).
@@ -5148,7 +5460,7 @@ function ReportsTab({ demoCase }) {
             LogoUploadBox's own — see there) takes over for swapping it
             out, instead of an always-visible "Change Photo" pill. */}
         <div className={coverImageSrc ? "group" : undefined} style={{
-          position: "relative", overflow: "hidden", marginBottom: 32,
+          position: "relative", overflow: "hidden",
           ...(coverImageSrc
             ? { borderRadius: 12 }
             : { borderRadius: 8, border: "1px dashed var(--tt-grey04)", background: "var(--tt-grey01)" }),
@@ -5159,17 +5471,17 @@ function ReportsTab({ demoCase }) {
             <button
               onClick={() => !coverImageUploading && !previewSaved && coverImageInputRef.current?.click()}
               disabled={coverImageUploading || previewSaved}
-              style={{ width: "100%", height: 240, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, border: "none", background: "none", padding: 0, cursor: previewSaved ? "default" : "pointer" }}
+              style={{ width: "100%", height: 240, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", border: "none", background: "none", padding: 0, cursor: previewSaved ? "default" : "pointer" }}
             >
               {coverImageUploading ? (
-                <Loader size={24} strokeWidth={SW} color="var(--tt-grey05)" style={{ display: "block", animation: "tt-spin 0.75s linear infinite, tt-fade-in 0.15s ease-out" }} />
+                <Loader size={40} strokeWidth={SW} color="var(--tt-grey05)" style={{ display: "block", flexShrink: 0, animation: "tt-spin 0.75s linear infinite, tt-fade-in 0.15s ease-out" }} />
               ) : (
-                <Upload size={24} strokeWidth={SW} color="var(--tt-grey06)" />
+                <Upload size={40} strokeWidth={SW} color="var(--tt-grey06)" style={{ flexShrink: 0 }} />
               )}
               {!previewSaved && (
-                <span style={{ fontSize: 20, fontWeight: 600, color: "var(--tt-text-2)" }}>Highlight Photo</span>
+                <span style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-2)", marginTop: 6 }}>Highlight Photo</span>
               )}
-              <span style={{ fontSize: 10, fontWeight: 500, color: "var(--tt-grey05)" }}>(Landscape Preferred)</span>
+              <span style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)", marginTop: 2 }}>Landscape 16:9 · PNG or JPG · up to 5 MB</span>
             </button>
           )}
           {coverImageSrc && !previewSaved && (
@@ -5209,15 +5521,18 @@ function ReportsTab({ demoCase }) {
             />
           )}
         </div>
-        {/* X is this draft's position in the project's save history
-            (reports.length + 1, so the very first save reads "Update No.
-            1"), not tied to the period itself — the same period can be
-            regenerated and saved more than once, so the period alone
-            can't tell two saves apart (see the results table, which
-            shows this same pairing for that reason). */}
-        <p style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "var(--tt-grey05)", margin: "0 0 12px" }}>
-          Update No. {preview.version} · {preview.period}
-        </p>
+      </div>
+    );
+  };
+
+  // Cover content — project name/address, Prepared For + By, Additional
+  // Information. Its own section, separate from the Cover Header and the
+  // Highlight Photo above it.
+  const renderCoverContent = () => {
+    return (
+      <div>
+        {/* The "Update No. X · period" line lives on the right of the
+            "Cover" group heading now (see sectionCards' groupHeading). */}
         {/* alwaysEditing — same edit mode as the task note input (see
             renderNoteSlot): a live, ready-to-type field while empty,
             rather than a click-to-edit prompt that only reveals the
@@ -5229,7 +5544,7 @@ function ReportsTab({ demoCase }) {
           value={preview.projectName}
           placeholder={PROJECT_NAME}
           disabled={previewSaved}
-          alwaysEditing
+          live
           aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Project Name</p>}
           onSave={v => setPreview(p => ({ ...p, projectName: v }))}
           textStyle={{ fontSize: 40, fontWeight: 700, color: "var(--tt-text-1)", lineHeight: 1.1, margin: "0 0 8px" }}
@@ -5240,14 +5555,14 @@ function ReportsTab({ demoCase }) {
           // own — without it, the gap to address below collapses while
           // this field is actively being edited, since inputStyle isn't
           // otherwise related to textStyle at all.
-          inputStyle={{ fontSize: 14, height: 40, margin: "0 0 8px" }}
+          inputStyle={{ fontSize: 14, height: 40, margin: "0 0 16px" }}
         />
         <EditableField
           fieldId="address"
           value={preview.address}
           placeholder={PROJECT_ADDRESS}
           disabled={previewSaved}
-          alwaysEditing
+          live
           aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Address</p>}
           onSave={v => setPreview(p => ({ ...p, address: v }))}
           textStyle={{ fontSize: 15, fontWeight: 400, fontStyle: "italic", color: "var(--tt-grey05)", lineHeight: 1.3, margin: "0 0 32px" }}
@@ -5256,7 +5571,7 @@ function ReportsTab({ demoCase }) {
           // margin matches textStyle's own — without it, the 32px gap
           // to Prepared For below collapses while this field is actively
           // being edited, the same issue projectName's own margin fixes.
-          inputStyle={{ fontSize: 14, height: 40, margin: "0 0 32px" }}
+          inputStyle={{ fontSize: 14, height: 40, margin: "0 0 16px" }}
         />
         {/* Prepared For and By are the same kind of pair (uppercase label
             + value), both text-secondary throughout — label and value
@@ -5269,35 +5584,54 @@ function ReportsTab({ demoCase }) {
             different box metrics than a plain <p>; baseline aligns by the
             text itself, which is what "aligned" actually means here
             regardless of any such wrapper differences. */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 24, alignItems: "baseline", marginBottom: 40 }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-            <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", lineHeight: 1, margin: 0, flexShrink: 0 }}>Prepared For</p>
-            {/* alwaysEditing — same edit mode as the task note input,
-                rather than a popover editor. */}
-            <EditableField
-              fieldId="clientName"
-              value={preview.clientName}
-              placeholder="Add client name"
-              disabled={previewSaved}
-              alwaysEditing
-              onSave={v => setPreview(p => ({ ...p, clientName: v }))}
-              // Label (grey05) vs value (text-secondary) — the value is
-              // the actual content and reads a touch more prominent than
-              // its own label, same as everywhere else values/labels
-              // pair up on this page.
-              textStyle={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "var(--tt-text-2)", lineHeight: 1, margin: 0 }}
-              // Same size as the task note's own input (see renderNoteSlot)
-              // — 12px/40px-tall — rather than a bespoke smaller size of
-              // its own, just capped to 160px wide since this sits inline
-              // next to its label instead of spanning a full-width card.
-              inputStyle={{ fontSize: 12, height: 40, width: 160 }}
-            />
+        {previewSaved ? (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 24, alignItems: "baseline", marginBottom: 40 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+              <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", lineHeight: 1, margin: 0, flexShrink: 0 }}>Prepared For</p>
+              <EditableField
+                fieldId="clientName"
+                value={preview.clientName}
+                placeholder="Add client name"
+                disabled
+                textStyle={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "var(--tt-text-2)", lineHeight: 1, margin: 0 }}
+              />
+            </div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+              <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", lineHeight: 1, margin: 0, flexShrink: 0 }}>Project Owner</p>
+              <p style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "var(--tt-text-2)", lineHeight: 1, margin: 0 }}>{preview.contactName || POINT_OF_CONTACT_NAME}</p>
+            </div>
           </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-            <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", lineHeight: 1, margin: 0, flexShrink: 0 }}>By</p>
-            <p style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "var(--tt-text-2)", lineHeight: 1, margin: 0 }}>{preview.contactName || POINT_OF_CONTACT_NAME}</p>
+        ) : (
+          // Draft: both are ordinary labeled form inputs, side by side,
+          // same as the rest of the cover form. "By" edits the same
+          // contactName the Footer section's Name field does (every
+          // project has exactly one owner), so it has its own fieldId
+          // only to keep focus tracking separate from that field.
+          <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <EditableField
+                fieldId="clientName"
+                value={preview.clientName}
+                placeholder="Add client name"
+                live
+                aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Prepared For</p>}
+                onSave={v => setPreview(p => ({ ...p, clientName: v }))}
+                inputStyle={{ fontSize: 14, height: 40, width: "100%" }}
+              />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <EditableField
+                fieldId="coverContactName"
+                value={preview.contactName}
+                placeholder={POINT_OF_CONTACT_NAME}
+                live
+                aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Project Owner</p>}
+                onSave={v => setPreview(p => ({ ...p, contactName: v }))}
+                inputStyle={{ fontSize: 14, height: 40, width: "100%" }}
+              />
+            </div>
           </div>
-        </div>
+        )}
         {/* Same free-text pattern as renderSummaryBlock — multiline,
             alwaysEditing, its label/"Optional" row passed as
             aboveWhenEditing so it only shows alongside the live textarea. */}
@@ -5306,13 +5640,13 @@ function ReportsTab({ demoCase }) {
           value={preview.additionalInfo}
           placeholder="Add any extra context for this cover..."
           disabled={previewSaved}
-          alwaysEditing
+          live
           multiline
           counter
           maxLength={ADDITIONAL_INFO_MAX_LEN}
           aboveWhenEditing={
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 8 }}>
-              <p style={{ fontSize: 14, fontWeight: 500, color: "var(--tt-text-1)", margin: 0 }}>Additional Information</p>
+              <p style={{ fontSize: 14, fontWeight: 500, color: "var(--tt-text-2)", margin: 0 }}>Additional Information</p>
               <span style={{ fontSize: 10, fontWeight: 400, color: "var(--tt-grey05)", lineHeight: 1 }}>Optional</span>
             </div>
           }
@@ -5402,7 +5736,7 @@ function ReportsTab({ demoCase }) {
       boxSizing: "border-box",
       background: "white",
       border: "1px solid var(--tt-grey03)",
-      borderRadius: 12,
+      borderRadius: 16,
       display: "flex", flexDirection: "column",
     };
     // "Task List" also carries the progress indicator (X of Y tasks
@@ -5432,6 +5766,19 @@ function ReportsTab({ demoCase }) {
           </span>
         </div>
       </div>
+    ) : section.type === "coverHeader" ? (
+      // X is this draft's position in the project's save history
+      // (reports.length + 1, so the very first save reads "Update No.
+      // 1"), not tied to the period itself — the same period can be
+      // regenerated and saved more than once, so the period alone can't
+      // tell two saves apart (see the results table, which shows this
+      // same pairing for that reason). Sits right of the "Cover" heading.
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16, margin: groupHeadingStyle.margin }}>
+        <p style={{ ...groupHeadingStyle, margin: 0 }}>{group.label}</p>
+        <p style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "var(--tt-text-2)", margin: 0 }}>
+          Update No. {preview.version} · {preview.period}
+        </p>
+      </div>
     ) : (
       <p style={groupHeadingStyle}>{group.label}</p>
     );
@@ -5453,9 +5800,18 @@ function ReportsTab({ demoCase }) {
         <div key={section.key} ref={el => { sectionRefs.current[section.key] = el; }}>
           {groupHeading}
           <div style={cardStyle}>
-            <div style={{ padding: PAGE_PAD }}>
+            <div style={{ padding: DRAFT_PAD }}>
               {renderCoverHeader()}
             </div>
+          </div>
+        </div>
+      );
+    }
+    if (section.type === "coverPhoto") {
+      return (
+        <div key={section.key} ref={el => { sectionRefs.current[section.key] = el; }} style={cardStyle}>
+          <div style={{ padding: DRAFT_PAD }}>
+            {renderCoverPhoto()}
           </div>
         </div>
       );
@@ -5463,7 +5819,7 @@ function ReportsTab({ demoCase }) {
     if (section.type === "coverContent") {
       return (
         <div key={section.key} ref={el => { sectionRefs.current[section.key] = el; }} style={cardStyle}>
-          <div style={{ padding: PAGE_PAD }}>
+          <div style={{ padding: DRAFT_PAD }}>
             {renderCoverContent()}
           </div>
         </div>
@@ -5479,7 +5835,7 @@ function ReportsTab({ demoCase }) {
                 pagination buffer; it happens to also be 40 today, but
                 borrowing it here made this padding only accidentally equal
                 to the cover's, not guaranteed to stay that way). */}
-            <div style={{ padding: PAGE_PAD }}>
+            <div style={{ padding: DRAFT_PAD }}>
               {renderSummaryBlock()}
               {/* Only reachable when there's no activity at all for the
                   period — every real task otherwise gets its own Task N
@@ -5500,7 +5856,7 @@ function ReportsTab({ demoCase }) {
                 borrows PAGE_BOTTOM_BUFFER. Week/month group label (e.g.
                 "September 2026") no longer shows here — it's in the sidebar
                 now instead (see navGroups). */}
-            <div style={{ padding: PAGE_PAD }}>
+            <div style={{ padding: DRAFT_PAD }}>
               {renderTaskSection(section)}
             </div>
           </div>
@@ -5517,7 +5873,7 @@ function ReportsTab({ demoCase }) {
       <div key={section.key} ref={el => { sectionRefs.current[section.key] = el; }}>
         {groupHeading}
         <div style={cardStyle}>
-        <div style={{ padding: PAGE_PAD, display: "flex", alignItems: "center", gap: 20 }}>
+        <div style={{ padding: DRAFT_PAD, display: "flex", alignItems: "center", gap: 20 }}>
           <button
             className="group"
             onClick={() => !contactPhotoUploading && !previewSaved && contactPhotoInputRef.current?.click()}
@@ -5576,17 +5932,17 @@ function ReportsTab({ demoCase }) {
               value={preview.contactName}
               placeholder="e.g. Maria Jose"
               disabled={previewSaved}
-              alwaysEditing
+              live
               onSave={v => setPreview(p => ({ ...p, contactName: v }))}
               textStyle={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 8px" }}
-              inputStyle={{ fontSize: 14, height: 40, margin: "0 0 12px" }}
+              inputStyle={{ fontSize: 14, height: 40, margin: "0 0 16px" }}
             />
             <EditableField
               fieldId="contactRole"
               value={preview.contactRole}
               placeholder="e.g. Project Manager"
               disabled={previewSaved}
-              alwaysEditing
+              live
               onSave={v => setPreview(p => ({ ...p, contactRole: v }))}
               textStyle={{ fontSize: 14, fontWeight: 400, color: "var(--tt-grey05)", margin: 0 }}
               inputStyle={{ fontSize: 14, height: 40 }}
@@ -5654,9 +6010,24 @@ function ReportsTab({ demoCase }) {
   // uses (see deleteTarget).
   const handleSaveReportClick = () => {
     if (saving) return;
-    // Notes already live in preview.extraNotes — every EditableField note
-    // commits there the moment its check icon is clicked, so there's no
-    // draft state left to fold in here.
+    // Draft form fields (the `live` EditableFields) already write into
+    // preview as you type, so this is the first point they get checked —
+    // required/format errors show inline under the field and block the
+    // save, same fields the old per-field confirm used to guard.
+    const errs = {};
+    if (!preview.companyName.trim()) errs.companyName = "Company name can't be empty.";
+    if (!preview.companyAddress.trim()) errs.companyAddress = "Address can't be empty.";
+    const email = preview.companyEmail.trim();
+    if (email && !EMAIL_PATTERN.test(email)) errs.companyEmail = "Enter a valid email address.";
+    const phone = preview.companyPhone.trim();
+    if (phone && !US_PHONE_PATTERN.test(phone)) errs.companyPhone = "Enter a valid US phone number.";
+    setFormErrors(errs);
+    const firstErrorId = Object.keys(errs)[0];
+    if (firstErrorId) {
+      showToast("error", "Fix the highlighted fields");
+      setTimeout(() => document.querySelector(`[data-field="${firstErrorId}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" }), 0);
+      return;
+    }
     const finalGroups = applyExtraNotesToGroups(applyChecklistOverrides(applyTitleOverrides(applyPhotoExclusions(previewData.groups, preview.excludedPhotos), titleOverrides), checklistOverrides), preview.extraNotes);
     if (!hasGroupData(finalGroups)) { showToast("error", "No data to save"); return; }
     setShowSaveConfirm(true);
@@ -5683,7 +6054,7 @@ function ReportsTab({ demoCase }) {
         showToast("error", "Save failed. Try again.");
         return;
       }
-      pushReport({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, version: preview.version, data: { ...previewData, groups: finalGroups }, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides, checklistOverrides, photoCaptions: preview.photoCaptions, projectName: preview.projectName, address: preview.address, logo: preview.logo, companyName: preview.companyName, companyAddress: preview.companyAddress, companyEmail: preview.companyEmail, companyPhone: preview.companyPhone, contactName: preview.contactName, contactRole: preview.contactRole, contactPhoto: preview.contactPhoto, summary: preview.summary, clientName: preview.clientName, additionalInfo: preview.additionalInfo, coverImage: preview.coverImage });
+      pushReport({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, version: preview.version, data: { ...previewData, groups: finalGroups }, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides, checklistOverrides, photoCaptions: preview.photoCaptions, projectName: preview.projectName.trim(), address: preview.address.trim(), logo: preview.logo, companyName: preview.companyName.trim(), companyAddress: preview.companyAddress.trim(), companyEmail: preview.companyEmail.trim(), companyPhone: preview.companyPhone.trim(), contactName: preview.contactName.trim(), contactRole: preview.contactRole.trim(), contactPhoto: preview.contactPhoto, summary: preview.summary.trim(), clientName: preview.clientName.trim(), additionalInfo: preview.additionalInfo.trim(), coverImage: preview.coverImage });
       setDateRange("since_last");
       setSaving(false);
       showToast("success", "Report saved");
@@ -6113,7 +6484,7 @@ function ReportsTab({ demoCase }) {
                       </span>
                     ) : (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                        <FixedTooltipBtn label="Preview" onAction={() => handlePreviewOpen(r)}><Eye size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
+                        <FixedTooltipBtn label="Preview" onAction={() => handlePreviewOpen(r)}><Eye size={16} strokeWidth={SW} color="var(--tt-grey06)" className="tt-split-eye" /></FixedTooltipBtn>
                         <FixedTooltipBtn label="Download" onAction={async () => { const ok = await handleDownload(r); if (ok) showToast("success", "Downloaded"); }}><Download size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
                         <FixedTooltipBtn label="Copy link to share" onAction={async () => { const ok = await handleCopy(r); if (ok) showToast("success", "Link copied"); }}><Link size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
                         {/* Free tier's one report is a one-time allowance
@@ -6121,7 +6492,7 @@ function ReportsTab({ demoCase }) {
                             paywalled so there's no way to clear it and
                             generate a "fresh" free report in its place. */}
                         {!paywalled && (
-                          <FixedTooltipBtn label="Delete report" onAction={() => setDeleteTarget(r)}><Trash2 size={16} strokeWidth={SW} color="var(--tt-grey06)" /></FixedTooltipBtn>
+                          <FixedTooltipBtn label="Delete report" onAction={() => setDeleteTarget(r)}><Trash2 size={16} strokeWidth={SW} color="var(--tt-grey06)" className="tt-split-trash2" /></FixedTooltipBtn>
                         )}
                       </span>
                     )}
@@ -6158,6 +6529,7 @@ function ReportsTab({ demoCase }) {
           lightbox, not inline content within the tab. ── */}
       {preview && (
         <ActiveEditContext.Provider value={activeEditCtxValue}>
+        <FormErrorsContext.Provider value={formErrorsCtxValue}>
           <div
             ref={previewPanelRef}
             style={{
@@ -6424,7 +6796,19 @@ function ReportsTab({ demoCase }) {
                   // synchronously off `preview`/`previewData`, not actually
                   // gated behind this fake delay, so every skeleton below
                   // is sized off the real data instead of a generic guess.
-                  sections.map((section, si) => {
+                  // Task sections are the one deliberate exception — a
+                  // report can have any number of them, so skeletoning
+                  // every single one (rather than one single-section/
+                  // single-page, section like Cover/Summary, which really
+                  // can only ever be exactly one) would mean a long scroll
+                  // of near-identical shimmer cards for no benefit; only
+                  // the FIRST task section renders here, as one
+                  // representative placeholder, and the rest are skipped
+                  // (return null below) until the real cards replace it.
+                  (() => {
+                    const firstTaskKey = sections.find(s => s.type === "task")?.key;
+                    return sections.map((section, si) => {
+                    if (section.type === "task" && section.key !== firstTaskKey) return null;
                     // Same group-heading logic as sectionCards below — the
                     // label/icon itself renders as real text/icon, not a
                     // shimmering bar, since it's static and already known
@@ -6432,7 +6816,7 @@ function ReportsTab({ demoCase }) {
                     // here), so it doesn't need to "load" at all.
                     const group = SECTION_GROUP[section.type];
                     const showGroupHeading = !!group && (section.type !== "task" || sections[si - 1]?.type !== "task");
-                    const skeletonCardStyle = { width: PAGE_W, margin: si === 0 || showGroupHeading ? 0 : "24px 0 0", boxSizing: "border-box", background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 12 };
+                    const skeletonCardStyle = { width: PAGE_W, margin: si === 0 || showGroupHeading ? 0 : "24px 0 0", boxSizing: "border-box", background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 16 };
                     // Same real progress values as sectionCards' own
                     // groupHeading (not a shimmer bar) — previewData is
                     // already known synchronously too, per this block's
@@ -6457,51 +6841,107 @@ function ReportsTab({ demoCase }) {
                       <p style={skeletonGroupHeadingStyle}>{group.label}</p>
                     );
                     if (section.type === "coverHeader") {
+                      // Mirrors renderCoverHeader's own real layout — logo
+                      // (square) on the left, form fields on the right.
+                      // Each field there is a LABEL (FIELD_LABEL_STYLE,
+                      // 14px, 6px margin-bottom) above an actual INPUT box
+                      // (40px tall, rounded) — see Company Name/Address/
+                      // Email/Phone's own aboveWhenEditing+inputStyle —
+                      // not a single flat bar, which is what this used to
+                      // skeleton. Email/Phone split the row evenly
+                      // (flex:1 each), matching that row's own fix.
+                      // The logo box reuses the SAME coverFormRef/
+                      // coverLogoSize the real logo does (see those hooks'
+                      // own comment, above renderCoverHeader) — this field
+                      // stack gets the ref instead of the real one while
+                      // this skeleton is what's mounted, so the measured
+                      // height is the real height of THIS stack, and the
+                      // logo box is a genuinely identical size to the real
+                      // logo's own, not just a visual approximation of it.
                       return (
                         <Fragment key={section.key}>
                           {groupHeading}
                           <div style={skeletonCardStyle}>
-                            <div style={{ padding: PAGE_PAD }}>
-                              <div className="tt-skeleton" style={{ width: 180, height: 90, borderRadius: 8, marginBottom: 24 }} />
-                              <div className="tt-skeleton" style={{ width: "50%", height: 22, marginBottom: 8 }} />
-                              <div className="tt-skeleton" style={{ width: "35%", height: 14, marginBottom: 12 }} />
-                              <div style={{ display: "flex", gap: 16 }}>
-                                <div className="tt-skeleton" style={{ width: 160, height: 14 }} />
-                                <div className="tt-skeleton" style={{ width: 120, height: 14 }} />
+                            <div style={{ padding: DRAFT_PAD, display: "flex", gap: 24 }}>
+                              <div className="tt-skeleton" style={{ width: coverLogoSize, height: coverLogoSize, borderRadius: 8, flexShrink: 0 }} />
+                              <div ref={coverFormRef} style={{ flex: 1, minWidth: 0 }}>
+                                <div className="tt-skeleton" style={{ width: 100, height: 14, marginBottom: 6 }} />
+                                <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8, marginBottom: 16 }} />
+                                <div className="tt-skeleton" style={{ width: 60, height: 14, marginBottom: 6 }} />
+                                <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8, marginBottom: 16 }} />
+                                <div style={{ display: "flex", gap: 16 }}>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div className="tt-skeleton" style={{ width: 50, height: 14, marginBottom: 6 }} />
+                                    <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8 }} />
+                                  </div>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div className="tt-skeleton" style={{ width: 50, height: 14, marginBottom: 6 }} />
+                                    <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8 }} />
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           </div>
                         </Fragment>
                       );
                     }
-                    if (section.type === "coverContent") {
+                    if (section.type === "coverPhoto") {
                       return (
                         <div key={section.key} style={skeletonCardStyle}>
-                          <div style={{ padding: PAGE_PAD }}>
-                            <div className="tt-skeleton" style={{ width: "100%", height: 240, borderRadius: 12, marginBottom: 32 }} />
-                            <div className="tt-skeleton" style={{ width: 100, height: 11, marginBottom: 8 }} />
-                            <div className="tt-skeleton" style={{ width: "70%", height: 26, marginBottom: 8 }} />
-                            <div className="tt-skeleton" style={{ width: "50%", height: 16, marginBottom: 32 }} />
-                            <div style={{ display: "flex", gap: 24, marginBottom: 40 }}>
-                              <div className="tt-skeleton" style={{ width: 120, height: 16 }} />
-                              <div className="tt-skeleton" style={{ width: 120, height: 16 }} />
+                          <div style={{ padding: DRAFT_PAD }}>
+                            <div className="tt-skeleton" style={{ width: "100%", height: 240, borderRadius: 12 }} />
+                          </div>
+                        </div>
+                      );
+                    }
+                    if (section.type === "coverContent") {
+                      // Matches renderCoverContent's own real (draft,
+                      // non-previewSaved) structure field for field — each
+                      // of Project Name/Address/Prepared For/By is a
+                      // label (FIELD_LABEL_STYLE, 14px/6px margin) above a
+                      // 40px input, same rhythm as Cover Header's own
+                      // skeleton; Additional Information is its own label
+                      // row + a 2-row textarea (2×14×1.6=39.2 content +
+                      // 8px top padding + 22px bottom padding reserved for
+                      // its counter ≈ 70).
+                      return (
+                        <div key={section.key} style={skeletonCardStyle}>
+                          <div style={{ padding: DRAFT_PAD }}>
+                            <div className="tt-skeleton" style={{ width: 110, height: 14, marginBottom: 6 }} />
+                            <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8, marginBottom: 16 }} />
+                            <div className="tt-skeleton" style={{ width: 60, height: 14, marginBottom: 6 }} />
+                            <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8, marginBottom: 16 }} />
+                            <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div className="tt-skeleton" style={{ width: 90, height: 14, marginBottom: 6 }} />
+                                <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8 }} />
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div className="tt-skeleton" style={{ width: 24, height: 14, marginBottom: 6 }} />
+                                <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8 }} />
+                              </div>
                             </div>
-                            {/* Additional Information — same free-text
-                                pattern as Summary, see renderCoverContent. */}
                             <div className="tt-skeleton" style={{ width: 160, height: 14, marginBottom: 8 }} />
-                            <div className="tt-skeleton" style={{ width: "100%", height: 60, borderRadius: 8 }} />
+                            <div className="tt-skeleton" style={{ width: "100%", height: 70, borderRadius: 8 }} />
                           </div>
                         </div>
                       );
                     }
                     if (section.type === "summary") {
+                      // Matches renderSummaryBlock's own real height exactly
+                      // (no stale label bar — the card itself has no label
+                      // of its own anymore, that moved to groupHeading
+                      // above): rows=5 at 14px/1.6 line-height is 5×22.4=112
+                      // content px, plus the Textarea's own 8px top padding
+                      // (py-2) and the 22px bottom padding reserved for the
+                      // character counter (see EditableField's own
+                      // paddingBottom:counter?22) = 142 total.
                       return (
                         <Fragment key={section.key}>
                           {groupHeading}
                           <div style={skeletonCardStyle}>
-                            <div style={{ padding: PAGE_PAD }}>
-                              <div className="tt-skeleton" style={{ width: 90, height: 14, marginBottom: 8 }} />
-                              <div className="tt-skeleton" style={{ width: "100%", height: 70, borderRadius: 8 }} />
+                            <div style={{ padding: DRAFT_PAD }}>
+                              <div className="tt-skeleton" style={{ width: "100%", height: 142, borderRadius: 8 }} />
                             </div>
                           </div>
                         </Fragment>
@@ -6519,21 +6959,31 @@ function ReportsTab({ demoCase }) {
                         <Fragment key={section.key}>
                           {groupHeading}
                           <div style={skeletonCardStyle}>
-                            <div style={{ padding: PAGE_PAD }}>
-                              <div className="tt-skeleton" style={{ width: "60%", height: 18, marginBottom: 8 }} />
-                              <div className="tt-skeleton" style={{ width: 160, height: 11 }} />
+                            <div style={{ padding: DRAFT_PAD }}>
+                              {/* Title is a `live` field now (see
+                                  renderTaskSection) — always a real,
+                                  rounded h-10 (40px) input, not committed
+                                  text at a flat 18px, even while unsaved. */}
+                              <div className="tt-skeleton" style={{ width: "60%", height: 40, borderRadius: 8, marginBottom: 8 }} />
+                              <div className="tt-skeleton" style={{ width: 160, height: 11, marginTop: 8 }} />
                               <div style={{ height: 1, background: "var(--tt-grey03)", marginTop: 16 }} />
-                              {checklistCount > 0 && (
-                                <div style={{ marginTop: 16 }}>
-                                  <div className="tt-skeleton" style={{ width: 220, height: 11, marginBottom: 8 }} />
-                                  {Array.from({ length: checklistPreviewCount }, (_, ci) => (
-                                    <div key={ci} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: ci === 0 ? 0 : 6 }}>
-                                      <div className="tt-skeleton" style={{ width: 14, height: 14, borderRadius: 4, flexShrink: 0 }} />
-                                      <div className="tt-skeleton" style={{ width: ci % 2 === 0 ? "60%" : "45%", height: 13 }} />
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
+                              {/* The "Checklist items completed..." header
+                                  itself shows unconditionally while
+                                  !previewSaved (always true during this
+                                  fake delay) — see renderTaskSection's own
+                                  condition — not just when the task
+                                  already has items; only the item rows
+                                  below it are conditional on actually
+                                  having any. */}
+                              <div style={{ marginTop: 16 }}>
+                                <div className="tt-skeleton" style={{ width: 220, height: 11, marginBottom: 8 }} />
+                                {Array.from({ length: checklistPreviewCount }, (_, ci) => (
+                                  <div key={ci} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: ci === 0 ? 0 : 6 }}>
+                                    <div className="tt-skeleton" style={{ width: 14, height: 14, borderRadius: 4, flexShrink: 0 }} />
+                                    <div className="tt-skeleton" style={{ width: ci % 2 === 0 ? "60%" : "45%", height: 13 }} />
+                                  </div>
+                                ))}
+                              </div>
                               {/* Note — always a live input while loading
                                   (previewLoading only ever happens on an
                                   unsaved draft, see renderNoteSlot). */}
@@ -6552,22 +7002,27 @@ function ReportsTab({ demoCase }) {
                         </Fragment>
                       );
                     }
-                    // type === "footer"
+                    // type === "footer" — Name/Role are `live` fields now
+                    // (always a real 40px input, not committed text at
+                    // 16px/14px the way this used to skeleton), each
+                    // filling the full width of their own flex:1 column,
+                    // same as the real contactName/contactRole inputs do.
                     return (
                       <Fragment key={section.key}>
                         {groupHeading}
                         <div style={skeletonCardStyle}>
-                          <div style={{ padding: PAGE_PAD, display: "flex", alignItems: "center", gap: 20 }}>
+                          <div style={{ padding: DRAFT_PAD, display: "flex", alignItems: "center", gap: 20 }}>
                             <div className="tt-skeleton" style={{ width: 64, height: 64, borderRadius: "50%", flexShrink: 0 }} />
-                            <div>
-                              <div className="tt-skeleton" style={{ width: 100, height: 16, marginBottom: 8 }} />
-                              <div className="tt-skeleton" style={{ width: 140, height: 14 }} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8, marginBottom: 16 }} />
+                              <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8 }} />
                             </div>
                           </div>
                         </div>
                       </Fragment>
                     );
-                  })
+                    });
+                  })()
                 ) : (
                   <>
                     {/* Real, visible sections — Cover/Summary/Task N cards,
@@ -6601,6 +7056,7 @@ function ReportsTab({ demoCase }) {
 
           </div>
           </div>
+        </FormErrorsContext.Provider>
         </ActiveEditContext.Provider>
       )}
 
@@ -7332,7 +7788,7 @@ export default function ProjectDetail() {
                 <LayoutGrid size={11} strokeWidth={SW} /> Personal Projects
               </span>
               <span className="flex items-center gap-1 text-[12px] text-[var(--tt-grey05)]">
-                <MapPin size={11} strokeWidth={SW} /> {PROJECT_ADDRESS}
+                <MapPin size={11} strokeWidth={SW} className="tt-split-mappin" /> {PROJECT_ADDRESS}
               </span>
             </div>
           </div>
@@ -7370,7 +7826,7 @@ export default function ProjectDetail() {
               background: "var(--tt-mint)",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
-              <Clock size={18} color="var(--tt-secondary)" strokeWidth={SW} />
+              <Clock size={18} color="var(--tt-secondary)" strokeWidth={SW} className="tt-split-clock" />
             </div>
             <div>
               <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", margin: 0 }}>16h logged this week</p>
@@ -7387,7 +7843,7 @@ export default function ProjectDetail() {
             onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
             onMouseLeave={e => e.currentTarget.style.background = "transparent"}
           >
-            <Clock size={14} strokeWidth={SW} color="var(--tt-text-2)" />
+            <Clock size={14} strokeWidth={SW} color="var(--tt-text-2)" className="tt-split-clock" />
             <span style={{ lineHeight: "14px" }}>Open Timesheet</span>
             <ChevronDown size={14} strokeWidth={SW} color="var(--tt-grey05)" style={{ transform: "rotate(-90deg)" }} />
           </button>
@@ -7402,12 +7858,18 @@ export default function ProjectDetail() {
         >
           {tabs.map(({ id, label, Icon }) => {
             const active = activeTab === id;
+            // Active-state styling (light mint background, no underline)
+            // lives in the global [data-radix-collection-item]
+            // [data-state="active"] rule up top, not here — that rule's
+            // !important declarations would silently beat any inline
+            // style on this element anyway.
             return (
               <TabsTrigger key={id} value={id} className="flex items-center gap-2">
                 <Icon
                   size={16}
                   strokeWidth={SW}
                   color={active ? "var(--tt-secondary)" : "var(--tt-grey06)"}
+                  className={iconSplitClassFor(Icon)}
                   style={{ opacity: 1 }}
                 />
                 {label}
