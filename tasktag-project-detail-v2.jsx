@@ -959,7 +959,9 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
     //
     // No X button — the confirm button is never disabled (clicking it with
     // an empty draft saves blank, same as every other save, and commit()
-    // below still guards against an invalid non-empty one via `validate`).
+    // below still guards against an invalid non-empty one via `validate`,
+    // or an empty one via `required` — e.g. Company Name/Address, which
+    // unlike most fields here can't be cleared back to blank at all).
     // Cancelling an unsaved edit is instead just: click away. Blur syncs
     // editStartValueRef back into draft (see onBlur below), which discards
     // whatever was typed and never saved; a successful commit() keeps
@@ -967,6 +969,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
     // blur-triggered sync after a save is a no-op, not a revert.
     const commit = () => {
       const trimmed = draft.trim();
+      if (required && !trimmed) { setError(true); return; }
       if (trimmed && validate && !validate(trimmed)) { setError(true); return; }
       onSave(trimmed);
       editStartValueRef.current = trimmed;
@@ -5039,6 +5042,8 @@ function ReportsTab({ demoCase }) {
         placeholder="e.g. Acme Construction Co."
         disabled={previewSaved}
         alwaysEditing
+        required
+        errorMessage="Company name can't be empty."
         aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Company Name</p>}
         onSave={v => setPreview(p => ({ ...p, companyName: v }))}
         textStyle={{ fontSize: 22, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 8px" }}
@@ -5050,6 +5055,8 @@ function ReportsTab({ demoCase }) {
         placeholder="e.g. 123 Main St, Austin, TX"
         disabled={previewSaved}
         alwaysEditing
+        required
+        errorMessage="Address can't be empty."
         aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Address</p>}
         onSave={v => setPreview(p => ({ ...p, companyAddress: v }))}
         textStyle={{ fontSize: 14, fontWeight: 400, color: "var(--tt-grey05)", margin: "0 0 12px" }}
@@ -5223,6 +5230,7 @@ function ReportsTab({ demoCase }) {
           placeholder={PROJECT_NAME}
           disabled={previewSaved}
           alwaysEditing
+          aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Project Name</p>}
           onSave={v => setPreview(p => ({ ...p, projectName: v }))}
           textStyle={{ fontSize: 40, fontWeight: 700, color: "var(--tt-text-1)", lineHeight: 1.1, margin: "0 0 8px" }}
           // Only the committed display text (textStyle) is the big 40px
@@ -5240,6 +5248,7 @@ function ReportsTab({ demoCase }) {
           placeholder={PROJECT_ADDRESS}
           disabled={previewSaved}
           alwaysEditing
+          aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Address</p>}
           onSave={v => setPreview(p => ({ ...p, address: v }))}
           textStyle={{ fontSize: 15, fontWeight: 400, fontStyle: "italic", color: "var(--tt-grey05)", lineHeight: 1.3, margin: "0 0 32px" }}
           // Same reasoning as projectName above — plain, normal-sized
