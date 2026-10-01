@@ -951,62 +951,55 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
   }
 
   if (alwaysEditing) {
-    // No text yet — nothing to confirm, so the button stays disabled
-    // instead of blurring into an unchanged empty field.
     const isEmpty = !value || !value.trim();
     // Typing only ever touches this local draft — onSave (writing into the
     // parent's committed value) fires only from the confirm button or
     // Enter, same as the click-to-edit `editing` branch below, never from
     // onChange or blur.
-    const draftEmpty = !draft.trim();
-    // Same "never fires against an empty draft" rule the popover/editing
-    // modes use — a field stays freely clearable back to blank regardless
-    // of validate.
+    //
+    // No X button — the confirm button is never disabled (clicking it with
+    // an empty draft saves blank, same as every other save, and commit()
+    // below still guards against an invalid non-empty one via `validate`).
+    // Cancelling an unsaved edit is instead just: click away. Blur syncs
+    // editStartValueRef back into draft (see onBlur below), which discards
+    // whatever was typed and never saved; a successful commit() keeps
+    // editStartValueRef in sync with the fresh value first, so the same
+    // blur-triggered sync after a save is a no-op, not a revert.
     const commit = () => {
       const trimmed = draft.trim();
       if (trimmed && validate && !validate(trimmed)) { setError(true); return; }
       onSave(trimmed);
+      editStartValueRef.current = trimmed;
       setError(false);
       alwaysEditingRef.current?.blur();
     };
-    // Same "nothing to confirm" rule as every other edit mode — disabled
-    // until the draft actually differs from what the field held when this
-    // edit session started (editStartValueRef, set on the text-tag's
-    // onClick below).
-    const confirmDisabled = draftEmpty || draft.trim() === (editStartValueRef.current || "").trim();
-    // Discards this session's draft and blurs without saving — same
-    // "cancel discards this session's changes" contract as the
-    // click-to-edit `editing` branch's X button/Escape.
-    const cancelEdit = () => { setDraft(editStartValueRef.current || ""); setError(false); alwaysEditingRef.current?.blur(); };
-    // The X only makes sense once there's a prior committed value to revert
-    // to — i.e. this is a re-edit of existing content (editStartValueRef
-    // was seeded from a non-empty value on the text-tag's onClick below),
-    // not the field's very first, still-blank fill-in.
-    const showCancel = !!(editStartValueRef.current && editStartValueRef.current.trim());
-    // The confirm button only appears once something's actually been
-    // typed — an untouched, still-blank field (its initial default state)
-    // shows neither button, not a permanently-disabled checkmark.
-    const showConfirm = !draftEmpty;
-    const buttonReserve = (showCancel && showConfirm) ? 76 : (showCancel || showConfirm) ? 44 : 12;
+    // Hidden on a pristine, still-blank field until the user actually
+    // types something — there's nothing to confirm yet. Once this edit
+    // session started from an existing non-blank value (editStartValueRef
+    // — set on the text-tag's onClick below, or by commit() after a save),
+    // it stays visible for the rest of the session even if the draft gets
+    // cleared back to empty, so clearing existing content and explicitly
+    // saving that empty state is still possible — not just left to
+    // blur-cancel, which would revert to the old text instead.
+    const showConfirm = !!(editStartValueRef.current && editStartValueRef.current.trim()) || draft.trim().length > 0;
+    const buttonReserve = showConfirm ? 44 : 12;
     const confirmButton = (
       <button
-        disabled={confirmDisabled}
+        // Without this, clicking the button first fires a native blur on
+        // the still-focused textarea/input (mousedown moves focus to the
+        // button before its own click event fires) — which would run
+        // onBlur's cancel-reset (setDraft back to editStartValueRef)
+        // BEFORE commit() ever reads `draft`, wiping out what was just
+        // typed and saving blank instead. preventDefault on mousedown
+        // stops the browser from shifting focus at all, so no blur (and
+        // no reset) happens before the click's own commit() runs.
+        onMouseDown={ev => ev.preventDefault()}
         onClick={commit}
-        onMouseEnter={ev => !confirmDisabled && (ev.currentTarget.style.opacity = "0.85")}
+        onMouseEnter={ev => ev.currentTarget.style.opacity = "0.85"}
         onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
-        style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: confirmDisabled ? "var(--tt-grey04)" : "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: confirmDisabled ? "not-allowed" : "pointer", padding: 0, transition: "opacity 0.15s" }}
+        style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "opacity 0.15s" }}
       >
         <Check size={15} strokeWidth={SW} color="white" />
-      </button>
-    );
-    const cancelButton = (
-      <button
-        onClick={cancelEdit}
-        onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
-        onMouseLeave={ev => ev.currentTarget.style.background = "none"}
-        style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "background 0.15s" }}
-      >
-        <X size={15} strokeWidth={SW} color="var(--tt-grey06)" />
       </button>
     );
 
@@ -1063,18 +1056,26 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
             value={draft}
             onChange={ev => setDraft(maxLength ? ev.target.value.slice(0, maxLength) : ev.target.value)}
             onFocus={() => setActiveField(fieldId)}
-            // Only clears if this field is still the active one — a plain
-            // unconditional null would risk wiping out whichever OTHER
-            // field's click just claimed activeField, if this blur were
-            // ever to fire after that (native blur-before-click ordering
-            // means it normally won't, but this stays correct either way).
-            onBlur={() => setActiveField(prev => prev === fieldId ? null : prev)}
+            // Blur = cancel (click away, or Escape below triggering this
+            // same path via .blur()): resets draft back to whatever this
+            // edit session started from, discarding anything typed but
+            // never saved. "Only clears if this field is still the active
+            // one" guards setActiveField the same way it always has — a
+            // plain unconditional null would risk wiping out whichever
+            // OTHER field's click just claimed activeField. A successful
+            // commit() already synced editStartValueRef to the fresh value
+            // first, so this reset is a no-op in that case, not a revert.
+            onBlur={() => {
+              setActiveField(prev => prev === fieldId ? null : prev);
+              setDraft(editStartValueRef.current || "");
+              setError(false);
+            }}
             onKeyDown={ev => {
               if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); commit(); }
-              // Same reasoning as the click-to-edit fields' Escape handler —
-              // stopPropagation so this only cancels this field's own edit,
-              // not the whole preview modal.
-              if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); cancelEdit(); }
+              // stopPropagation so this only blurs (cancelling) this
+              // field's own edit, not bubbling into the preview modal's
+              // own document-level Escape listener and closing it too.
+              if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); alwaysEditingRef.current?.blur(); }
             }}
             placeholder={placeholder}
             rows={rows}
@@ -1085,8 +1086,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
             // itself always grows to fit its content.
             // paddingBottom reserves room for the counter below (same
             // "controls live inside the textarea" idea as buttonReserve
-            // does for Check/X on the right) so typed text never runs
-            // under it.
+            // does for the confirm button) so typed text never runs under it.
             style={{ fontFamily: "inherit", paddingRight: buttonReserve, paddingBottom: counter ? 22 : undefined, resize: "none", overflow: "hidden", ...inputStyle }}
           />
           {/* Remaining count, not "used/max" — starts at maxLength and
@@ -1097,7 +1097,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
               {maxLength - draft.length}
             </span>
           )}
-          <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>{showCancel && cancelButton}{showConfirm && confirmButton}</div>
+          <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>{showConfirm && confirmButton}</div>
         </div>
       </div>
     ) : (
@@ -1112,17 +1112,20 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
             // the user types, same as the popover mode's own onChange.
             onChange={ev => { setDraft(filterInput ? filterInput(ev.target.value) : ev.target.value); if (error) setError(false); }}
             onFocus={() => setActiveField(fieldId)}
-            // Same "only clear if still active" guard as the multiline
-            // branch above.
-            onBlur={() => setActiveField(prev => prev === fieldId ? null : prev)}
+            // Same blur-is-cancel reset as the multiline branch above.
+            onBlur={() => {
+              setActiveField(prev => prev === fieldId ? null : prev);
+              setDraft(editStartValueRef.current || "");
+              setError(false);
+            }}
             onKeyDown={ev => {
               if (ev.key === "Enter") { ev.preventDefault(); commit(); }
-              if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); cancelEdit(); }
+              if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); alwaysEditingRef.current?.blur(); }
             }}
             placeholder={placeholder}
             style={{ fontFamily: "inherit", padding: `0 ${buttonReserve}px 0 12px`, ...(error ? { borderColor: "var(--tt-red)" } : {}), ...inputStyle }}
           />
-          <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>{showCancel && cancelButton}{showConfirm && confirmButton}</div>
+          <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>{showConfirm && confirmButton}</div>
         </div>
         {error && (
           <p style={{ color: "var(--tt-red)", fontSize: 10, fontWeight: 500, margin: "2px 0 0", textAlign: "left" }}>
@@ -1141,15 +1144,20 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
       setActiveField(null);
       setError(false);
     };
-    const cancel = () => { setActiveField(null); setError(false); if (onCancel) onCancel(); };
     const onChange = ev => { setDraft(ev.target.value); if (error) setError(false); };
-    // No text typed yet — nothing to commit, so the check button stays
-    // disabled (same rule as the always-editing fields below).
-    const isEmpty = !draft.trim();
-    // Same "nothing to confirm" rule as every other edit mode — disabled
-    // until the draft actually differs from the committed value (draft
-    // starts seeded from `value` the moment editing begins).
-    const confirmDisabled = isEmpty || draft.trim() === (value || "").trim();
+    // No X button — the confirm button is never disabled (an empty/
+    // unchanged draft saves fine, same as every other field now). Clicking
+    // away cancels instead: blur below clears activeField without calling
+    // onSave, so this whole block un-mounts back to the plain display
+    // below, which still shows the untouched `value` — draft re-seeds
+    // fresh from `value` the next time editing starts (see the display
+    // Tag's own onClick), so there's nothing to actively revert here.
+    // Same "hidden until there's something to confirm" rule as the
+    // always-editing branch above — visible once this session started
+    // from an existing non-blank value OR the draft has anything typed,
+    // so clearing existing content can still be explicitly saved rather
+    // than only ever left to blur-cancel (which reverts instead).
+    const showConfirm = !!(value && value.trim()) || draft.trim().length > 0;
     return (
       <div key="editing" style={{ position: "relative", maxWidth: "100%", minWidth: 0, ...(!boxed ? { marginBottom: 8 } : {}), ...boxStyle }}>
         {multiline ? (
@@ -1157,13 +1165,14 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
             ref={focusAtEnd}
             value={draft}
             onChange={onChange}
+            onBlur={() => setActiveField(prev => prev === fieldId ? null : prev)}
             onKeyDown={ev => {
               if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); commit(); }
               // stopPropagation so this only cancels the field's own edit —
               // without it, the keydown still bubbles to the preview
               // modal's own document-level Escape listener and closes the
               // whole modal right behind it.
-              if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); cancel(); }
+              if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); setActiveField(prev => prev === fieldId ? null : prev); }
             }}
             rows={3}
             placeholder={placeholder}
@@ -1175,38 +1184,32 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
             type="text"
             value={draft}
             onChange={onChange}
+            onBlur={() => setActiveField(prev => prev === fieldId ? null : prev)}
             onKeyDown={ev => {
               if (ev.key === "Enter") { ev.preventDefault(); commit(); }
               // Same reasoning as the textarea above — stop this from also
               // bubbling into the modal's own Escape-to-close listener.
-              if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); cancel(); }
+              if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); setActiveField(prev => prev === fieldId ? null : prev); }
             }}
             placeholder={placeholder}
-            style={{ fieldSizing: "content", width: "100%", maxWidth: "100%", minWidth: 120, height: 40, padding: "0 76px 0 12px", border: `1px solid ${error ? "var(--tt-red)" : "var(--tt-text-1)"}`, borderRadius: 8, fontFamily: "inherit", outline: "none", boxSizing: "border-box", ...inputStyle }}
+            style={{ fieldSizing: "content", width: "100%", maxWidth: "100%", minWidth: 120, height: 40, padding: `0 ${showConfirm ? 44 : 12}px 0 12px`, border: `1px solid ${error ? "var(--tt-red)" : "var(--tt-text-1)"}`, borderRadius: 8, fontFamily: "inherit", outline: "none", boxSizing: "border-box", ...inputStyle }}
           />
         )}
-        <div style={multiline
-          ? { display: "flex", justifyContent: "flex-end", gap: 4, marginTop: 8 }
-          : { position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }
-        }>
-          <button
-            onClick={cancel}
-            onMouseEnter={ev => ev.currentTarget.style.background = boxed ? "rgba(255,255,255,0.6)" : "var(--tt-grey02)"}
-            onMouseLeave={ev => ev.currentTarget.style.background = "none"}
-            style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "background 0.15s" }}
-          >
-            <X size={15} strokeWidth={SW} color="var(--tt-grey06)" />
-          </button>
-          <button
-            disabled={confirmDisabled}
-            onClick={commit}
-            onMouseEnter={ev => !confirmDisabled && (ev.currentTarget.style.opacity = "0.85")}
-            onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
-            style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: confirmDisabled ? "var(--tt-grey04)" : "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: confirmDisabled ? "not-allowed" : "pointer", padding: 0, transition: "opacity 0.15s" }}
-          >
-            <Check size={15} strokeWidth={SW} color="white" />
-          </button>
-        </div>
+        {showConfirm && (
+          <div style={multiline
+            ? { display: "flex", justifyContent: "flex-end", gap: 4, marginTop: 8 }
+            : { position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }
+          }>
+            <button
+              onClick={commit}
+              onMouseEnter={ev => ev.currentTarget.style.opacity = "0.85"}
+              onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
+              style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "opacity 0.15s" }}
+            >
+              <Check size={15} strokeWidth={SW} color="white" />
+            </button>
+          </div>
+        )}
         {error && (
           <p style={{ color: "var(--tt-red)", fontSize: 11, fontWeight: 500, margin: "8px 0 0" }}>
             {errorMessage || "This can't be empty."}
@@ -1607,9 +1610,10 @@ const PHOTO_GRID_CAP = PHOTO_GRID_COLS; // 1 row before "+N more"
 // one popover is open at a time across the grid.
 function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, onDeletePhoto, captions, windowStart, windowEnd, onExpand }) {
   // Captions are read-only here — editable only from the lightbox (see
-  // PhotoLightbox). This is just a hover indicator: the sticky-note icon
-  // only appears when a caption already exists, and hovering it (not
-  // clicking) shows the caption text in a tooltip.
+  // PhotoLightbox). The sticky-note icon itself is always visible once a
+  // caption already exists (not just on hover, unlike the delete button
+  // above) — hovering it (not clicking) shows the caption text in a
+  // tooltip.
   const [captionTooltipIdx, setCaptionTooltipIdx] = useState(null); // original photo index, or null
   const [captionTooltipPos, setCaptionTooltipPos] = useState({ top: 0, left: 0 });
   const [deleteTooltipIdx, setDeleteTooltipIdx] = useState(null); // original photo index, or null
@@ -1698,7 +1702,6 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, onDeletePhoto, ca
                   setCaptionTooltipIdx(i);
                 }}
                 onMouseLeave={() => setCaptionTooltipIdx(null)}
-                className="opacity-0 transition-opacity group-hover:opacity-100"
                 style={{
                   position: "absolute", bottom: 6, left: 6,
                   width: 20, height: 20, borderRadius: "50%",
@@ -2325,7 +2328,8 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
               alwaysEditing textarea uses for its
               Check/X, just with the counter added on the opposite corner.
             - saved, not editing: centered plain text, 14px/1.6 line
-              height, clickable to re-edit. Bound directly to the
+              height (16px medium, text-wrap: balance so multi-line captions
+              get near-equal line widths), clickable to re-edit. Bound directly to the
               `caption` prop (no separate draft/commit step) — every
               keystroke while editing calls onCaptionChange immediately;
               Escape is what reverts to captionStartRef instead. Hidden
@@ -2337,9 +2341,18 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
         {Object.keys(selectedFilmstrip).length === 0 && (
         <div style={{
           position: "absolute", left: 0, right: 0, bottom: 0, display: "flex", justifyContent: "center",
-          padding: "20px 24px 18px", background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent)",
+          padding: "20px 24px 18px", background: "linear-gradient(to top, rgba(0,0,0,0.85), transparent)",
         }}>
-          {captionEditing ? (
+          {captionEditing ? (() => {
+            // No X — same "click away cancels, check button only shows
+            // once there's something to confirm" rules as EditableField's
+            // own alwaysEditing textarea (see its own comment). Here
+            // "cancel" means reverting to captionStartRef (this session's
+            // starting caption) since every keystroke already commits
+            // live via onCaptionChange, same as Escape already did.
+            const showCheck = !!(captionStartRef.current && captionStartRef.current.trim()) || (caption || "").trim().length > 0;
+            const revertAndClose = () => { onCaptionChange && onCaptionChange(originalIdx, captionStartRef.current); setCaptionEditing(false); };
+            return (
             <div className="tt-caption-box" style={{ position: "relative" }}>
               <Textarea
                 // Combines two jobs in one ref callback (same pattern
@@ -2362,11 +2375,15 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
                 }}
                 value={caption || ""}
                 onChange={ev => onCaptionChange && onCaptionChange(originalIdx, ev.target.value.slice(0, CAPTION_MAX_LEN))}
+                // Blur = cancel (click away) — reverts the same way Escape
+                // does. The check button's own onMouseDown preventDefault
+                // (below) stops clicking it from triggering this first.
+                onBlur={revertAndClose}
                 onKeyDown={ev => {
                   // Enter alone confirms (closes editing, same as the
                   // Check button); Shift+Enter inserts a real newline.
                   if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); setCaptionEditing(false); }
-                  if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); onCaptionChange && onCaptionChange(originalIdx, captionStartRef.current); setCaptionEditing(false); }
+                  if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); revertAndClose(); }
                 }}
                 placeholder="Add a caption"
                 rows={1}
@@ -2376,36 +2393,31 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
                 // is the ref callback's job now, not a manual drag handle
                 // fighting it on the next keystroke. paddingLeft/Right/
                 // Bottom carve out room for the counter (bottom-left) and
-                // Check/X (bottom-right) overlaid on top of the text.
-                style={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, resize: "none", overflow: "hidden", paddingLeft: 12, paddingRight: 68, paddingBottom: 30 }}
+                // the check button (bottom-right, only once it's shown)
+                // overlaid on top of the text.
+                style={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, resize: "none", overflow: "hidden", paddingLeft: 12, paddingRight: showCheck ? 40 : 12, paddingBottom: 30 }}
               />
               {/* Remaining count, not "used/max" — starts at CAPTION_MAX_LEN
                   and counts down (250, 249, 248, ...) as you type. */}
               <span style={{ position: "absolute", left: 12, bottom: 9, fontSize: 11, fontWeight: 500, color: (caption || "").length >= CAPTION_MAX_LEN ? "var(--tt-red)" : "var(--tt-grey05)" }}>
                 {CAPTION_MAX_LEN - (caption || "").length}
               </span>
-              <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>
-                <button
-                  onMouseDown={ev => ev.preventDefault()}
-                  onClick={() => { onCaptionChange && onCaptionChange(originalIdx, captionStartRef.current); setCaptionEditing(false); }}
-                  onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey02)"}
-                  onMouseLeave={ev => ev.currentTarget.style.background = "none"}
-                  style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 0 }}
-                >
-                  <X size={15} strokeWidth={SW} color="var(--tt-grey06)" />
-                </button>
-                <button
-                  onMouseDown={ev => ev.preventDefault()}
-                  onClick={() => setCaptionEditing(false)}
-                  onMouseEnter={ev => ev.currentTarget.style.opacity = "0.85"}
-                  onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
-                  style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: "pointer", padding: 0 }}
-                >
-                  <Check size={15} strokeWidth={SW} color="white" />
-                </button>
-              </div>
+              {showCheck && (
+                <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>
+                  <button
+                    onMouseDown={ev => ev.preventDefault()}
+                    onClick={() => setCaptionEditing(false)}
+                    onMouseEnter={ev => ev.currentTarget.style.opacity = "0.85"}
+                    onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
+                    style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: "pointer", padding: 0 }}
+                  >
+                    <Check size={15} strokeWidth={SW} color="white" />
+                  </button>
+                </div>
+              )}
             </div>
-          ) : caption ? (
+            );
+          })() : caption ? (
             <p
               onClick={() => { captionStartRef.current = caption || ""; setCaptionEditing(true); }}
               // 50vw, not .tt-caption-box's 30/90 — see .tt-caption-saved
@@ -2416,7 +2428,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
               // like a link/placeholder at rest.
               onMouseEnter={ev => ev.currentTarget.style.textDecoration = "underline"}
               onMouseLeave={ev => ev.currentTarget.style.textDecoration = "none"}
-              style={{ margin: 0, textAlign: "center", fontSize: 14, lineHeight: 1.6, color: "white", textShadow: "0 1px 3px rgba(0,0,0,0.6)", cursor: "pointer", textDecoration: "none", whiteSpace: "pre-wrap" }}
+              style={{ margin: 0, textAlign: "center", fontSize: 16, fontWeight: 500, lineHeight: 1.6, textWrap: "balance", color: "white", textShadow: "0 1px 3px rgba(0,0,0,0.6)", cursor: "pointer", textDecoration: "none", whiteSpace: "pre-wrap" }}
             >
               {caption}
             </p>
@@ -3010,7 +3022,7 @@ const CAPTION_MAX_LEN = 250;
 // Summary and Additional Information's own caps (EditableField's
 // maxLength) — same "enforced at the source" idea as CAPTION_MAX_LEN above.
 const SUMMARY_MAX_LEN = 1000;
-const ADDITIONAL_INFO_MAX_LEN = 50;
+const ADDITIONAL_INFO_MAX_LEN = 250;
 
 // Marks everything past the first PER_ENTRY_PHOTO_LIMIT photos in each entry
 // as excluded by default, using the exact same excludedPhotos shape (and
@@ -3385,7 +3397,7 @@ const buildReportHTML = async (report) => {
       // together as EditableField's own long-caption handling).
       return h("div", { style: `flex-shrink:0;width:${w}px;min-width:0;` },
         selfClose("img", { src: p.src, style: `display:block;width:${w}px;height:${cellH}px;border-radius:4px;` }),
-        p.caption ? h("p", { style: `font-size:12px;line-height:1.6;font-style:italic;color:#828282;font-family:${SERIF};text-align:center;margin:6px 0 0;overflow-wrap:break-word;` }, p.caption) : ""
+        p.caption ? h("p", { style: `font-size:12px;line-height:1.6;font-style:italic;color:#303742;font-family:${SERIF};text-align:center;margin:6px 0 0;overflow-wrap:break-word;` }, p.caption) : ""
       );
     }).join("");
     return h("div", { style: `display:flex;gap:${gap}px;align-items:flex-start;margin-top:${marginTop}px;margin-bottom:${marginBottom}px;` }, cells);
@@ -3504,7 +3516,7 @@ const buildReportHTML = async (report) => {
             // own caption (a long unbroken run of characters otherwise
             // overflows past this column's own width instead of wrapping
             // inside it).
-            p.caption ? h("p", { style: `font-size:12px;line-height:1.6;font-style:italic;color:#828282;font-family:${SERIF};text-align:center;margin:6px 0 0;overflow-wrap:break-word;` }, p.caption) : ""
+            p.caption ? h("p", { style: `font-size:12px;line-height:1.6;font-style:italic;color:#303742;font-family:${SERIF};text-align:center;margin:6px 0 0;overflow-wrap:break-word;` }, p.caption) : ""
           );
         }).join("")
       )
@@ -3544,7 +3556,10 @@ const buildReportHTML = async (report) => {
   // marginBottom:24 rendered as a 24px gap instead of 8px; nesting it
   // avoids that collapse entirely and gives each gap its exact value.
   const noteHTML = (note) =>
-    h("p", { style: `font-family:${SANS};font-size:13px;color:#303742;line-height:1.5;margin:16px 0 0;` }, note.note);
+    h("div", { style: "margin-top:24px;margin-bottom:12px;" },
+      h("p", { style: `font-family:${SANS};font-size:12px;font-weight:600;color:#828282;margin:0;` }, "Note"),
+      h("p", { style: `font-family:${SANS};font-size:13px;color:#303742;line-height:1.5;margin:0;` }, note.note)
+    );
 
   // Title + meta line + divider — shared by both the no-checklist single
   // block (entryHeaderHTML) and the checklist-item-split path
@@ -3684,13 +3699,19 @@ const buildReportHTML = async (report) => {
               const caption = report.photoCaptions && report.photoCaptions[`${e.entryKey}_${originalIndices[i]}`];
               return { src: toAbsoluteUrl(src), width: dims.width, height: dims.height, caption };
             }).filter(Boolean);
+            // The first row/chunk's own marginTop collapses against
+            // whatever precedes it — 12 when that's an attached note's own
+            // marginBottom:12 (see noteHTML), or 16 against the entry
+            // header/checklist's marginBottom:0 otherwise (collapses up to
+            // 16 either way since margin collapse takes the larger side).
+            const firstChunkMarginTop = attachedNoteHTML ? 12 : 16;
             if (useRowGrouping) {
               const rows = packRowsByOrientation(photoMetas, PHOTO_ROW_WIDTH, JUSTIFIED_GAP);
               rows.forEach((row, idx) => {
                 const isFirst = idx === 0;
                 const isLast = idx === rows.length - 1;
                 groupBlocks.push({
-                  html: photoRowHTML(row, isFirst ? 16 : 8, isLast ? 80 : 0),
+                  html: photoRowHTML(row, isFirst ? firstChunkMarginTop : 8, isLast ? 80 : 0),
                   isLabel: false,
                 });
               });
@@ -3703,7 +3724,7 @@ const buildReportHTML = async (report) => {
                   html: masonryHTML(
                     photoMetas.slice(start, start + PHOTO_CHUNK),
                     columnWidth, JUSTIFIED_GAP,
-                    isFirst ? 16 : 8, isLast ? 80 : 0
+                    isFirst ? firstChunkMarginTop : 8, isLast ? 80 : 0
                   ),
                   isLabel: false,
                 });
@@ -4604,20 +4625,44 @@ function ReportsTab({ demoCase }) {
   // state) as a plain, always-editable input — no separate "Add a note"
   // trigger step. Notes commit into preview.extraNotes on every keystroke,
   // same as typing into any other input.
+  const noteLabelStyle = { fontSize: 12, fontWeight: 600, color: "var(--tt-grey05)", margin: 0 };
   const renderNoteSlot = (key) => {
     // Locked once saved — Download/Copy link now act on the saved snapshot.
+    // marginBottom explicit in both branches below — rather than left to
+    // collapse with PhotoGrid's own fixed marginTop:10, so the gap to the
+    // photo list below lands on the exact value intended (10 would
+    // otherwise never lose to a collapse against either of these).
     if (previewSaved) {
       const savedNote = preview.extraNotes[key];
       if (!savedNote) return null;
+      // Always settled/plain text once locked — same 24px-above/12px-below
+      // rule as the live "isText" case below, just unconditional here since
+      // there's no input state left to be in.
       return (
-        <p style={{ fontSize: 12, fontStyle: "italic", color: "var(--tt-text-2)", lineHeight: "1.5", margin: "10px 0 0", background: "var(--tt-grey02)", padding: 8, borderRadius: 8 }}>{savedNote}</p>
+        <div style={{ marginTop: 24, marginBottom: 12 }}>
+          <p style={noteLabelStyle}>Note</p>
+          <p style={{ fontSize: 12, fontStyle: "italic", color: "var(--tt-text-2)", lineHeight: "1.5", margin: 0, background: "var(--tt-grey02)", padding: 8, borderRadius: 8 }}>{savedNote}</p>
+        </div>
       );
     }
 
+    const noteFieldId = `note_${key}`;
+    // "Note" label only once there's an actual saved value to label — an
+    // empty, still-unused slot just shows the bare placeholder input, same
+    // as before this label existed.
+    const hasNote = !!(preview.extraNotes[key] && preview.extraNotes[key].trim());
+    // Same "is this field actually live" condition EditableField uses
+    // internally (isEmpty, or it's the shared activeField) — the label and
+    // the wider 24px-above/12px-below gaps only make sense once the note
+    // has actually settled into plain text; while it's still a live input
+    // (empty, or being actively retyped), none of that applies and the
+    // gaps stay 16px, same as every other field mid-edit.
+    const isText = hasNote && activeEditField !== noteFieldId;
     return (
-      <div style={{ marginTop: 16, marginBottom: 12 }}>
+      <div style={{ marginTop: isText ? 24 : 16, marginBottom: isText ? 12 : 16 }}>
+        {isText && <p style={noteLabelStyle}>Note</p>}
         <EditableField
-          fieldId={`note_${key}`}
+          fieldId={noteFieldId}
           value={preview.extraNotes[key] || ""}
           placeholder="Describe the note for this task"
           alwaysEditing
