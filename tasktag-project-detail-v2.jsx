@@ -5531,6 +5531,18 @@ function ReportsTab({ demoCase }) {
     if (!el) return;
     setCoverLogoSize(el.getBoundingClientRect().height + COVER_LOGO_ERROR_BUFFER);
   }, []);
+  // One-line description at the top of each cover card (Header / Highlight
+  // Photo / Content) saying what the section is for — draft only, a saved
+  // report is just its content. 27px line box (18px × 1.5), mirrored by the
+  // skeletons' SECTION_INTRO_SKELETON below so loading and loaded heights match.
+  const renderSectionIntro = (text) => !previewSaved && (
+    <p style={{ fontSize: 18, fontWeight: 400, lineHeight: 1.5, color: "var(--tt-text-2)", margin: "0 0 24px" }}>{text}</p>
+  );
+  const SECTION_INTRO_SKELETON = (
+    <div style={{ height: 27, marginBottom: 24, display: "flex", alignItems: "center" }}>
+      <div className="tt-skeleton" style={{ width: "55%", height: 18 }} />
+    </div>
+  );
   const renderCoverHeader = () => (
     // Logo (left) and the form fields (right), side by side — the logo's
     // size comes from coverLogoSize (see the ResizeObserver above this
@@ -5542,6 +5554,7 @@ function ReportsTab({ demoCase }) {
     // 4/8px rhythm below wasn't actually showing up; Name/Address/
     // Email-Phone space themselves purely off their own margins instead.
     <>
+    {renderSectionIntro("Your company identity.")}
     <div style={{ display: "flex", alignItems: "flex-start", gap: 24 }}>
       <LogoUploadBox
         src={preview.logo}
@@ -5662,6 +5675,7 @@ function ReportsTab({ demoCase }) {
       // No deliberate top gap here — flows directly after the header for
       // now rather than a fixed/enforced spacing rule.
       <div>
+        {renderSectionIntro("The photo that represents your project.")}
         {/* Landscape called out explicitly — the frame crops to a fixed
             aspect via object-fit:cover once a photo's set, so a portrait
             photo would lose a lot off its sides. Empty state matches
@@ -5777,6 +5791,7 @@ function ReportsTab({ demoCase }) {
   const renderCoverContent = () => {
     return (
       <div>
+        {renderSectionIntro("Project details and who it is for.")}
         {/* The "Update No. X · period" line lives on the right of the
             "Cover" group heading now (see sectionCards' groupHeading). */}
         {/* alwaysEditing — same edit mode as the task note input (see
@@ -5894,7 +5909,7 @@ function ReportsTab({ demoCase }) {
           counter
           maxLength={ADDITIONAL_INFO_MAX_LEN}
           aboveWhenEditing={
-            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 8 }}>
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 6 }}>
               <p style={{ fontSize: 14, fontWeight: 500, color: "var(--tt-text-2)", margin: 0 }}>Additional Information</p>
               <span style={{ fontSize: 10, fontWeight: 400, color: "var(--tt-grey05)", lineHeight: 1 }}>Optional</span>
             </div>
@@ -7126,7 +7141,9 @@ function ReportsTab({ demoCase }) {
                         <Fragment key={section.key}>
                           {groupHeading}
                           <div style={skeletonCardStyle}>
-                            <div style={{ padding: DRAFT_PAD, display: "flex", alignItems: "flex-start", gap: 24 }}>
+                            <div style={{ padding: DRAFT_PAD }}>
+                            {SECTION_INTRO_SKELETON}
+                            <div style={{ display: "flex", alignItems: "flex-start", gap: 24 }}>
                               <div className="tt-skeleton" style={{ width: coverLogoSize, height: coverLogoSize, borderRadius: 8, flexShrink: 0 }} />
                               <div ref={coverFormRef} style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ height: 21, marginBottom: 6, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 100, height: 14 }} /></div>
@@ -7145,6 +7162,7 @@ function ReportsTab({ demoCase }) {
                                 </div>
                               </div>
                             </div>
+                            </div>
                           </div>
                         </Fragment>
                       );
@@ -7153,7 +7171,8 @@ function ReportsTab({ demoCase }) {
                       return (
                         <div key={section.key} style={skeletonCardStyle}>
                           <div style={{ padding: DRAFT_PAD }}>
-                            <div className="tt-skeleton" style={{ width: "100%", height: 240, borderRadius: 12 }} />
+                            {SECTION_INTRO_SKELETON}
+                            <div className="tt-skeleton" style={{ width: "100%", height: 242, borderRadius: 12 }} />
                           </div>
                         </div>
                       );
@@ -7171,21 +7190,22 @@ function ReportsTab({ demoCase }) {
                       return (
                         <div key={section.key} style={skeletonCardStyle}>
                           <div style={{ padding: DRAFT_PAD }}>
-                            <div className="tt-skeleton" style={{ width: 110, height: 14, marginBottom: 6 }} />
+                            {SECTION_INTRO_SKELETON}
+                            <div style={{ height: 21, marginBottom: 6, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 110, height: 14 }} /></div>
                             <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8, marginBottom: 16 }} />
-                            <div className="tt-skeleton" style={{ width: 60, height: 14, marginBottom: 6 }} />
+                            <div style={{ height: 21, marginBottom: 6, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 60, height: 14 }} /></div>
                             <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8, marginBottom: 16 }} />
                             <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                <div className="tt-skeleton" style={{ width: 90, height: 14, marginBottom: 6 }} />
+                                <div style={{ height: 21, marginBottom: 6, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 90, height: 14 }} /></div>
                                 <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8 }} />
                               </div>
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                <div className="tt-skeleton" style={{ width: 24, height: 14, marginBottom: 6 }} />
+                                <div style={{ height: 21, marginBottom: 6, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 24, height: 14 }} /></div>
                                 <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8 }} />
                               </div>
                             </div>
-                            <div className="tt-skeleton" style={{ width: 160, height: 14, marginBottom: 8 }} />
+                            <div style={{ height: 21, marginBottom: 6, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 160, height: 14 }} /></div>
                             <div className="tt-skeleton" style={{ width: "100%", height: 97, borderRadius: 8 }} />
                           </div>
                         </div>
