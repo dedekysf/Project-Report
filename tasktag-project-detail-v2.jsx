@@ -5154,7 +5154,9 @@ function ReportsTab({ demoCase }) {
               return { ...p, extraNotes: next };
             });
           }}
-          inputStyle={{ fontSize: 12, height: 40 }}
+          // Same input as Company Name (14px, 40px tall) — the character
+          // counter (counter/maxLength above) is the only extra.
+          inputStyle={{ fontSize: 14, height: 40 }}
         />
       </div>
     );
