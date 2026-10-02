@@ -13,7 +13,7 @@ import {
   ArrowUpDown, Calendar, AlignJustify, Clock,
   UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, Crown, AlertTriangle,
   RotateCw, ZoomIn, ZoomOut, Folder, ArrowLeft, ArrowRight, Info, StickyNote,
-  ExternalLink, Forward, Loader, Mail, Phone, Upload, GripVertical, Eye,
+  ExternalLink, Forward, Loader, Mail, Phone, Upload, ImagePlus, GripVertical, Eye, Lock,
 } from "lucide-react";
 
 import logoImg from "./src/Img/tasktag-logo.13f1babda8fdbb1b7251572a0fe11f9e.png";
@@ -210,6 +210,16 @@ style.textContent = `
   /* Forward — open shelf (path) containing the arrow popping out of it (polyline). */
   .tt-split-forward path { stroke-width: 1.6; }
   .tt-split-forward polyline { stroke-width: 1.4; }
+
+  /* ImagePlus — picture frame (3rd path) containing a mountain glyph (4th
+     path) + sun (circle); the "+" badge (1st/2nd paths) sits outside the
+     frame, same "accessory badge reads as inner detail" treatment
+     UserPlus's own "+" gets below. */
+  .tt-split-imageplus path:nth-of-type(3) { stroke-width: 1.6; }
+  .tt-split-imageplus path:nth-of-type(1),
+  .tt-split-imageplus path:nth-of-type(2),
+  .tt-split-imageplus path:nth-of-type(4),
+  .tt-split-imageplus circle { stroke-width: 1.4; }
 
   /* Upload — tray (path) containing the lift-out arrow (polyline + line). */
   .tt-split-upload path { stroke-width: 1.6; }
@@ -456,6 +466,7 @@ const ICON_SPLIT_CLASSES = new Map([
   [Forward, "tt-split-forward"],
   [IdCard, "tt-split-idcard"],
   [Upload, "tt-split-upload"],
+  [ImagePlus, "tt-split-imageplus"],
   [X, "tt-split-x"],
   [MoreVertical, "tt-split-morevertical"],
   [Link, "tt-split-link"],
@@ -1643,6 +1654,14 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
 // cover photo instead asks for JPEG at quality, since it's ordinary
 // photographic content where PNG would cost several times the file size
 // for no visible difference.
+// The "up to 5 MB" hint next to the Logo/Highlight Photo uploaders (see
+// LogoUploadBox and handleCoverImageUpload) was display-only until now —
+// nothing actually checked the picked file's own size before handing it
+// to resizeImageToDataURL, so a much bigger file quietly went through
+// anyway (just resized down like any other). This is what both of those
+// now check against first.
+const MAX_UPLOAD_IMAGE_BYTES = 5 * 1024 * 1024;
+
 const resizeImageToDataURL = (file, maxDim = 64, mimeType = "image/png", quality) => new Promise((resolve, reject) => {
   const reader = new FileReader();
   reader.onload = () => {
@@ -1679,11 +1698,14 @@ const resizeImageToDataURL = (file, maxDim = 64, mimeType = "image/png", quality
 function LogoUploadBox({ src, onChange, disabled, size = 120, resizeTo = 360, hint }) {
   const inputRef = useRef(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleFile = ev => {
     const file = ev.target.files?.[0];
     ev.target.value = "";
     if (!file) return;
+    if (file.size > MAX_UPLOAD_IMAGE_BYTES) { setError("File size exceeds the limit of 5 MB."); return; }
+    setError("");
     setLoading(true);
     // resizeTo — comfortably sharp at any real on-screen size this box
     // ends up rendered at (its own display size is dynamic, driven by the
@@ -1696,11 +1718,12 @@ function LogoUploadBox({ src, onChange, disabled, size = 120, resizeTo = 360, hi
   };
 
   return (
+    <div style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
     <div
       className={`tt-editable-wrap${src ? " group" : ""}`}
       onClick={() => !disabled && !loading && inputRef.current?.click()}
       style={{
-        position: "relative", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        position: "relative", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
         cursor: disabled || loading ? "default" : "pointer",
         // Explicit width AND height from `size` (a measured pixel value
         // the caller passes down, not CSS alone) — align-items:stretch +
@@ -1724,8 +1747,8 @@ function LogoUploadBox({ src, onChange, disabled, size = 120, resizeTo = 360, hi
         boxSizing: "border-box",
         borderRadius: 8, overflow: "hidden",
         ...(src
-          ? { border: "1px solid var(--tt-grey03)", background: "white", padding: 12 }
-          : { border: "1px dashed var(--tt-grey04)", background: "var(--tt-grey01)" }),
+          ? { border: `1px solid ${error ? "var(--tt-red)" : "var(--tt-grey03)"}`, background: "white", padding: 12 }
+          : { border: `1px dashed ${error ? "var(--tt-red)" : "var(--tt-grey04)"}`, background: "var(--tt-grey01)" }),
       }}
     >
       {loading ? (
@@ -1753,7 +1776,7 @@ function LogoUploadBox({ src, onChange, disabled, size = 120, resizeTo = 360, hi
               onClick={e => { e.stopPropagation(); !loading && inputRef.current?.click(); }}
               className="opacity-0 transition-opacity group-hover:opacity-100"
               style={{
-                position: "absolute", top: 6, right: 6, width: 20, height: 20, borderRadius: "50%",
+                position: "absolute", top: 6, right: 32, width: 20, height: 20, borderRadius: "50%",
                 border: "none", background: "rgba(10,22,41,0.55)",
                 display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
                 cursor: "pointer", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)",
@@ -1762,13 +1785,41 @@ function LogoUploadBox({ src, onChange, disabled, size = 120, resizeTo = 360, hi
               <Pencil size={12} color="white" strokeWidth={2.25} />
             </button>
           )}
+          {/* Remove — clears the logo back to the empty/dashed state
+              (rather than only ever being replaceable) via the same
+              onChange the real upload uses, just with an empty value. */}
+          {!disabled && (
+            <button
+              onClick={e => { e.stopPropagation(); setError(""); onChange(""); }}
+              className="opacity-0 transition-opacity group-hover:opacity-100"
+              style={{
+                position: "absolute", top: 6, right: 6, width: 20, height: 20, borderRadius: "50%",
+                border: "none", background: "rgba(10,22,41,0.55)",
+                display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+                cursor: "pointer", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)",
+              }}
+            >
+              <Trash2 size={12} color="white" strokeWidth={2.25} />
+            </button>
+          )}
         </>
       ) : (
         <>
-          <Upload size={40} strokeWidth={SW} color="var(--tt-grey05)" className="tt-split-upload" style={{ flexShrink: 0 }} />
+          <ImagePlus size={40} strokeWidth={SW} color="var(--tt-grey05)" className="tt-split-imageplus" style={{ flexShrink: 0 }} />
           <span style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-2)", marginTop: 6 }}>Company Logo</span>
           {hint && !disabled && (
             <span style={{ fontSize: 12, fontWeight: 400, lineHeight: 1.4, color: "var(--tt-grey05)", textAlign: "center", padding: "0 12px", marginTop: 2 }}>{hint}</span>
+          )}
+          {!disabled && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-full mt-3"
+              onClick={e => { e.stopPropagation(); inputRef.current?.click(); }}
+            >
+              Choose File
+            </Button>
           )}
         </>
       )}
@@ -1781,6 +1832,10 @@ function LogoUploadBox({ src, onChange, disabled, size = 120, resizeTo = 360, hi
           style={{ display: "none" }}
         />
       )}
+    </div>
+    {error && (
+      <p style={{ color: "var(--tt-red)", fontSize: 10, fontWeight: 500, margin: "4px 0 0", textAlign: "center" }}>{error}</p>
+    )}
     </div>
   );
 }
@@ -1899,6 +1954,25 @@ function NavSidebar({ items, activeKey, onSelect, footer }) {
 
 // ── Fixed-position tooltip button ──
 // Renders tooltip via a fixed div that escapes overflow clipping
+// Small lock badge pinned to an action icon's bottom-right corner — marks
+// Download / Copy link as locked behind the paywall (clicking them opens
+// the paywall modal instead, see handleDownload/handleCopy). `dark` is for
+// icons sitting on the lightbox's dark toolbar.
+function LockedIcon({ locked, dark, children }) {
+  if (!locked) return children;
+  return (
+    <span style={{ position: "relative", display: "inline-flex" }}>
+      {children}
+      <span style={{
+        position: "absolute", right: -5, bottom: -5, width: 12, height: 12, borderRadius: "50%",
+        background: dark ? "var(--tt-text-1)" : "white", display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        <Lock size={9} strokeWidth={2.5} color={dark ? "white" : "var(--tt-text-2)"} />
+      </span>
+    </span>
+  );
+}
+
 function FixedTooltipBtn({ children, label, onAction }) {
   const [tip, setTip] = useState(null); // { top, left }
   const btnRef = useRef(null);
@@ -2387,7 +2461,7 @@ function LightboxIconBtn({ label, onClick, disabled, children }) {
   );
 }
 
-function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalIndices, captions, onCaptionChange, onIndexChange, onClose, onDeleteSelected, onDownload, onCopyLink, linkCopied, actionsDisabled }) {
+function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalIndices, captions, onCaptionChange, onIndexChange, onClose, onDeleteSelected, onDownload, onCopyLink, linkCopied, actionsDisabled, locked }) {
   const [rotation, setRotation] = useState(0);
   const [zoom, setZoom] = useState(100);
   const [showFileDetails, setShowFileDetails] = useState(false);
@@ -2532,14 +2606,14 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, justifySelf: "end" }}>
-          <LightboxIconBtn label="Download" disabled={actionsDisabled} onClick={onDownload}>
-            <Download size={20} strokeWidth={SW} className="tt-split-download" />
+          <LightboxIconBtn label={locked ? "Upgrade to unlock" : "Download"} disabled={actionsDisabled} onClick={onDownload}>
+            <LockedIcon locked={locked} dark><Download size={20} strokeWidth={SW} className="tt-split-download" /></LockedIcon>
           </LightboxIconBtn>
           <LightboxIconBtn label="Share">
             <Forward size={20} strokeWidth={SW} className="tt-split-forward" />
           </LightboxIconBtn>
-          <LightboxIconBtn label={linkCopied ? "Link copied" : "Copy link to share"} disabled={actionsDisabled} onClick={onCopyLink}>
-            {linkCopied ? <Check size={20} strokeWidth={SW} /> : <Link size={20} strokeWidth={SW} className="tt-split-link" />}
+          <LightboxIconBtn label={locked ? "Upgrade to unlock" : linkCopied ? "Link copied" : "Copy link to share"} disabled={actionsDisabled} onClick={onCopyLink}>
+            {linkCopied ? <Check size={20} strokeWidth={SW} /> : <LockedIcon locked={locked} dark><Link size={20} strokeWidth={SW} className="tt-split-link" /></LockedIcon>}
           </LightboxIconBtn>
           <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.15)", margin: "0 6px" }} />
           <LightboxIconBtn label="Rotate" onClick={() => setRotation(r => (r + 90) % 360)}>
@@ -4561,10 +4635,13 @@ function ReportsTab({ demoCase }) {
   // just inlined here since it isn't reused anywhere else.
   const coverImageInputRef = useRef(null);
   const [coverImageUploading, setCoverImageUploading] = useState(false);
+  const [coverImageError, setCoverImageError] = useState("");
   const handleCoverImageUpload = (ev) => {
     const file = ev.target.files?.[0];
     ev.target.value = "";
     if (!file) return;
+    if (file.size > MAX_UPLOAD_IMAGE_BYTES) { setCoverImageError("File size exceeds the limit of 5 MB."); return; }
+    setCoverImageError("");
     setCoverImageUploading(true);
     // 1600 comfortably covers the cover's own full page-content width
     // (720px) with retina headroom to spare — well past the flat 64px
@@ -5420,11 +5497,26 @@ function ReportsTab({ demoCase }) {
   // assigns its cross-axis (height) size, so aspect-ratio never actually
   // sees a resolved height to derive a width from — it only ever sees
   // the box's own tiny intrinsic content width, leaving it tall and
-  // narrow instead of square. A ResizeObserver sidesteps that circular
-  // dependency entirely by measuring the real height after layout and
-  // setting both of LogoUploadBox's dimensions explicitly from it.
+  // narrow instead of square. Measuring the form's real height in JS
+  // sidesteps that circular dependency.
+  //
+  // This is a ONE-TIME measurement, not a live ResizeObserver — Company
+  // Name/Address can each independently grow by one error line
+  // (required-field validation, see handleSaveReportClick), and
+  // continuously re-measuring to chase that made the box visibly
+  // resize (even flash a frame at the stale size first) right as a
+  // Save click failed validation. Instead COVER_LOGO_ERROR_BUFFER bakes
+  // that possible growth in up front, so the box is already tall enough
+  // — taller than the error-free form actually needs — and never has to
+  // move again once set.
+  //
+  // marginTop(4) + a 10px/500 error line's own rendered height(~14) per
+  // field, no further margin (the field's own 16px gap-to-next-field
+  // margin just relocates from the input onto the error message itself
+  // when one shows, rather than adding on top of it — see EditableField's
+  // own live-branch styling).
+  const COVER_LOGO_ERROR_BUFFER = 2 * (4 + 14);
   const [coverLogoSize, setCoverLogoSize] = useState(120);
-  const coverFormRoRef = useRef(null);
   // A CALLBACK ref (not useRef + useLayoutEffect with a [] dependency
   // array) — this section mounts behind the preview's own fake-generate
   // loading delay (previewLoading), well after ReportsTab's own first
@@ -5435,21 +5527,10 @@ function ReportsTab({ demoCase }) {
   // the "stuck at the 120 default forever" symptom this replaces: a
   // callback ref instead fires exactly when THIS element attaches,
   // however late that happens to be, so the measurement always runs
-  // against the real, already-rendered form. getBoundingClientRect() for
-  // the immediate reading (synchronous, no async "first callback" lag),
-  // then a ResizeObserver stays attached for any later resize (an error
-  // message appearing, a label toggling, etc.).
+  // against the real, already-rendered (error-free) form.
   const coverFormRef = useCallback(el => {
-    coverFormRoRef.current?.disconnect();
-    coverFormRoRef.current = null;
     if (!el) return;
-    setCoverLogoSize(el.getBoundingClientRect().height);
-    const ro = new ResizeObserver(entries => {
-      const h = entries[0]?.contentRect?.height;
-      if (h) setCoverLogoSize(h);
-    });
-    ro.observe(el);
-    coverFormRoRef.current = ro;
+    setCoverLogoSize(el.getBoundingClientRect().height + COVER_LOGO_ERROR_BUFFER);
   }, []);
   const renderCoverHeader = () => (
     // Logo (left) and the form fields (right), side by side — the logo's
@@ -5597,27 +5678,37 @@ function ReportsTab({ demoCase }) {
         <div className={coverImageSrc ? "group" : undefined} style={{
           position: "relative", overflow: "hidden",
           ...(coverImageSrc
-            ? { borderRadius: 12 }
-            : { borderRadius: 8, border: "1px dashed var(--tt-grey04)", background: "var(--tt-grey01)" }),
+            ? { borderRadius: 12, ...(coverImageError ? { border: "1px solid var(--tt-red)" } : {}) }
+            : { borderRadius: 8, border: `1px dashed ${coverImageError ? "var(--tt-red)" : "var(--tt-grey04)"}`, background: "var(--tt-grey01)" }),
         }}>
           {coverImageSrc ? (
             <img src={coverImageSrc} alt="" style={{ display: "block", width: "100%", maxHeight: 360, objectFit: "cover" }} />
           ) : (
-            <button
+            <div
               onClick={() => !coverImageUploading && !previewSaved && coverImageInputRef.current?.click()}
-              disabled={coverImageUploading || previewSaved}
-              style={{ width: "100%", height: 240, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", border: "none", background: "none", padding: 0, cursor: previewSaved ? "default" : "pointer" }}
+              style={{ width: "100%", height: 240, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 0, cursor: previewSaved ? "default" : "pointer" }}
             >
               {coverImageUploading ? (
                 <Loader size={40} strokeWidth={SW} color="var(--tt-grey05)" className="tt-split-loader" style={{ display: "block", flexShrink: 0, animation: "tt-spin 0.75s linear infinite, tt-fade-in 0.15s ease-out" }} />
               ) : (
-                <Upload size={40} strokeWidth={SW} color="var(--tt-grey05)" className="tt-split-upload" style={{ flexShrink: 0 }} />
+                <ImagePlus size={40} strokeWidth={SW} color="var(--tt-grey05)" className="tt-split-imageplus" style={{ flexShrink: 0 }} />
               )}
               {!previewSaved && (
                 <span style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-2)", marginTop: 6 }}>Highlight Photo</span>
               )}
               <span style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)", marginTop: 2 }}>Landscape 16:9 · PNG or JPG · up to 5 MB</span>
-            </button>
+              {!previewSaved && !coverImageUploading && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full mt-3"
+                  onClick={e => { e.stopPropagation(); coverImageInputRef.current?.click(); }}
+                >
+                  Choose File
+                </Button>
+              )}
+            </div>
           )}
           {coverImageSrc && !previewSaved && (
             // Same darkening overlay a task's own PhotoGrid thumbnail
@@ -5633,7 +5724,7 @@ function ReportsTab({ demoCase }) {
               disabled={coverImageUploading}
               className="opacity-0 transition-opacity group-hover:opacity-100"
               style={{
-                position: "absolute", top: 12, right: 12, width: 28, height: 28, borderRadius: "50%",
+                position: "absolute", top: 12, right: 48, width: 28, height: 28, borderRadius: "50%",
                 border: "none", background: "rgba(10,22,41,0.55)",
                 display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
                 cursor: coverImageUploading ? "default" : "pointer", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)",
@@ -5646,6 +5737,22 @@ function ReportsTab({ demoCase }) {
               )}
             </button>
           )}
+          {/* Remove — clears the highlight photo back to the empty/dashed
+              upload prompt (rather than only ever being replaceable). */}
+          {coverImageSrc && !previewSaved && (
+            <button
+              onClick={() => { setCoverImageError(""); setPreview(p => ({ ...p, coverImage: "" })); }}
+              className="opacity-0 transition-opacity group-hover:opacity-100"
+              style={{
+                position: "absolute", top: 12, right: 12, width: 28, height: 28, borderRadius: "50%",
+                border: "none", background: "rgba(10,22,41,0.55)",
+                display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+                cursor: "pointer", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)",
+              }}
+            >
+              <Trash2 size={13} strokeWidth={2.25} color="white" />
+            </button>
+          )}
           {!previewSaved && (
             <input
               ref={coverImageInputRef}
@@ -5656,6 +5763,9 @@ function ReportsTab({ demoCase }) {
             />
           )}
         </div>
+        {coverImageError && (
+          <p style={{ color: "var(--tt-red)", fontSize: 10, fontWeight: 500, margin: "4px 0 0", textAlign: "center" }}>{coverImageError}</p>
+        )}
       </div>
     );
   };
@@ -6216,11 +6326,13 @@ function ReportsTab({ demoCase }) {
   // same, in case a real narrow-layout mode is worth reintroducing later.
   const isWide = true;
 
-  // Always succeeds now (Download/Copy link are no longer paywall-gated —
-  // see the comment inside) — still returns a boolean since callers (the
-  // table row's success toast, handlePreviewCopy's "Link copied" flash)
-  // key their own follow-up feedback off it.
+  // Returns whether the download actually happened — false when paywalled
+  // (Download/Copy link are locked then; the paywall modal opens instead).
+  // Callers (the table row's success toast, handlePreviewCopy's "Link
+  // copied" flash) key their own follow-up feedback off it.
   const handleDownload = async (report) => {
+    // Paywalled — Download is locked; open the paywall modal instead.
+    if (paywalled) { setShowPaywallModal(true); return false; }
     // Free tier — Download/Copy link stay available for the one report it
     // already includes (see the paywall's own "Shareable link for any
     // period" unlock item — that's about OTHER periods, not this one).
@@ -6348,6 +6460,8 @@ function ReportsTab({ demoCase }) {
 
   // Same "returns whether it actually happened" contract as handleDownload.
   const handleCopy = async (report) => {
+    // Paywalled — Copy link is locked too, same as Download above.
+    if (paywalled) { setShowPaywallModal(true); return false; }
     // Same "free tier still gets Download/Copy link for its one included
     // report" reasoning as handleDownload above.
     const url = buildShareURL(report);
@@ -6620,8 +6734,8 @@ function ReportsTab({ demoCase }) {
                     ) : (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                         <FixedTooltipBtn label="Preview" onAction={() => handlePreviewOpen(r)}><Eye size={16} strokeWidth={SW} color="var(--tt-grey06)" className="tt-split-eye" /></FixedTooltipBtn>
-                        <FixedTooltipBtn label="Download" onAction={async () => { const ok = await handleDownload(r); if (ok) showToast("success", "Downloaded"); }}><Download size={16} strokeWidth={SW} color="var(--tt-grey06)" className="tt-split-download" /></FixedTooltipBtn>
-                        <FixedTooltipBtn label="Copy link to share" onAction={async () => { const ok = await handleCopy(r); if (ok) showToast("success", "Link copied"); }}><Link size={16} strokeWidth={SW} color="var(--tt-grey06)" className="tt-split-link" /></FixedTooltipBtn>
+                        <FixedTooltipBtn label={paywalled ? "Upgrade to unlock" : "Download"} onAction={async () => { const ok = await handleDownload(r); if (ok) showToast("success", "Downloaded"); }}><LockedIcon locked={paywalled}><Download size={16} strokeWidth={SW} color="var(--tt-grey06)" className="tt-split-download" /></LockedIcon></FixedTooltipBtn>
+                        <FixedTooltipBtn label={paywalled ? "Upgrade to unlock" : "Copy link to share"} onAction={async () => { const ok = await handleCopy(r); if (ok) showToast("success", "Link copied"); }}><LockedIcon locked={paywalled}><Link size={16} strokeWidth={SW} color="var(--tt-grey06)" className="tt-split-link" /></LockedIcon></FixedTooltipBtn>
                         {/* Free tier's one report is a one-time allowance
                             (see handleGenerate) — Delete stays hidden while
                             paywalled so there's no way to clear it and
@@ -6765,7 +6879,7 @@ function ReportsTab({ demoCase }) {
                       onMouseLeave={e => e.currentTarget.style.background = "white"}
                       style={{ height: 40, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "0 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "background 0.15s" }}
                     >
-                      <Download size={14} strokeWidth={SW} className="tt-split-download" /> Download
+                      <LockedIcon locked={paywalled}><Download size={14} strokeWidth={SW} className="tt-split-download" /></LockedIcon> Download
                     </button>
                     <button
                       disabled={previewLoading}
@@ -6776,7 +6890,7 @@ function ReportsTab({ demoCase }) {
                     >
                       {previewCopied
                         ? <><Check size={14} strokeWidth={SW} /> Link copied</>
-                        : <><Link size={14} strokeWidth={SW} className="tt-split-link" /> Copy link</>}
+                        : <><LockedIcon locked={paywalled}><Link size={14} strokeWidth={SW} className="tt-split-link" /></LockedIcon> Copy link</>}
                     </button>
                   </>
                 ) : (
@@ -7334,6 +7448,7 @@ function ReportsTab({ demoCase }) {
           onCopyLink={handlePreviewCopy}
           linkCopied={previewCopied}
           actionsDisabled={previewLoading}
+          locked={paywalled}
           onDeleteSelected={(indices) => {
             // originalIndices map filmstrip position -> this entry's real
             // photo index, so the exclusion lands on the same keys the
@@ -7445,7 +7560,7 @@ function ReportPaywall() {
 function PaywallModal({ onClose }) {
   return (
     <div
-      style={{ position: "fixed", inset: 0, zIndex: 4000, background: "rgba(10,22,41,0.45)", display: "flex", alignItems: "center", justifyContent: "center" }}
+      style={{ position: "fixed", inset: 0, zIndex: 6000, background: "rgba(10,22,41,0.45)", display: "flex", alignItems: "center", justifyContent: "center" }}
       onClick={onClose}
     >
       <div
