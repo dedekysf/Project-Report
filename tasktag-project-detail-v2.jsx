@@ -5858,7 +5858,7 @@ function ReportsTab({ demoCase }) {
               />
             </div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-              <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", lineHeight: 1, margin: 0, flexShrink: 0 }}>Project Owner</p>
+              <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-grey05)", lineHeight: 1, margin: 0, flexShrink: 0 }}>Prepared By</p>
               <p style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "var(--tt-text-2)", lineHeight: 1, margin: 0 }}>{preview.contactName || POINT_OF_CONTACT_NAME}</p>
             </div>
           </div>
@@ -5886,7 +5886,7 @@ function ReportsTab({ demoCase }) {
                 value={preview.contactName}
                 placeholder={POINT_OF_CONTACT_NAME}
                 live
-                aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Project Owner</p>}
+                aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Prepared By</p>}
                 onSave={v => setPreview(p => ({ ...p, contactName: v }))}
                 inputStyle={{ fontSize: 14, height: 40, width: "100%" }}
               />
