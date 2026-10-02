@@ -5128,7 +5128,7 @@ function ReportsTab({ demoCase }) {
     // the small 12px "Note" label + plain text only exists in the saved
     // view above.
     return (
-      <div style={{ marginTop: 16, marginBottom: 16 }}>
+      <div style={{ marginTop: 18, marginBottom: 18 }}>
         <EditableField
           fieldId={noteFieldId}
           value={preview.extraNotes[key] || ""}
@@ -5146,7 +5146,7 @@ function ReportsTab({ demoCase }) {
           }}
           // Same input as Company Name (14px, 40px tall) — the character
           // counter (counter/maxLength above) is the only extra.
-          inputStyle={{ fontSize: 14, height: 40 }}
+          inputStyle={{ fontSize: 14, height: 48 }}
         />
       </div>
     );
@@ -5354,7 +5354,7 @@ function ReportsTab({ demoCase }) {
                         alwaysEditing
                         onSave={v => updateChecklistItem(entryKey, e, idx, v)}
                         textStyle={{ fontSize: 13, color: "var(--tt-text-2)", margin: 0 }}
-                        inputStyle={{ fontSize: 13, height: 40 }}
+                        inputStyle={{ fontSize: 13, height: 48 }}
                       />
                     </div>
                   )}
@@ -5478,7 +5478,7 @@ function ReportsTab({ demoCase }) {
   // Name, Address, Email/Phone.
   // Also reused by the Footer section's own Name/Role labels, for the
   // same "shared form-field convention" reasoning as before.
-  const FIELD_LABEL_STYLE = { fontSize: 14, fontWeight: 500, color: "var(--tt-text-2)", margin: "0 0 6px" };
+  const FIELD_LABEL_STYLE = { fontSize: 14, fontWeight: 500, color: "var(--tt-text-2)", margin: "0 0 8px" };
   // Measures the form column's actual rendered height (it changes as
   // labels/errors show and hide while editing) so the logo box beside it
   // can be kept an exact square matching that height. Pure CSS
@@ -5587,8 +5587,8 @@ function ReportsTab({ demoCase }) {
         aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Company Name</p>}
         onSave={v => setPreview(p => ({ ...p, companyName: v }))}
         textStyle={{ fontSize: 22, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 8px" }}
-        gap={16}
-        inputStyle={{ fontSize: 14, height: 40 }}
+        gap={18}
+        inputStyle={{ fontSize: 14, height: 48 }}
       />
       <EditableField
         fieldId="companyAddress"
@@ -5601,8 +5601,8 @@ function ReportsTab({ demoCase }) {
         aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Address</p>}
         onSave={v => setPreview(p => ({ ...p, companyAddress: v }))}
         textStyle={{ fontSize: 14, fontWeight: 400, color: "var(--tt-grey05)", margin: "0 0 12px" }}
-        gap={16}
-        inputStyle={{ fontSize: 14, height: 40 }}
+        gap={18}
+        inputStyle={{ fontSize: 14, height: 48 }}
       />
       {/* Email and phone side by side, no dash between them, a flat 16px
           gap regardless of state (empty input, actively being edited, or
@@ -5614,7 +5614,7 @@ function ReportsTab({ demoCase }) {
           between them, so the two together reach the same full width
           Address above fills, instead of a fixed width stopping short of
           it and leaving the rest of the row empty. */}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 18 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <EditableField
             fieldId="companyEmail"
@@ -5632,7 +5632,7 @@ function ReportsTab({ demoCase }) {
             errorMessage="Enter a valid email address."
             onSave={v => setPreview(p => ({ ...p, companyEmail: v }))}
             textStyle={{ fontSize: 14, fontWeight: 400, color: "var(--tt-text-2)", margin: 0 }}
-            inputStyle={{ fontSize: 14, height: 40, width: "100%" }}
+            inputStyle={{ fontSize: 14, height: 48, width: "100%" }}
           />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -5651,7 +5651,7 @@ function ReportsTab({ demoCase }) {
             errorMessage="Enter a valid US phone number."
             onSave={v => setPreview(p => ({ ...p, companyPhone: v }))}
             textStyle={{ fontSize: 14, fontWeight: 400, color: "var(--tt-text-2)", margin: 0 }}
-            inputStyle={{ fontSize: 14, height: 40, width: "100%" }}
+            inputStyle={{ fontSize: 14, height: 48, width: "100%" }}
           />
         </div>
       </div>
@@ -5800,7 +5800,7 @@ function ReportsTab({ demoCase }) {
         <EditableField
           fieldId="projectName"
           value={preview.projectName}
-          placeholder={PROJECT_NAME}
+          placeholder={`E.g. ${PROJECT_NAME}`}
           disabled={previewSaved}
           live
           aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Project Name</p>}
@@ -5813,13 +5813,13 @@ function ReportsTab({ demoCase }) {
           // own — without it, the gap to address below collapses while
           // this field is actively being edited, since inputStyle isn't
           // otherwise related to textStyle at all.
-          gap={16}
-          inputStyle={{ fontSize: 14, height: 40 }}
+          gap={18}
+          inputStyle={{ fontSize: 14, height: 48 }}
         />
         <EditableField
           fieldId="address"
           value={preview.address}
-          placeholder={PROJECT_ADDRESS}
+          placeholder={`E.g. ${PROJECT_ADDRESS}`}
           disabled={previewSaved}
           live
           aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Address</p>}
@@ -5830,8 +5830,8 @@ function ReportsTab({ demoCase }) {
           // margin matches textStyle's own — without it, the 32px gap
           // to Prepared For below collapses while this field is actively
           // being edited, the same issue projectName's own margin fixes.
-          gap={16}
-          inputStyle={{ fontSize: 14, height: 40 }}
+          gap={18}
+          inputStyle={{ fontSize: 14, height: 48 }}
         />
         {/* Prepared For and By are the same kind of pair (uppercase label
             + value), both text-secondary throughout — label and value
@@ -5867,27 +5867,27 @@ function ReportsTab({ demoCase }) {
           // contactName the Footer section's Name field does (every
           // project has exactly one owner), so it has its own fieldId
           // only to keep focus tracking separate from that field.
-          <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
+          <div style={{ display: "flex", gap: 18, marginBottom: 18 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <EditableField
                 fieldId="clientName"
                 value={preview.clientName}
-                placeholder="Add client name"
+                placeholder="E.g. Carlos Eduardo Alvarez"
                 live
                 aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Prepared For</p>}
                 onSave={v => setPreview(p => ({ ...p, clientName: v }))}
-                inputStyle={{ fontSize: 14, height: 40, width: "100%" }}
+                inputStyle={{ fontSize: 14, height: 48, width: "100%" }}
               />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <EditableField
                 fieldId="coverContactName"
                 value={preview.contactName}
-                placeholder={POINT_OF_CONTACT_NAME}
+                placeholder="E.g. Maria Jose"
                 live
                 aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Prepared By</p>}
                 onSave={v => setPreview(p => ({ ...p, contactName: v }))}
-                inputStyle={{ fontSize: 14, height: 40, width: "100%" }}
+                inputStyle={{ fontSize: 14, height: 48, width: "100%" }}
               />
             </div>
           </div>
@@ -5906,7 +5906,7 @@ function ReportsTab({ demoCase }) {
           counter
           maxLength={ADDITIONAL_INFO_MAX_LEN}
           aboveWhenEditing={
-            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 6 }}>
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 8 }}>
               <p style={{ fontSize: 14, fontWeight: 500, color: "var(--tt-text-2)", margin: 0 }}>Additional Information</p>
               <span style={{ fontSize: 10, fontWeight: 400, color: "var(--tt-grey05)", lineHeight: 1 }}>Optional</span>
             </div>
@@ -6183,8 +6183,8 @@ function ReportsTab({ demoCase }) {
                 aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Name</p>}
                 onSave={v => setPreview(p => ({ ...p, contactName: v }))}
                 textStyle={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 8px" }}
-                gap={16}
-                inputStyle={{ fontSize: 14, height: 40 }}
+                gap={18}
+                inputStyle={{ fontSize: 14, height: 48 }}
               />
               <EditableField
                 fieldId="contactRole"
@@ -6195,7 +6195,7 @@ function ReportsTab({ demoCase }) {
                 aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Role</p>}
                 onSave={v => setPreview(p => ({ ...p, contactRole: v }))}
                 textStyle={{ fontSize: 14, fontWeight: 400, color: "var(--tt-grey05)", margin: 0 }}
-                inputStyle={{ fontSize: 14, height: 40 }}
+                inputStyle={{ fontSize: 14, height: 48 }}
               />
             </div>
           </div>
@@ -7142,18 +7142,18 @@ function ReportsTab({ demoCase }) {
                             <div style={{ display: "flex", alignItems: "flex-start", gap: 24 }}>
                               <div className="tt-skeleton" style={{ width: coverLogoSize, height: coverLogoSize, borderRadius: 8, flexShrink: 0 }} />
                               <div ref={coverFormRef} style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ height: 21, marginBottom: 6, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 100, height: 14 }} /></div>
-                                <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8, marginBottom: 16 }} />
-                                <div style={{ height: 21, marginBottom: 6, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 60, height: 14 }} /></div>
-                                <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8, marginBottom: 16 }} />
-                                <div style={{ display: "flex", gap: 16 }}>
+                                <div style={{ height: 21, marginBottom: 8, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 100, height: 14 }} /></div>
+                                <div className="tt-skeleton" style={{ width: "100%", height: 48, borderRadius: 8, marginBottom: 18 }} />
+                                <div style={{ height: 21, marginBottom: 8, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 60, height: 14 }} /></div>
+                                <div className="tt-skeleton" style={{ width: "100%", height: 48, borderRadius: 8, marginBottom: 18 }} />
+                                <div style={{ display: "flex", gap: 18 }}>
                                   <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ height: 21, marginBottom: 6, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 50, height: 14 }} /></div>
-                                    <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8 }} />
+                                    <div style={{ height: 21, marginBottom: 8, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 50, height: 14 }} /></div>
+                                    <div className="tt-skeleton" style={{ width: "100%", height: 48, borderRadius: 8 }} />
                                   </div>
                                   <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ height: 21, marginBottom: 6, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 50, height: 14 }} /></div>
-                                    <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8 }} />
+                                    <div style={{ height: 21, marginBottom: 8, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 50, height: 14 }} /></div>
+                                    <div className="tt-skeleton" style={{ width: "100%", height: 48, borderRadius: 8 }} />
                                   </div>
                                 </div>
                               </div>
@@ -7187,21 +7187,21 @@ function ReportsTab({ demoCase }) {
                         <div key={section.key} style={skeletonCardStyle}>
                           <div style={{ padding: DRAFT_PAD }}>
                             {SECTION_INTRO_SKELETON}
-                            <div style={{ height: 21, marginBottom: 6, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 110, height: 14 }} /></div>
-                            <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8, marginBottom: 16 }} />
-                            <div style={{ height: 21, marginBottom: 6, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 60, height: 14 }} /></div>
-                            <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8, marginBottom: 16 }} />
-                            <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
+                            <div style={{ height: 21, marginBottom: 8, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 110, height: 14 }} /></div>
+                            <div className="tt-skeleton" style={{ width: "100%", height: 48, borderRadius: 8, marginBottom: 18 }} />
+                            <div style={{ height: 21, marginBottom: 8, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 60, height: 14 }} /></div>
+                            <div className="tt-skeleton" style={{ width: "100%", height: 48, borderRadius: 8, marginBottom: 18 }} />
+                            <div style={{ display: "flex", gap: 18, marginBottom: 18 }}>
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ height: 21, marginBottom: 6, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 90, height: 14 }} /></div>
-                                <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8 }} />
+                                <div style={{ height: 21, marginBottom: 8, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 90, height: 14 }} /></div>
+                                <div className="tt-skeleton" style={{ width: "100%", height: 48, borderRadius: 8 }} />
                               </div>
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ height: 21, marginBottom: 6, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 24, height: 14 }} /></div>
-                                <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8 }} />
+                                <div style={{ height: 21, marginBottom: 8, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 24, height: 14 }} /></div>
+                                <div className="tt-skeleton" style={{ width: "100%", height: 48, borderRadius: 8 }} />
                               </div>
                             </div>
-                            <div style={{ height: 21, marginBottom: 6, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 160, height: 14 }} /></div>
+                            <div style={{ height: 21, marginBottom: 8, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 160, height: 14 }} /></div>
                             <div className="tt-skeleton" style={{ width: "100%", height: 97, borderRadius: 8 }} />
                           </div>
                         </div>
@@ -7268,7 +7268,7 @@ function ReportsTab({ demoCase }) {
                                   (previewLoading only ever happens on an
                                   unsaved draft, see renderNoteSlot). */}
                               <div style={{ marginTop: 16, marginBottom: 12 }}>
-                                <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8 }} />
+                                <div className="tt-skeleton" style={{ width: "100%", height: 48, borderRadius: 8 }} />
                               </div>
                               {photoCount > 0 && (
                                 <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8 }}>
@@ -7296,10 +7296,10 @@ function ReportsTab({ demoCase }) {
                             <div style={{ display: "flex", alignItems: "flex-start", gap: 24 }}>
                               <div className="tt-skeleton" style={{ width: FOOTER_UPLOAD_SIZE, height: FOOTER_UPLOAD_SIZE, borderRadius: 8, flexShrink: 0 }} />
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ height: 21, marginBottom: 6, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 50, height: 14 }} /></div>
-                                <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8, marginBottom: 16 }} />
-                                <div style={{ height: 21, marginBottom: 6, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 40, height: 14 }} /></div>
-                                <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8 }} />
+                                <div style={{ height: 21, marginBottom: 8, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 50, height: 14 }} /></div>
+                                <div className="tt-skeleton" style={{ width: "100%", height: 48, borderRadius: 8, marginBottom: 18 }} />
+                                <div style={{ height: 21, marginBottom: 8, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 40, height: 14 }} /></div>
+                                <div className="tt-skeleton" style={{ width: "100%", height: 48, borderRadius: 8 }} />
                               </div>
                             </div>
                           </div>
