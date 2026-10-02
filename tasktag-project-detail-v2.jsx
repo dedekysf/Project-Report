@@ -4393,7 +4393,6 @@ const buildReportHTML = async (report) => {
     h("div", { style: "height:1px;background:#e8e8e6;margin-bottom:16px;" }, "")
   );
 
-  const contactRoleLine = contactRole + (report.companyName ? ` · ${report.companyName}` : "");
   // Real uploaded photo (see contactPhoto/the draft's Footer section) when
   // there is one, same "photo replaces the initials placeholder" pattern
   // the cover photo and logo already use — plain initials circle otherwise.
@@ -4414,7 +4413,7 @@ const buildReportHTML = async (report) => {
         contactAvatarHTML,
         h("div", {},
           h("p", { style: `font-family:${SANS};font-size:12px;font-weight:600;color:#0a1629;line-height:1;margin:0 0 6px;` }, contactName),
-          h("p", { style: `font-family:${SANS};font-size:12px;font-weight:400;color:#6b6b6b;line-height:1;margin:0;` }, contactRoleLine)
+          h("p", { style: `font-family:${SANS};font-size:12px;font-weight:400;color:#6b6b6b;line-height:1;margin:0;` }, contactRole)
         )
       ),
       h("div", { style: `font-family:${SANS};font-size:12px;color:#6b6b6b;line-height:1;align-self:center;white-space:nowrap;` }, `Page ${pageNum} of ${totalPages}`),
