@@ -1077,7 +1077,7 @@ function focusAtEnd(el) {
 // handleSaveReportClick, which also runs the required/format checks that
 // `required`/`validate` describe here). Once the report is saved the
 // `disabled` branch below shows it as plain text, as before.
-function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPlaceholder, filterInput, onSave, onCancel, multiline, disabled, boxed, required, validate, errorMessage, textStyle, inputStyle, as: Tag = "p", alwaysEditing, live, popover, popoverAlign = "left", aboveWhenEditing, counter, maxLength, rows = 2, leadingIcon }) {
+function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPlaceholder, filterInput, onSave, onCancel, multiline, disabled, boxed, required, validate, errorMessage, textStyle, inputStyle, as: Tag = "p", alwaysEditing, live, gap = 0, popover, popoverAlign = "left", aboveWhenEditing, counter, maxLength, rows = 2, leadingIcon }) {
   const { activeField, setActiveField } = useContext(ActiveEditContext);
   const { errors: formErrors, clearError: clearFormError } = useContext(FormErrorsContext);
   const [draft, setDraft] = useState(value || "");
@@ -1197,7 +1197,11 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
         )}
       </div>
     ) : (
-      <div data-field={fieldId}>
+      // The gap to the next field (`gap`) is a fixed margin on this wrapper,
+      // not on the <input> itself: it stays the same whether the field is
+      // empty, filled, or showing an error, instead of depending on
+      // margin-collapsing through the nested wrappers below.
+      <div data-field={fieldId} style={{ marginBottom: gap }}>
         {aboveWhenEditing}
         <div style={{ position: "relative" }}>
           {/* leadingIcon sits inside the input itself (absolutely
@@ -1221,7 +1225,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
             }}
             placeholder={placeholder}
             maxLength={maxLength}
-            style={{ fontFamily: "inherit", paddingLeft: leadingIcon ? 34 : 12, paddingRight: counter && maxLength ? 44 : 12, ...(liveError ? { borderColor: "var(--tt-red)" } : {}), ...inputStyle, ...(liveError ? { marginBottom: 0 } : {}) }}
+            style={{ fontFamily: "inherit", paddingLeft: leadingIcon ? 34 : 12, paddingRight: counter && maxLength ? 44 : 12, ...(liveError ? { borderColor: "var(--tt-red)" } : {}), ...inputStyle, margin: 0 }}
           />
           {counter && maxLength && (
             <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", fontSize: 11, fontWeight: 500, color: current.length >= maxLength ? "var(--tt-red)" : "var(--tt-grey05)" }}>
@@ -1230,12 +1234,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
           )}
         </div>
         {liveError && (
-          // marginBottom:16 here takes over the "gap to next field" job
-          // inputStyle's own margin would normally do — that margin gets
-          // zeroed above whenever an error shows, so the two don't stack
-          // into a much bigger gap than the 4px actually wanted above the
-          // error text itself.
-          <p style={{ color: "var(--tt-red)", fontSize: 10, fontWeight: 500, margin: "4px 0 16px", textAlign: "left" }}>{liveError}</p>
+          <p style={{ color: "var(--tt-red)", fontSize: 10, fontWeight: 500, margin: "4px 0 0", textAlign: "left" }}>{liveError}</p>
         )}
       </div>
     );
@@ -1806,7 +1805,7 @@ function LogoUploadBox({ src, onChange, disabled, size = 120, resizeTo = 360, hi
       ) : (
         <>
           <ImagePlus size={40} strokeWidth={SW} color="var(--tt-grey05)" className="tt-split-imageplus" style={{ flexShrink: 0 }} />
-          <span style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-2)", marginTop: 6 }}>Company Logo</span>
+          <span style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-2)", marginTop: 8 }}>Company Logo</span>
           {hint && !disabled && (
             <span style={{ fontSize: 12, fontWeight: 400, lineHeight: 1.4, color: "var(--tt-grey05)", textAlign: "center", padding: "0 12px", marginTop: 2 }}>{hint}</span>
           )}
@@ -5549,7 +5548,7 @@ function ReportsTab({ demoCase }) {
         onChange={url => setPreview(p => ({ ...p, logo: url }))}
         disabled={previewSaved}
         size={coverLogoSize}
-        hint="PNG or JPG · up to 5 MB"
+        hint="PNG or JPG · Max size 5MB"
       />
       <div ref={coverFormRef} style={{ flex: 1, minWidth: 0 }}>
       {/* TODO(BE): replace with the firm's actual name from the API */}
@@ -5578,7 +5577,8 @@ function ReportsTab({ demoCase }) {
         aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Company Name</p>}
         onSave={v => setPreview(p => ({ ...p, companyName: v }))}
         textStyle={{ fontSize: 22, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 8px" }}
-        inputStyle={{ fontSize: 14, height: 40, margin: "0 0 16px" }}
+        gap={16}
+        inputStyle={{ fontSize: 14, height: 40 }}
       />
       <EditableField
         fieldId="companyAddress"
@@ -5591,7 +5591,8 @@ function ReportsTab({ demoCase }) {
         aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Address</p>}
         onSave={v => setPreview(p => ({ ...p, companyAddress: v }))}
         textStyle={{ fontSize: 14, fontWeight: 400, color: "var(--tt-grey05)", margin: "0 0 12px" }}
-        inputStyle={{ fontSize: 14, height: 40, margin: "0 0 16px" }}
+        gap={16}
+        inputStyle={{ fontSize: 14, height: 40 }}
       />
       {/* Email and phone side by side, no dash between them, a flat 16px
           gap regardless of state (empty input, actively being edited, or
@@ -5694,9 +5695,9 @@ function ReportsTab({ demoCase }) {
                 <ImagePlus size={40} strokeWidth={SW} color="var(--tt-grey05)" className="tt-split-imageplus" style={{ flexShrink: 0 }} />
               )}
               {!previewSaved && (
-                <span style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-2)", marginTop: 6 }}>Highlight Photo</span>
+                <span style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-2)", marginTop: 8 }}>Highlight Photo</span>
               )}
-              <span style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)", marginTop: 2 }}>Landscape 16:9 · PNG or JPG · up to 5 MB</span>
+              <span style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)", marginTop: 2 }}>Landscape 16:9 · PNG or JPG · Max size 5MB</span>
               {!previewSaved && !coverImageUploading && (
                 <Button
                   type="button"
@@ -5800,7 +5801,8 @@ function ReportsTab({ demoCase }) {
           // own — without it, the gap to address below collapses while
           // this field is actively being edited, since inputStyle isn't
           // otherwise related to textStyle at all.
-          inputStyle={{ fontSize: 14, height: 40, margin: "0 0 16px" }}
+          gap={16}
+          inputStyle={{ fontSize: 14, height: 40 }}
         />
         <EditableField
           fieldId="address"
@@ -5816,7 +5818,8 @@ function ReportsTab({ demoCase }) {
           // margin matches textStyle's own — without it, the 32px gap
           // to Prepared For below collapses while this field is actively
           // being edited, the same issue projectName's own margin fixes.
-          inputStyle={{ fontSize: 14, height: 40, margin: "0 0 16px" }}
+          gap={16}
+          inputStyle={{ fontSize: 14, height: 40 }}
         />
         {/* Prepared For and By are the same kind of pair (uppercase label
             + value), both text-secondary throughout — label and value
@@ -6181,7 +6184,8 @@ function ReportsTab({ demoCase }) {
               live
               onSave={v => setPreview(p => ({ ...p, contactName: v }))}
               textStyle={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 8px" }}
-              inputStyle={{ fontSize: 14, height: 40, margin: "0 0 16px" }}
+              gap={16}
+              inputStyle={{ fontSize: 14, height: 40 }}
             />
             <EditableField
               fieldId="contactRole"
@@ -7086,6 +7090,17 @@ function ReportsTab({ demoCase }) {
                           </span>
                         </div>
                       </div>
+                    ) : section.type === "coverHeader" ? (
+                      // Same "Update No. X · period" line on the right of
+                      // the "Cover" heading as the real draft (see
+                      // sectionCards' groupHeading) — static text, already
+                      // known, so it renders for real instead of shimmering.
+                      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16, margin: skeletonGroupHeadingStyle.margin }}>
+                        <p style={{ ...skeletonGroupHeadingStyle, margin: 0 }}>{group.label}</p>
+                        <p style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", color: "var(--tt-text-2)", margin: 0 }}>
+                          Update No. {preview.version} · {preview.period}
+                        </p>
+                      </div>
                     ) : (
                       <p style={skeletonGroupHeadingStyle}>{group.label}</p>
                     );
@@ -7111,20 +7126,20 @@ function ReportsTab({ demoCase }) {
                         <Fragment key={section.key}>
                           {groupHeading}
                           <div style={skeletonCardStyle}>
-                            <div style={{ padding: DRAFT_PAD, display: "flex", gap: 24 }}>
+                            <div style={{ padding: DRAFT_PAD, display: "flex", alignItems: "flex-start", gap: 24 }}>
                               <div className="tt-skeleton" style={{ width: coverLogoSize, height: coverLogoSize, borderRadius: 8, flexShrink: 0 }} />
                               <div ref={coverFormRef} style={{ flex: 1, minWidth: 0 }}>
-                                <div className="tt-skeleton" style={{ width: 100, height: 14, marginBottom: 6 }} />
+                                <div style={{ height: 21, marginBottom: 6, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 100, height: 14 }} /></div>
                                 <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8, marginBottom: 16 }} />
-                                <div className="tt-skeleton" style={{ width: 60, height: 14, marginBottom: 6 }} />
+                                <div style={{ height: 21, marginBottom: 6, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 60, height: 14 }} /></div>
                                 <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8, marginBottom: 16 }} />
                                 <div style={{ display: "flex", gap: 16 }}>
                                   <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div className="tt-skeleton" style={{ width: 50, height: 14, marginBottom: 6 }} />
+                                    <div style={{ height: 21, marginBottom: 6, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 50, height: 14 }} /></div>
                                     <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8 }} />
                                   </div>
                                   <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div className="tt-skeleton" style={{ width: 50, height: 14, marginBottom: 6 }} />
+                                    <div style={{ height: 21, marginBottom: 6, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 50, height: 14 }} /></div>
                                     <div className="tt-skeleton" style={{ width: "100%", height: 40, borderRadius: 8 }} />
                                   </div>
                                 </div>
