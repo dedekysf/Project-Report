@@ -4897,6 +4897,22 @@ function ReportsTab({ demoCase }) {
     return () => document.removeEventListener("keydown", handler);
   }, [preview, lightbox, deleteTarget, photoManager, showSaveConfirm]);
 
+  // First-time setup nudge: when a draft finishes loading and there is no
+  // company identity yet (nothing carried over from a previous saved
+  // report), put the cursor straight into Company Name. If the company data
+  // already exists the field is left alone. Runs once per draft (on the
+  // loading → loaded transition), not on every edit.
+  const draftOpen = !!preview;
+  useEffect(() => {
+    if (!draftOpen || previewLoading) return;
+    if (preview.companyName && preview.companyName.trim()) return;
+    const id = requestAnimationFrame(() => {
+      document.querySelector('[data-field="companyName"] input')?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftOpen, previewLoading]);
+
   // This screen is a full-screen takeover with its own scroll container —
   // the page behind it has no reason to scroll (or show its own scrollbar)
   // while it's open.
@@ -5501,7 +5517,7 @@ function ReportsTab({ demoCase }) {
   // Name, Address, Email/Phone.
   // Also reused by the Footer section's own Name/Role labels, for the
   // same "shared form-field convention" reasoning as before.
-  const FIELD_LABEL_STYLE = { fontSize: 14, fontWeight: 500, color: "var(--tt-text-2)", margin: "0 0 8px" };
+  const FIELD_LABEL_STYLE = { fontSize: 14, fontWeight: 500, color: "var(--tt-text-1)", margin: "0 0 8px" };
   // Measures the form column's actual rendered height (it changes as
   // labels/errors show and hide while editing) so the logo box beside it
   // can be kept an exact square matching that height. Pure CSS
@@ -5930,7 +5946,7 @@ function ReportsTab({ demoCase }) {
           maxLength={ADDITIONAL_INFO_MAX_LEN}
           aboveWhenEditing={
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 8 }}>
-              <p style={{ fontSize: 14, fontWeight: 500, color: "var(--tt-text-2)", margin: 0 }}>Additional Information</p>
+              <p style={{ fontSize: 14, fontWeight: 500, color: "var(--tt-text-1)", margin: 0 }}>Additional Information</p>
               <span style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)", lineHeight: 1 }}>Optional</span>
             </div>
           }
@@ -8128,7 +8144,7 @@ export default function ProjectDetail() {
       {/* Description */}
       <div className="px-4 pt-4 pb-6">
         <div className="p-4" style={{ background: "var(--tt-grey02)", borderRadius: 16 }}>
-          <p className="text-[16px] font-semibold leading-6 text-[var(--tt-text-1)] mb-1">Description</p>
+          <p className="text-[16px] font-semibold leading-6 text-[var(--tt-text-2)] mb-1">Description</p>
           <p className="text-[14px] text-[var(--tt-text-2)] leading-6 max-w-[680px]">
             This project focuses on conducting a comprehensive assessment and improvement.
           </p>
@@ -8151,7 +8167,7 @@ export default function ProjectDetail() {
               <Clock size={18} color="var(--tt-secondary)" strokeWidth={SW} className="tt-split-clock" />
             </div>
             <div>
-              <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", margin: 0 }}>16h logged this week</p>
+              <p style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", margin: 0 }}>16h logged this week</p>
               <p style={{ fontSize: 14, color: "var(--tt-grey05)", margin: 0 }}>Across 4 members</p>
             </div>
           </div>
