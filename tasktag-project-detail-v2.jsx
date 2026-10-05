@@ -7610,7 +7610,7 @@ function PaywallModal({ onClose }) {
     >
       <div
         onClick={e => e.stopPropagation()}
-        style={{ position: "relative", width: 440, maxWidth: "calc(100vw - 32px)", background: "white", borderRadius: 16, padding: "32px 28px 28px", boxShadow: "0 16px 48px rgba(10,22,41,0.25)" }}
+        style={{ position: "relative", width: 600, maxWidth: "calc(100vw - 32px)", background: "white", borderRadius: 16, padding: "32px 28px 28px", boxShadow: "0 16px 48px rgba(10,22,41,0.25)" }}
       >
         <button
           onClick={onClose}
