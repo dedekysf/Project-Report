@@ -1083,6 +1083,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
   const [draft, setDraft] = useState(value || "");
   const [error, setError] = useState(false);
   const alwaysEditingRef = useRef(null);
+  const cancelBlurRef = useRef(false); // set by Escape so the blur it triggers cancels instead of saving
   // Shares activeField/setActiveField with the click-to-edit `editing`
   // branch below instead of tracking its own local "am I focused" state —
   // that's what makes clicking a second alwaysEditing field's committed
@@ -1362,6 +1363,28 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
       setError(false);
       alwaysEditingRef.current?.blur();
     };
+    // Click away = SAVE (not cancel): leaving the field commits whatever is
+    // in the draft, exactly like the confirm button/Enter would — unless it
+    // fails the field's own rules (required/validate), in which case the
+    // edit is dropped back to the last good value. Escape is the explicit
+    // cancel: it sets cancelBlurRef so the blur it triggers reverts instead.
+    const handleBlurSave = () => {
+      setActiveField(prev => prev === fieldId ? null : prev);
+      if (cancelBlurRef.current) {
+        cancelBlurRef.current = false;
+        setDraft(editStartValueRef.current || "");
+        setError(false);
+        return;
+      }
+      const trimmed = draft.trim();
+      const startTrimmed = (editStartValueRef.current || "").trim();
+      const invalid = (required && !trimmed) || (trimmed && validate && !validate(trimmed));
+      if (invalid) { setDraft(editStartValueRef.current || ""); setError(false); return; }
+      if (trimmed !== startTrimmed) onSave(trimmed);
+      editStartValueRef.current = trimmed;
+      setDraft(trimmed);
+      setError(false);
+    };
     // Hidden on a pristine, still-blank field until the user actually
     // types something — there's nothing to confirm yet. Once this edit
     // session started from an existing non-blank value (editStartValueRef
@@ -1454,17 +1477,13 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
             // OTHER field's click just claimed activeField. A successful
             // commit() already synced editStartValueRef to the fresh value
             // first, so this reset is a no-op in that case, not a revert.
-            onBlur={() => {
-              setActiveField(prev => prev === fieldId ? null : prev);
-              setDraft(editStartValueRef.current || "");
-              setError(false);
-            }}
+            onBlur={handleBlurSave}
             onKeyDown={ev => {
               if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); commit(); }
               // stopPropagation so this only blurs (cancelling) this
               // field's own edit, not bubbling into the preview modal's
               // own document-level Escape listener and closing it too.
-              if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); alwaysEditingRef.current?.blur(); }
+              if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); cancelBlurRef.current = true; alwaysEditingRef.current?.blur(); }
             }}
             placeholder={placeholder}
             rows={rows}
@@ -1502,14 +1521,10 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
             onChange={ev => { setDraft(filterInput ? filterInput(ev.target.value) : ev.target.value); if (error) setError(false); }}
             onFocus={() => setActiveField(fieldId)}
             // Same blur-is-cancel reset as the multiline branch above.
-            onBlur={() => {
-              setActiveField(prev => prev === fieldId ? null : prev);
-              setDraft(editStartValueRef.current || "");
-              setError(false);
-            }}
+            onBlur={handleBlurSave}
             onKeyDown={ev => {
               if (ev.key === "Enter") { ev.preventDefault(); commit(); }
-              if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); alwaysEditingRef.current?.blur(); }
+              if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); cancelBlurRef.current = true; alwaysEditingRef.current?.blur(); }
             }}
             placeholder={placeholder}
             style={{ fontFamily: "inherit", padding: `0 ${buttonReserve}px 0 12px`, ...(error ? { borderColor: "var(--tt-red)" } : {}), ...inputStyle }}
@@ -1660,6 +1675,14 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
 // anyway (just resized down like any other). This is what both of those
 // now check against first.
 const MAX_UPLOAD_IMAGE_BYTES = 5 * 1024 * 1024;
+// Draft uploads (logo, highlight photo, profile photo) accept PNG and JPG only —
+// the file picker is filtered to these (UPLOAD_ACCEPT) AND the chosen file is
+// re-checked (isAllowedUploadType), since "All files" in the picker or a
+// drag from elsewhere can still hand over e.g. AVIF/WebP/SVG.
+const UPLOAD_ACCEPT = "image/png,image/jpeg,.png,.jpg,.jpeg";
+const UPLOAD_TYPE_ERROR = "Only PNG or JPG files are allowed.";
+const isAllowedUploadType = (file) =>
+  ["image/png", "image/jpeg"].includes(file.type) || /.(png|jpe?g)$/i.test(file.name || "") && !file.type;
 
 const resizeImageToDataURL = (file, maxDim = 64, mimeType = "image/png", quality) => new Promise((resolve, reject) => {
   const reader = new FileReader();
@@ -1703,6 +1726,7 @@ function LogoUploadBox({ src, onChange, disabled, size = 120, resizeTo = 360, hi
     const file = ev.target.files?.[0];
     ev.target.value = "";
     if (!file) return;
+    if (!isAllowedUploadType(file)) { setError(UPLOAD_TYPE_ERROR); return; }
     if (file.size > MAX_UPLOAD_IMAGE_BYTES) { setError("File size exceeds the limit of 5 MB."); return; }
     setError("");
     setLoading(true);
@@ -1826,7 +1850,7 @@ function LogoUploadBox({ src, onChange, disabled, size = 120, resizeTo = 360, hi
         <input
           ref={inputRef}
           type="file"
-          accept="image/*"
+          accept={UPLOAD_ACCEPT}
           onChange={handleFile}
           style={{ display: "none" }}
         />
@@ -2843,10 +2867,10 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
                 }}
                 value={caption || ""}
                 onChange={ev => onCaptionChange && onCaptionChange(originalIdx, ev.target.value.slice(0, CAPTION_MAX_LEN))}
-                // Blur = cancel (click away) — reverts the same way Escape
-                // does. The check button's own onMouseDown preventDefault
-                // (below) stops clicking it from triggering this first.
-                onBlur={revertAndClose}
+                // Click away = save: every keystroke already committed live via
+                // onCaptionChange, so closing editing is all that's left.
+                // Escape is the only way to cancel (revertAndClose).
+                onBlur={() => setCaptionEditing(false)}
                 onKeyDown={ev => {
                   // Enter alone confirms (closes editing, same as the
                   // Check button); Shift+Enter inserts a real newline.
@@ -4648,6 +4672,7 @@ function ReportsTab({ demoCase }) {
     const file = ev.target.files?.[0];
     ev.target.value = "";
     if (!file) return;
+    if (!isAllowedUploadType(file)) { setCoverImageError(UPLOAD_TYPE_ERROR); return; }
     if (file.size > MAX_UPLOAD_IMAGE_BYTES) { setCoverImageError("File size exceeds the limit of 5 MB."); return; }
     setCoverImageError("");
     setCoverImageUploading(true);
@@ -5773,7 +5798,7 @@ function ReportsTab({ demoCase }) {
             <input
               ref={coverImageInputRef}
               type="file"
-              accept="image/*"
+              accept={UPLOAD_ACCEPT}
               onChange={handleCoverImageUpload}
               style={{ display: "none" }}
             />
