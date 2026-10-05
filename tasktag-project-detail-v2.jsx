@@ -1523,7 +1523,12 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
             placeholder={placeholder}
             style={{ fontFamily: "inherit", padding: `0 ${buttonReserve}px 0 12px`, ...(error ? { borderColor: "var(--tt-red)" } : {}), ...inputStyle }}
           />
-          <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>{showConfirm && confirmButton}</div>
+          {/* Vertically centered (not bottom-anchored like the multiline
+              branch's own confirm button, which tracks a growing
+              textarea's bottom edge) — this is a fixed-height single-line
+              input, so centering is what actually fills it instead of
+              leaving an uneven gap above the button. */}
+          <div style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center", gap: 4 }}>{showConfirm && confirmButton}</div>
         </div>
         {error && (
           <p style={{ color: "var(--tt-red)", fontSize: 12, fontWeight: 500, margin: "4px 0 0", textAlign: "left" }}>
@@ -5183,6 +5188,7 @@ function ReportsTab({ demoCase }) {
         <EditableField
           fieldId={`title_${entryKey}`}
           value={displayTitle}
+          placeholder="Enter task name..."
           disabled={previewSaved}
           // Same independent-save flow as a checklist item (plain text →
           // click to edit → confirm button commits), not a live form field
@@ -5195,7 +5201,7 @@ function ReportsTab({ demoCase }) {
             });
           }}
           textStyle={{ fontSize: 18, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.35", margin: 0 }}
-          inputStyle={{ fontSize: 18, fontWeight: 600 }}
+          inputStyle={{ fontSize: 14, fontWeight: 400, height: 48 }}
         />
         {/* Status/date meta line — Completed (green) folds its date
             directly into the status text ("Completed Sep 9", no
@@ -6098,6 +6104,7 @@ function ReportsTab({ demoCase }) {
           {showGroupHeading && preview.includeSummary && previewChecklistItemCount === 0 && (
             <div style={{
               display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
+              width: PAGE_W, boxSizing: "border-box",
               padding: "12px 16px", borderRadius: 12,
               border: "1px solid var(--tt-grey03)", background: "white",
               marginBottom: 16,
@@ -6107,7 +6114,7 @@ function ReportsTab({ demoCase }) {
                 <span style={{ fontSize: 14, color: "var(--tt-text-2)" }}>No checklist items were completed in this period.</span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                <EyeOff size={14} strokeWidth={SW} color="var(--tt-grey05)" style={{ flexShrink: 0 }} />
+                <EyeOff size={16} strokeWidth={SW} color="var(--tt-grey05)" style={{ flexShrink: 0 }} />
                 <span style={{ fontSize: 12, color: "var(--tt-grey05)" }}>Only you see this</span>
               </div>
             </div>
