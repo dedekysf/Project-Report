@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   ChevronLeft, Search, MoreVertical, Plus, Check, Link, Download,
-  LayoutGrid, MapPin, Hash, FileText, FileImage, IdCard,
+  MapPin, Hash, FileText, FileImage, IdCard,
   Activity, Users, BarChart2, SlidersHorizontal,
   ArrowUpDown, Calendar, AlignJustify, Clock,
   UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, Crown, AlertTriangle,
@@ -70,7 +70,7 @@ style.textContent = `
     color: var(--tt-text-2) !important;
     border-bottom: none !important;
     border-radius: 8px !important;
-    padding: 12px 12px;
+    padding: 14px 12px;
     font-size: 14px;
     font-weight: 400 !important;
     background: transparent !important;
@@ -266,11 +266,6 @@ style.textContent = `
   .tt-split-crown path:nth-of-type(1) { stroke-width: 1.6; }
   .tt-split-crown path:nth-of-type(2) { stroke-width: 1.4; }
 
-  /* LayoutGrid — top row outline, bottom row inner. */
-  .tt-split-layoutgrid rect:nth-of-type(1),
-  .tt-split-layoutgrid rect:nth-of-type(2) { stroke-width: 1.6; }
-  .tt-split-layoutgrid rect:nth-of-type(3),
-  .tt-split-layoutgrid rect:nth-of-type(4) { stroke-width: 1.4; }
 
   /* Search — lens outline, handle inner. */
   .tt-split-search circle { stroke-width: 1.6; }
@@ -477,7 +472,6 @@ const ICON_SPLIT_CLASSES = new Map([
   [Loader, "tt-split-loader"],
   [BarChart2, "tt-split-barchart2"],
   [Crown, "tt-split-crown"],
-  [LayoutGrid, "tt-split-layoutgrid"],
   [Search, "tt-split-search"],
   [UserPlus, "tt-split-userplus"],
   [SlidersHorizontal, "tt-split-slidershorizontal"],
@@ -6735,7 +6729,7 @@ function ReportsTab({ demoCase }) {
           <thead style={{ position: "sticky", top: 0, zIndex: 1 }}>
             <tr style={{ background: "var(--tt-grey02)", borderBottom: `1px solid var(--tt-grey03)` }}>
               {["Project Name", "Period", "Generation date"].map((h) => (
-                <th key={h} style={{ textAlign: "left", padding: "10px 16px", fontSize: 12, fontWeight: 500, color: "var(--tt-text-1)" }}>{h}</th>
+                <th key={h} style={{ textAlign: "left", padding: "10px 16px", fontSize: 14, fontWeight: 600, color: "var(--tt-text-2)" }}>{h}</th>
               ))}
               <th style={{ padding: "10px 16px", width: 190 }} />
             </tr>
@@ -6761,8 +6755,8 @@ function ReportsTab({ demoCase }) {
                    highlight off to (see lastSavedId), so it would just
                    sit there permanently instead of reading as recent. */
                 <tr key={r.id} style={{ background: (!paywalled && r.id === lastSavedId) ? "var(--tt-mint)" : "white", borderTop: i > 0 ? `1px solid var(--tt-grey03)` : "none", transition: "background 0.6s ease" }}>
-                  <td style={{ padding: "0 16px", fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", height: 52, verticalAlign: "middle", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.projectName || PROJECT_NAME}</td>
-                  <td style={{ padding: "0 16px", fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", height: 52, verticalAlign: "middle", whiteSpace: "nowrap" }}>
+                  <td style={{ padding: "0 16px", fontSize: 14, fontWeight: 500, color: "var(--tt-text-2)", height: 52, verticalAlign: "middle", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.projectName || PROJECT_NAME}</td>
+                  <td style={{ padding: "0 16px", fontSize: 14, fontWeight: 500, color: "var(--tt-text-2)", height: 52, verticalAlign: "middle", whiteSpace: "nowrap" }}>
                     {/* Update No. shown alongside the period since the same
                         period can be regenerated and saved more than once —
                         the period alone can't tell those saves apart. */}
@@ -8096,43 +8090,45 @@ export default function ProjectDetail() {
 
       {/* Header */}
       <div className="flex items-center justify-between gap-4 px-4 py-4 border-b border-[var(--tt-grey03)]">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <Button variant="ghost" size="icon" className="w-7 h-7 shrink-0 text-[var(--tt-grey05)] hover:bg-[var(--tt-grey02)]" style={{ borderRadius: 12 }}>
-            <ChevronLeft size={16} strokeWidth={SW} />
-          </Button>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <p className="text-[24px] font-bold leading-[1.1] text-[var(--tt-text-1)] truncate">
-                {PROJECT_NAME}
-              </p>
-              <Button variant="ghost" size="icon" className="w-6 h-6 shrink-0 text-[var(--tt-text-2)] hover:bg-[var(--tt-grey02)]" style={{ borderRadius: 12 }}>
-                <MoreVertical size={16} strokeWidth={SW} className="tt-split-morevertical" />
-              </Button>
-            </div>
-            <div className="flex items-center gap-3 mt-[2px]">
+        <div className="min-w-0 flex-1">
+          {/* Back arrow, title and kebab share one row, so the arrow centers
+              on the TITLE line (not on the title + subtitle block). Both
+              icon buttons are 24x24 rectangular boxes (6px radius) holding 20px icons. */}
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" className="w-6 h-6 p-0 shrink-0 text-[var(--tt-grey05)] hover:bg-[var(--tt-grey02)]" style={{ borderRadius: 6 }}>
+              <ChevronLeft size={20} strokeWidth={SW} />
+            </Button>
+            <p className="text-[24px] font-bold leading-[1.1] text-[var(--tt-text-1)] truncate">
+              {PROJECT_NAME}
+            </p>
+            <Button variant="ghost" size="icon" className="w-6 h-6 p-0 shrink-0 text-[var(--tt-text-2)] hover:bg-[var(--tt-grey02)]" style={{ borderRadius: 6 }}>
+              <MoreVertical size={20} strokeWidth={SW} className="tt-split-morevertical" />
+            </Button>
+          </div>
+          {/* pl-8 = arrow (24) + gap (8): keeps the subtitle aligned under the title text */}
+          <div className="flex items-center gap-3 mt-2 pl-8">
               <span className="flex items-center gap-1 text-[12px] text-[var(--tt-text-2)]">
-                <LayoutGrid size={12} strokeWidth={SW} className="tt-split-layoutgrid" /> Personal Projects
+                <Users size={12} strokeWidth={SW} /> Personal Projects
               </span>
-              <span className="flex items-center gap-1 text-[12px] text-[var(--tt-text-2)]">
+              <span className="flex items-center gap-1 text-[12px] text-[var(--tt-grey05)]">
                 <MapPin size={12} strokeWidth={SW} className="tt-split-mappin" /> {PROJECT_ADDRESS}
               </span>
             </div>
           </div>
-        </div>
         <div className="flex items-center gap-2 shrink-0">
           <Button variant="ghost" size="icon" className="w-8 h-8 text-[var(--tt-text-2)] hover:bg-[var(--tt-grey02)]" style={{ borderRadius: 12 }}>
             <Search size={20} strokeWidth={SW} className="tt-split-search" />
           </Button>
-          <Button className="gap-2 bg-[var(--tt-text-1)] hover:bg-black text-white text-[14px] font-medium h-8 px-4 !rounded-full">
-            <Plus size={16} strokeWidth={SW} className="tt-split-plus" /> New Task
+          <Button className="gap-2 bg-[var(--tt-text-1)] hover:bg-black text-white text-[14px] font-medium h-8 px-4 w-[120px] !rounded-full">
+            <Plus size={14} strokeWidth={SW} className="tt-split-plus" /> New Task
           </Button>
         </div>
       </div>
 
       {/* Description */}
-      <div className="px-4 pt-3 pb-4">
+      <div className="px-4 pt-4 pb-6">
         <div className="p-4" style={{ background: "var(--tt-grey02)", borderRadius: 16 }}>
-          <p className="text-[16px] font-semibold leading-6 text-[var(--tt-text-1)] mb-3">Description</p>
+          <p className="text-[16px] font-semibold leading-6 text-[var(--tt-text-1)] mb-1">Description</p>
           <p className="text-[14px] text-[var(--tt-text-2)] leading-6 max-w-[680px]">
             This project focuses on conducting a comprehensive assessment and improvement.
           </p>
@@ -8140,7 +8136,7 @@ export default function ProjectDetail() {
       </div>
 
       {/* Timesheet summary banner */}
-      <div className="px-4 pb-3">
+      <div className="px-4 pb-6">
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
           padding: "16px", borderRadius: 12,
@@ -8212,20 +8208,21 @@ export default function ProjectDetail() {
           })}
 
           <div className="flex-1" />
-          {/* Extra right padding so Invite's edge lines up with Open
-              Timesheet's above it, which sits inside a card with its own
-              16px padding on top of this row's 16px (px-4). */}
-          <div className="flex items-center gap-2 pb-[1px] pr-4">
+          {/* No extra right padding: Invite's right edge lines up with the
+              New Task button above it (both sit at this row's / the header's
+              16px px-4 inset). Vertically centered on the tab bar: tabs are 48px tall (14px
+              padding) and Invite is 32px, so 8px above and below. */}
+          <div className="flex items-center gap-2 self-center">
             <Button
               variant="ghost" size="icon"
               className="w-8 h-8 hover:bg-[var(--tt-grey02)]"
               style={{ color: "var(--tt-grey06)" }}
             >
-              <Link size={16} strokeWidth={SW} className="tt-split-link" />
+              <Link size={20} strokeWidth={SW} className="tt-split-link" />
             </Button>
             <Button
               variant="outline" size="sm"
-              className="gap-2 h-8 px-4 text-[14px] font-medium bg-white"
+              className="gap-2 h-8 px-4 w-[120px] text-[14px] font-medium bg-white"
               style={{ color: "var(--tt-text-1)", borderColor: "var(--tt-text-1)", borderWidth: "1.5px", borderRadius: "9999px" }}
             >
               <UserPlus size={14} strokeWidth={SW} className="tt-split-userplus" />
