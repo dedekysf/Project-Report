@@ -6593,12 +6593,8 @@ function ReportsTab({ demoCase }) {
 
       {!preview && (
       <>
-      {/* ── Create report — compact card ── */}
-      <div style={{ background: "var(--tt-grey02)", borderRadius: 16, padding: 20, marginBottom: 24 }}>
-        <div style={{ marginBottom: 16 }}>
-          <p style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)" }}>Choose what this report includes.</p>
-        </div>
-
+      {/* ── Create report ── */}
+      <div style={{ marginBottom: 24, paddingBottom: 24, borderBottom: "1px solid var(--tt-grey03)" }}>
         {/* Filter row */}
         <div style={{ display: "flex", alignItems: "flex-end", gap: 24, width: "100%" }}>
 
@@ -6663,8 +6659,8 @@ function ReportsTab({ demoCase }) {
           <div style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
             <Label style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)", marginBottom: 6, display: "block" }}>Include</Label>
             <div style={{ display: "flex", alignItems: "center", gap: 20, height: 40 }}>
-              <ReportCheckbox active={includeSummary} label="Task summary" onClick={() => setIncludeSummary(v => !v)} />
-              <ReportCheckbox active={includeNoPhotoTasks} label="Task complete without photos" onClick={() => setIncludeNoPhotoTasks(v => !v)} />
+              <ReportCheckbox active={includeSummary} label="Include checklist items" onClick={() => setIncludeSummary(v => !v)} />
+              <ReportCheckbox active={includeNoPhotoTasks} label="Tasks without photos" onClick={() => setIncludeNoPhotoTasks(v => !v)} />
             </div>
           </div>
 
@@ -8223,14 +8219,6 @@ export default function ProjectDetail() {
                     background: "var(--tt-grey06)", color: "white",
                     fontSize: 12, fontWeight: 600, lineHeight: 1, flexShrink: 0,
                   }}>4</span>
-                )}
-                {id === "timesheet" && (
-                  <span style={{
-                    display: "inline-flex", alignItems: "center", justifyContent: "center",
-                    padding: "2px 8px", borderRadius: 999,
-                    background: "var(--tt-mint)", color: "var(--tt-secondary)",
-                    fontSize: 11, fontWeight: 600, lineHeight: 1.3, flexShrink: 0,
-                  }}>16h</span>
                 )}
               </TabsTrigger>
             );
