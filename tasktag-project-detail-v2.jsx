@@ -616,7 +616,7 @@ function statusForEntry(e) {
 }
 const STATUS_META = {
   completed: { label: "Completed", color: "var(--tt-secondary)" },
-  open:      { label: "Open",      color: "var(--tt-blue)" },
+  open:      { label: "Ongoing",   color: "var(--tt-blue)" },
 };
 
 // ── Date Range Calendar ──
@@ -4087,7 +4087,7 @@ const buildReportHTML = async (report) => {
   const checklistLabelHTML = (e) =>
     h("div", { style: "margin-top:24px;" },
       h("p", { style: `font-family:${SANS};font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#6b6b6b;margin:0 0 16px;` },
-        "Checklist items completed as of this update"
+        "Checklist items completed this period"
       )
     );
 
@@ -5287,7 +5287,7 @@ function ReportsTab({ demoCase }) {
           // this task's own checklist, not any other task's.
           <div data-checklist-list={entryKey}>
             <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-text-2)", margin: "16px 0 8px" }}>
-              Checklist items completed as of this update
+              Checklist items completed this period
             </p>
             {!previewSaved && checklistItems.length >= 10 && (
               <p style={{ margin: "-4px 0 8px", color: "var(--tt-grey05)", fontSize: 12, fontWeight: 400 }}>
@@ -8057,6 +8057,20 @@ export default function ProjectDetail() {
   const [activeTab, setActiveTab] = useState("reports");
   const [demoCase, setDemoCase] = useState("happy");
 
+  // Description — single line by default (truncated with an ellipsis),
+  // only grows an expand/collapse action once its own text actually
+  // overflows that one line; a short description never gets a "Show
+  // more" it doesn't need. descRef measures that overflow once after
+  // mount (scrollWidth > clientWidth on a nowrap/truncated line reveals
+  // it didn't all fit on one line).
+  const [descExpanded, setDescExpanded] = useState(false);
+  const [descNeedsToggle, setDescNeedsToggle] = useState(false);
+  const descRef = useRef(null);
+  useLayoutEffect(() => {
+    const el = descRef.current;
+    if (el) setDescNeedsToggle(el.scrollWidth > el.clientWidth);
+  }, []);
+
   const demoCases = [
     { id: "happy",      label: "Happy Flow" },
     { id: "error",      label: "Generate error" },
@@ -8069,6 +8083,7 @@ export default function ProjectDetail() {
     { id: "checklist", label: "Checklist",     Icon: FileText },
     { id: "files",     label: "Files & Media", Icon: FileImage },
     { id: "activity",  label: "Activity Log",  Icon: Activity },
+    { id: "timesheet", label: "Timesheet",     Icon: Clock },
     { id: "members",   label: "Members",       Icon: Users },
     { id: "reports",   label: "Reports",       Icon: BarChart2 },
   ];
@@ -8105,7 +8120,7 @@ export default function ProjectDetail() {
       <div style={{ maxWidth: 1114, margin: "0 auto", background: "white", minHeight: "100vh" }}>
 
       {/* Header */}
-      <div className="flex items-center justify-between gap-4 px-4 py-4 border-b border-[var(--tt-grey03)]">
+      <div className="flex items-center justify-between gap-4 px-4 pt-4">
         <div className="min-w-0 flex-1">
           {/* Back arrow, title and kebab share one row, so the arrow centers
               on the TITLE line (not on the title + subtitle block). Both
@@ -8123,11 +8138,11 @@ export default function ProjectDetail() {
           </div>
           {/* pl-8 = arrow (24) + gap (8): keeps the subtitle aligned under the title text */}
           <div className="flex items-center gap-3 mt-2 pl-8">
-              <span className="flex items-center gap-1 text-[12px] text-[var(--tt-text-2)]">
-                <Users size={12} strokeWidth={SW} /> Personal Projects
+              <span className="flex items-center gap-1 text-[12px] leading-none text-[var(--tt-text-2)] hover:underline cursor-pointer">
+                <Users size={14} strokeWidth={SW} style={{ display: "block", flexShrink: 0 }} /> Painting Team
               </span>
-              <span className="flex items-center gap-1 text-[12px] text-[var(--tt-grey05)]">
-                <MapPin size={12} strokeWidth={SW} className="tt-split-mappin" /> {PROJECT_ADDRESS}
+              <span className="flex items-center gap-1 text-[12px] leading-none text-[var(--tt-grey05)] hover:underline cursor-pointer">
+                <MapPin size={14} strokeWidth={SW} className="tt-split-mappin" style={{ display: "block", flexShrink: 0 }} /> {PROJECT_ADDRESS}
               </span>
             </div>
           </div>
@@ -8141,50 +8156,40 @@ export default function ProjectDetail() {
         </div>
       </div>
 
-      {/* Description */}
-      <div className="px-4 pt-4 pb-6">
-        <div className="p-4" style={{ background: "var(--tt-grey02)", borderRadius: 16 }}>
-          <p className="text-[16px] font-semibold leading-6 text-[var(--tt-text-2)] mb-1">Description</p>
-          <p className="text-[14px] text-[var(--tt-text-2)] leading-6 max-w-[680px]">
-            This project focuses on conducting a comprehensive assessment and improvement.
-          </p>
-        </div>
-      </div>
-
-      {/* Timesheet summary banner */}
-      <div className="px-4 pb-6">
-        <div style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "16px", borderRadius: 12,
-          border: "1px solid var(--tt-grey03)", background: "white",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{
-              width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-              background: "var(--tt-mint)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <Clock size={18} color="var(--tt-secondary)" strokeWidth={SW} className="tt-split-clock" />
-            </div>
-            <div>
-              <p style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", margin: 0 }}>16h logged this week</p>
-              <p style={{ fontSize: 14, color: "var(--tt-grey05)", margin: 0 }}>Across 4 members</p>
-            </div>
-          </div>
-          <button style={{
-            display: "flex", alignItems: "center", gap: 6,
-            height: 40, padding: "0 12px", border: "none",
-            borderRadius: 12, background: "transparent", cursor: "pointer",
-            fontSize: 14, fontWeight: 500, color: "var(--tt-text-1)",
-            transition: "background 0.15s",
-          }}
-            onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
-            onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+      {/* Description — no card/label, just the text itself, left-aligned
+          to the subtitle row's own icons (pl-8) rather than the page's
+          flat px-4, so it reads as one more line about this project
+          alongside "Personal Projects"/the address above it. */}
+      <div className="pl-12 pr-4 pt-3 pb-4 mb-6">
+        <div className="flex items-baseline">
+          <p
+            ref={descRef}
+            className={descExpanded ? "text-[12px] text-[var(--tt-text-2)] leading-6" : "text-[12px] text-[var(--tt-text-2)] leading-6 truncate min-w-0"}
           >
-            <Clock size={14} strokeWidth={SW} color="var(--tt-text-2)" className="tt-split-clock" />
-            <span style={{ lineHeight: "14px" }}>Open Timesheet</span>
-            <ChevronDown size={14} strokeWidth={SW} color="var(--tt-grey05)" style={{ transform: "rotate(-90deg)" }} />
-          </button>
+            This project focuses on conducting a comprehensive assessment and improvement of the residential property located at 123 Main St, covering structural integrity, electrical systems, plumbing, roofing, and interior finishes, with the goal of identifying deferred maintenance items, code compliance gaps, and opportunities for energy-efficiency upgrades ahead of the upcoming renovation phase.
+            {descExpanded && descNeedsToggle && (
+              <button
+                onClick={() => setDescExpanded(false)}
+                className="ml-1 text-[12px] font-medium hover:underline"
+                style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--tt-text-2)" }}
+              >
+                Less
+              </button>
+            )}
+          </p>
+          {/* Collapsed state only — the truncated <p>'s own native
+              ellipsis already renders the "..."; this is just the
+              clickable word after it, spaced off with ml-2 like the
+              reference shows, not glued onto the ellipsis itself. */}
+          {!descExpanded && descNeedsToggle && (
+            <button
+              onClick={() => setDescExpanded(true)}
+              className="ml-2 flex-shrink-0 text-[12px] font-medium hover:underline"
+              style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--tt-text-2)" }}
+            >
+              More
+            </button>
+          )}
         </div>
       </div>
 
@@ -8219,6 +8224,14 @@ export default function ProjectDetail() {
                     fontSize: 12, fontWeight: 600, lineHeight: 1, flexShrink: 0,
                   }}>4</span>
                 )}
+                {id === "timesheet" && (
+                  <span style={{
+                    display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    padding: "2px 8px", borderRadius: 999,
+                    background: "var(--tt-mint)", color: "var(--tt-secondary)",
+                    fontSize: 11, fontWeight: 600, lineHeight: 1.3, flexShrink: 0,
+                  }}>16h</span>
+                )}
               </TabsTrigger>
             );
           })}
@@ -8247,7 +8260,44 @@ export default function ProjectDetail() {
           </div>
         </TabsList>
 
-        <TabsContent value="tasks"     className="mt-0 px-4" style={{ paddingTop: 16 }} />
+        <TabsContent value="tasks" className="mt-0 px-4" style={{ paddingTop: 16 }}>
+          {/* Timesheet summary banner — Tasks tab only, so it reads as
+              "hours logged on this project's tasks", not a global page
+              header shown the same way under every other tab too. */}
+          <div className="pb-6">
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "8px 8px 8px 14px", borderRadius: 12,
+              border: "1px solid var(--tt-grey03)", background: "white",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+                  background: "var(--tt-mint)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <Clock size={14} color="var(--tt-secondary)" strokeWidth={SW} className="tt-split-clock" style={{ display: "block" }} />
+                </div>
+                <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", margin: 0 }}>16h logged this week <span style={{ fontWeight: 400, color: "var(--tt-grey05)" }}>· Across 4 members</span></p>
+              </div>
+              <button
+                onClick={() => setActiveTab("timesheet")}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  height: 40, padding: "0 12px", border: "none",
+                  borderRadius: 12, background: "transparent", cursor: "pointer",
+                  fontSize: 14, fontWeight: 500, color: "var(--tt-text-1)",
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              >
+                <span style={{ lineHeight: "14px" }}>Open Timesheet</span>
+                <ChevronDown size={16} strokeWidth={SW} color="var(--tt-grey05)" style={{ transform: "rotate(-90deg)" }} />
+              </button>
+            </div>
+          </div>
+        </TabsContent>
         <TabsContent value="reports"   className="mt-0 px-4" style={{ paddingTop: 16 }}>
           {/* "Paywall" no longer swaps out the whole tab for a static
               mockup — ReportsTab itself now simulates the free-tier gate
@@ -8260,6 +8310,7 @@ export default function ProjectDetail() {
         <TabsContent value="checklist" className="mt-0 px-4" style={{ paddingTop: 16 }}></TabsContent>
         <TabsContent value="files"     className="mt-0 px-4" style={{ paddingTop: 16 }} />
         <TabsContent value="activity"  className="mt-0 px-4" style={{ paddingTop: 16 }} />
+        <TabsContent value="timesheet" className="mt-0 px-4" style={{ paddingTop: 16 }} />
         <TabsContent value="members"   className="mt-0 px-4" style={{ paddingTop: 16 }} />
       </Tabs>
       </div>
