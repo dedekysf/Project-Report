@@ -13,7 +13,7 @@ import {
   ArrowUpDown, Calendar, AlignJustify, Clock,
   UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, Crown, AlertTriangle,
   RotateCw, ZoomIn, ZoomOut, Folder, ArrowLeft, ArrowRight, Info, StickyNote,
-  ExternalLink, Forward, Loader, Mail, Phone, Upload, ImagePlus, GripVertical, Eye, Lock,
+  ExternalLink, Forward, Loader, Mail, Phone, Upload, ImagePlus, GripVertical, Eye, EyeOff, Lock,
 } from "lucide-react";
 
 import logoImg from "./src/Img/tasktag-logo.13f1babda8fdbb1b7251572a0fe11f9e.png";
@@ -3093,16 +3093,11 @@ const DUMMY_ENTRIES = [
   },
   {
     date: "2026-09-09", note: "Exterior siding repairs completed on the south wall.",
-    // Deliberately 7 items — see the flooring entry above for why.
-    checklist: [
-      { text: "Remove damaged siding panels" },
-      { text: "Inspect wall for moisture damage" },
-      { text: "Repair underlying sheathing" },
-      { text: "Install house wrap over sheathing" },
-      { text: "Install new siding panels" },
-      { text: "Caulk and seal all seams" },
-      { text: "Touch up paint to match existing siding" },
-    ],
+    // Empty — every 2nd dummy entry has no checklist items, so a period
+    // covering only these dates demos the "No checklist items were
+    // completed in this period" banner without needing to hand-delete
+    // items from a generated draft first.
+    checklist: [],
     photos: ["img9", "img2", "img3", "img7", "img4", "img5", "img6"],
   },
   {
@@ -3118,11 +3113,7 @@ const DUMMY_ENTRIES = [
   },
   {
     date: "2026-09-07", note: "Plumbing fixtures installed in all bathrooms.",
-    checklist: [
-      { text: "Install sinks and faucets" },
-      { text: "Connect shower and tub fixtures" },
-      { text: "Test all fixtures for leaks" },
-    ],
+    checklist: [],
     photos: [],
   },
   {
@@ -3134,11 +3125,7 @@ const DUMMY_ENTRIES = [
   },
   {
     date: "2026-09-06", note: "Final walkthrough completed with the client — no issues noted.",
-    checklist: [
-      { text: "Review completed work with client" },
-      { text: "Confirm no outstanding punch list items" },
-      { text: "Collect client sign-off" },
-    ],
+    checklist: [],
     photos: [],
   },
   {
@@ -3152,11 +3139,7 @@ const DUMMY_ENTRIES = [
   },
   {
     date: "2026-09-04", note: "Kitchen cabinet hardware installed.",
-    checklist: [
-      { text: "Install cabinet hinges" },
-      { text: "Attach handles and knobs" },
-      { text: "Adjust cabinet doors for alignment" },
-    ],
+    checklist: [],
     photos: ["img6", "img1", "img9", "img2", "img3", "img4", "img8"],
   },
   {
@@ -3170,11 +3153,7 @@ const DUMMY_ENTRIES = [
   },
   {
     date: "2026-09-02", note: "Drywall patching completed in the hallway.",
-    checklist: [
-      { text: "Cut out damaged drywall sections" },
-      { text: "Install patch and tape seams" },
-      { text: "Sand and prime patched area" },
-    ],
+    checklist: [],
     photos: ["img4"],
   },
   {
@@ -3188,11 +3167,7 @@ const DUMMY_ENTRIES = [
   },
   {
     date: "2026-08-31", note: "HVAC ductwork inspection passed.",
-    checklist: [
-      { text: "Inspect duct connections for leaks" },
-      { text: "Verify airflow at each vent" },
-      { text: "Confirm inspection sign-off" },
-    ],
+    checklist: [],
     photos: ["img8", "img9"],
   },
   {
@@ -3206,11 +3181,7 @@ const DUMMY_ENTRIES = [
   },
   {
     date: "2026-08-25", note: "Garage door opener installed and tested.",
-    checklist: [
-      { text: "Mount opener unit" },
-      { text: "Program remote controls" },
-      { text: "Test safety reverse sensors" },
-    ],
+    checklist: [],
     photos: ["img6"],
   },
   {
@@ -3224,11 +3195,7 @@ const DUMMY_ENTRIES = [
   },
   {
     date: "2026-08-18", note: "Landscaping grading completed around the foundation.",
-    checklist: [
-      { text: "Grade soil away from foundation" },
-      { text: "Install drainage swales" },
-      { text: "Seed and mulch disturbed areas" },
-    ],
+    checklist: [],
     photos: ["img2", "img3"],
   },
   {
@@ -3242,11 +3209,7 @@ const DUMMY_ENTRIES = [
   },
   {
     date: "2026-08-11", note: "Window trim installed on the front facade.",
-    checklist: [
-      { text: "Measure and cut trim boards" },
-      { text: "Install trim around window frames" },
-      { text: "Caulk and paint trim" },
-    ],
+    checklist: [],
     photos: ["img5", "img1", "img4"],
   },
   {
@@ -3260,11 +3223,7 @@ const DUMMY_ENTRIES = [
   },
   {
     date: "2026-08-04", note: "Insulation installed in the attic space.",
-    checklist: [
-      { text: "Air-seal attic penetrations" },
-      { text: "Install batt insulation between joists" },
-      { text: "Verify coverage meets R-value target" },
-    ],
+    checklist: [],
     photos: ["img7", "img8"],
   },
   {
@@ -3278,11 +3237,7 @@ const DUMMY_ENTRIES = [
   },
   {
     date: "2026-07-28", note: "Roof shingles replaced on the north slope.",
-    checklist: [
-      { text: "Remove damaged shingles" },
-      { text: "Install underlayment" },
-      { text: "Install new shingles and flashing" },
-    ],
+    checklist: [],
     photos: ["img9", "img2", "img6", "img3"],
   },
   {
@@ -3296,11 +3251,7 @@ const DUMMY_ENTRIES = [
   },
   {
     date: "2026-07-21", note: "Electrical panel upgrade completed.",
-    checklist: [
-      { text: "Disconnect and remove old panel" },
-      { text: "Install new panel and breakers" },
-      { text: "Schedule utility inspection" },
-    ],
+    checklist: [],
     photos: ["img1"],
   },
   {
@@ -3314,11 +3265,7 @@ const DUMMY_ENTRIES = [
   },
   {
     date: "2026-07-14", note: "Foundation waterproofing sealant applied.",
-    checklist: [
-      { text: "Clean foundation exterior surface" },
-      { text: "Apply sealant coating" },
-      { text: "Backfill against foundation wall" },
-    ],
+    checklist: [],
     photos: ["img4", "img5"],
   },
   {
@@ -3332,11 +3279,7 @@ const DUMMY_ENTRIES = [
   },
   {
     date: "2026-06-30", note: "Framing inspection passed for the second-floor addition.",
-    checklist: [
-      { text: "Verify framing meets plan specifications" },
-      { text: "Check header and joist spacing" },
-      { text: "Pass inspector walkthrough" },
-    ],
+    checklist: [],
     photos: ["img3", "img7", "img9"],
   },
   {
@@ -3350,11 +3293,7 @@ const DUMMY_ENTRIES = [
   },
   {
     date: "2026-06-16", note: "Excavation completed for the new foundation footprint.",
-    checklist: [
-      { text: "Mark foundation layout" },
-      { text: "Excavate to required depth" },
-      { text: "Verify grade and dimensions" },
-    ],
+    checklist: [],
     photos: ["img8", "img6", "img5", "img1", "img9"],
   },
 ];
@@ -4153,7 +4092,7 @@ const buildReportHTML = async (report) => {
           const next = g.entries[i + 1];
           const attachedNoteHTML = next && next.isNote ? noteHTML(next) : "";
           const photos = e.noPhotos ? [] : (e.photos || []);
-          const checklistItems = (e.checklist || []).slice(-10);
+          const checklistItems = report.includeSummary ? (e.checklist || []).slice(-10) : [];
           if (checklistItems.length === 0) {
             groupBlocks.push({ html: entryHeaderHTML(e, attachedNoteHTML, photos.length > 0), isLabel: false });
           } else {
@@ -4961,6 +4900,11 @@ function ReportsTab({ demoCase }) {
   // previewFinalGroups (already exclusion-filtered) rather than
   // recomputing against excludedPhotos separately.
   const previewPhotoCount = previewFinalGroups.reduce((s, g) => s + g.entries.reduce((es, e) => es + (e.isNote ? 0 : e.photos.length), 0), 0);
+  // Drives the "No checklist items were completed in this period" banner
+  // below the Task List heading — a flat count across every entry (post
+  // checklist-override edits), not per-task, since the banner itself is
+  // a one-time notice for the whole period, not repeated per card.
+  const previewChecklistItemCount = previewFinalGroups.reduce((s, g) => s + g.entries.reduce((es, e) => es + (e.isNote ? 0 : (e.checklist || []).length), 0), 0);
 
   // TODO(BE): replace with the account's actual per-report photo cap and
   // usage from the API. Lives in the sidebar's own fixed footer (see
@@ -5281,7 +5225,7 @@ function ReportsTab({ demoCase }) {
           )}
         </div>
         <div style={{ height: 1, background: "var(--tt-grey03)", marginTop: 16 }} />
-        {(checklistItems.length > 0 || !previewSaved) && (
+        {preview.includeSummary && (checklistItems.length > 0 || !previewSaved) && (
           // data-checklist-list, not a bare Fragment — Add item (below)
           // needs a real DOM node to scope its post-add focus query to
           // this task's own checklist, not any other task's.
@@ -5546,11 +5490,6 @@ function ReportsTab({ demoCase }) {
   // when one shows, rather than adding on top of it — see EditableField's
   // own live-branch styling).
   const COVER_LOGO_ERROR_BUFFER = 2 * (4 + 14);
-  // Footer upload box (profile photo) — the Footer form is only two fields
-  // tall (150px), too short for the upload box's icon + title + hint +
-  // Choose File button, so it gets a fixed size instead of the Cover
-  // Header's "match the form height" one.
-  const FOOTER_UPLOAD_SIZE = 180;
   const [coverLogoSize, setCoverLogoSize] = useState(120);
   // A CALLBACK ref (not useRef + useLayoutEffect with a [] dependency
   // array) — this section mounts behind the preview's own fake-generate
@@ -6150,6 +6089,29 @@ function ReportsTab({ demoCase }) {
       return (
         <div key={section.key} ref={el => { sectionRefs.current[section.key] = el; }}>
           {groupHeading}
+          {/* Owner-only notice — the export/shared link never shows this
+              (see buildReportHTML, which has no equivalent), so "Only you
+              see this" is literal, not just decorative copy. Sits once,
+              right under the Task List heading/progress bar, not
+              repeated per task card (showGroupHeading already gates this
+              section to the first task section only). */}
+          {showGroupHeading && preview.includeSummary && previewChecklistItemCount === 0 && (
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
+              padding: "12px 16px", borderRadius: 12,
+              border: "1px solid var(--tt-grey03)", background: "white",
+              marginBottom: 16,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Info size={16} strokeWidth={SW} color="var(--tt-grey05)" className="tt-split-info" style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: 14, color: "var(--tt-text-2)" }}>No checklist items were completed in this period.</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                <EyeOff size={14} strokeWidth={SW} color="var(--tt-grey05)" style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: 12, color: "var(--tt-grey05)" }}>Only you see this</span>
+              </div>
+            </div>
+          )}
           <div style={cardStyle}>
             {/* Same PAGE_PAD-on-every-side padding as every other section —
                 see the summary section's own comment on why this no longer
@@ -6197,13 +6159,18 @@ function ReportsTab({ demoCase }) {
           {renderSectionIntro("Who this report is signed by.")}
           {/* Same layout as the Cover Header: upload box on the left (the
               shared LogoUploadBox, just photo-flavoured — cover-fit, JPEG),
-              labelled form fields on the right with the same 16px rhythm. */}
+              labelled form fields on the right with the same 16px rhythm.
+              size reuses coverLogoSize itself (not a separate measurement
+              of THIS form's own, much shorter Name/Role column) so both
+              upload boxes are identically sized, not just identically
+              mechanised — Name/Role alone would measure far too short to
+              fit this box's icon/title/hint/Choose File content anyway. */}
           <div style={{ display: "flex", alignItems: "flex-start", gap: 24 }}>
             <LogoUploadBox
               src={contactPhotoSrc}
               onChange={url => setPreview(p => ({ ...p, contactPhoto: url }))}
               disabled={previewSaved}
-              size={FOOTER_UPLOAD_SIZE}
+              size={coverLogoSize}
               resizeTo={256}
               mimeType="image/jpeg"
               quality={0.85}
@@ -6659,7 +6626,7 @@ function ReportsTab({ demoCase }) {
           <div style={{ display: "flex", flexDirection: "column", flexShrink: 0 }}>
             <Label style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)", marginBottom: 6, display: "block" }}>Include</Label>
             <div style={{ display: "flex", alignItems: "center", gap: 20, height: 40 }}>
-              <ReportCheckbox active={includeSummary} label="Include checklist items" onClick={() => setIncludeSummary(v => !v)} />
+              <ReportCheckbox active={includeSummary} label="Checklist items" onClick={() => setIncludeSummary(v => !v)} />
               <ReportCheckbox active={includeNoPhotoTasks} label="Tasks without photos" onClick={() => setIncludeNoPhotoTasks(v => !v)} />
             </div>
           </div>
@@ -7329,7 +7296,7 @@ function ReportsTab({ demoCase }) {
                           <div style={{ padding: DRAFT_PAD }}>
                             {SECTION_INTRO_SKELETON}
                             <div style={{ display: "flex", alignItems: "flex-start", gap: 24 }}>
-                              <div className="tt-skeleton" style={{ width: FOOTER_UPLOAD_SIZE, height: FOOTER_UPLOAD_SIZE, borderRadius: 8, flexShrink: 0 }} />
+                              <div className="tt-skeleton" style={{ width: coverLogoSize, height: coverLogoSize, borderRadius: 8, flexShrink: 0 }} />
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ height: 21, marginBottom: 8, display: "flex", alignItems: "center" }}><div className="tt-skeleton" style={{ width: 50, height: 14 }} /></div>
                                 <div className="tt-skeleton" style={{ width: "100%", height: 48, borderRadius: 8, marginBottom: 18 }} />
