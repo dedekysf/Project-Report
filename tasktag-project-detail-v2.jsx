@@ -4000,17 +4000,17 @@ const buildReportHTML = async (report) => {
     const statusColor = STATUS_HEX[kind];
     const visiblePhotoCount = (e.photos || []).length;
     const dot = `<span style="display:inline-block;width:3px;height:3px;border-radius:50%;background:#bdbdbd;vertical-align:middle;margin:0 6px;"></span>`;
-    // Matches the live view exactly: Open never shows a date (just the
+    // Matches the live view exactly: Ongoing never shows a date (just the
     // status), while Completed folds its date directly into the status
-    // text — "Completed Sep 9" — with no separator dot between them and
-    // no uppercase transform, per statusPartHTML below. The section label
+    // text — "COMPLETED SEP 9" — with no separator dot between them,
+    // both uppercase per statusPartHTML below. The section label
     // above only appears for week/month grouping — see entriesHTML below,
     // which skips it for "day" the same way the live view's sections do.
     // Meta-line chrome (status/date/photo-count) stays on the sans stack,
     // same reasoning as SANS's own comment above.
     const statusDotHTML = `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${statusColor};vertical-align:middle;margin-right:6px;"></span>`;
     const statusPartHTML = kind === "completed"
-      ? statusDotHTML + `<span style="font-family:${SANS};font-size:12px;font-weight:700;color:${statusColor};">${statusMeta.label} ${fmtDate(parseDate(e.date))}</span>`
+      ? statusDotHTML + `<span style="font-family:${SANS};font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:${statusColor};">${statusMeta.label} ${fmtDate(parseDate(e.date))}</span>`
       : statusDotHTML + `<span style="font-family:${SANS};font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:${statusColor};">${statusMeta.label}</span>`;
     const photoCountHTML = (!e.noPhotos && visiblePhotoCount > 0)
       ? `<span style="font-family:${SANS};font-size:12px;font-weight:500;text-transform:uppercase;color:#6b6b6b;">${visiblePhotoCount} photo${visiblePhotoCount === 1 ? "" : "s"}</span>`
@@ -5210,7 +5210,7 @@ function ReportsTab({ demoCase }) {
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: statusMeta.color, flexShrink: 0 }} />
           {kind === "completed" ? (
-            <span style={{ fontSize: 12, fontWeight: 700, color: statusMeta.color }}>
+            <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: statusMeta.color }}>
               {statusMeta.label} {fmtDate(parseDate(e.date))}
             </span>
           ) : (
