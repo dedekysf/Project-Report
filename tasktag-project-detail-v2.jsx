@@ -325,7 +325,7 @@ style.textContent = `
     padding: 7px 16px; border-radius: 9999px;
     border: 1.5px solid var(--tt-grey03);
     background: white; color: var(--tt-text-2);
-    font-size: 13px; font-weight: 500; cursor: pointer;
+    font-size: 14px; font-weight: 500; cursor: pointer;
     transition: border-color 0.15s;
   }
   .tt-chip[data-selected="true"] { border-color: var(--tt-secondary); }
@@ -338,7 +338,7 @@ style.textContent = `
   }
 
   .tt-section-label {
-    font-size: 11px; font-weight: 500;
+    font-size: 12px; font-weight: 500;
     letter-spacing: 0.06em; color: var(--tt-grey05);
     text-transform: uppercase; margin-bottom: 12px;
   }
@@ -408,7 +408,7 @@ style.textContent = `
     display: inline-flex; align-items: center; gap: 6px;
     padding: 6px 10px; border-radius: 8px;
     border: none; background: none; cursor: pointer;
-    color: var(--tt-text-2); font-size: 13px; font-weight: 500;
+    color: var(--tt-text-2); font-size: 14px; font-weight: 500;
     transition: background 0.15s; white-space: nowrap;
   }
   .tt-cta-btn:hover { background: var(--tt-grey02); }
@@ -417,7 +417,7 @@ style.textContent = `
   .tt-fixed-tooltip {
     position: fixed; z-index: 9999;
     background: var(--tt-text-1); color: white;
-    font-size: 11px; font-weight: 500; white-space: nowrap;
+    font-size: 12px; font-weight: 500; white-space: nowrap;
     padding: 4px 8px; border-radius: 4px;
     pointer-events: none;
     transform: translateX(-50%);
@@ -786,7 +786,7 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
       {/* Day headers */}
       <div style={{ display: "grid", gridTemplateColumns: `repeat(7, ${CELL}px)`, marginBottom: 2 }}>
         {DAYS.map(d => (
-          <div key={d} style={{ textAlign: "center", fontSize: 11, fontWeight: 500, color: "var(--tt-grey05)", lineHeight: "20px" }}>{d}</div>
+          <div key={d} style={{ textAlign: "center", fontSize: 12, fontWeight: 500, color: "var(--tt-grey05)", lineHeight: "20px" }}>{d}</div>
         ))}
       </div>
 
@@ -848,7 +848,7 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
                 background: selected ? "var(--tt-text-1)" : "transparent",
                 border: isToday && !selected ? "1.5px solid var(--tt-text-1)" : "none",
                 color: selected ? "#fff" : (inBand || plainHover) ? "var(--tt-text-1)" : disabled ? "var(--tt-grey04)" : otherMonth ? "var(--tt-grey03)" : isToday ? "var(--tt-text-1)" : "var(--tt-text-2)",
-                fontSize: 13,
+                fontSize: 14,
                 fontWeight: selected || isToday ? 600 : 400,
                 zIndex: 1,
                 position: "relative",
@@ -870,7 +870,7 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
           style={{
             padding: "6px 16px", borderRadius: 8,
             border: "1px solid var(--tt-grey03)", background: "white",
-            fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s",
+            fontSize: 14, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s",
           }}>Cancel</button>
         <button
           onClick={() => onApply ? onApply(rangeStart, rangeEnd) : onClose()}
@@ -879,7 +879,7 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
           style={{
             padding: "6px 16px", borderRadius: 8,
             border: "none", background: "var(--tt-text-1)",
-            fontSize: 13, fontWeight: 500, color: "#fff", cursor: "pointer", transition: "opacity 0.15s",
+            fontSize: 14, fontWeight: 500, color: "#fff", cursor: "pointer", transition: "opacity 0.15s",
           }}>Apply</button>
       </div>}
     </div>
@@ -897,7 +897,7 @@ function TasksTab() {
           { Icon: Calendar,          label: "Add to calendar" },
         ].map(({ Icon, label }) => (
           <Button key={label} variant="outline" size="sm"
-            className="gap-2 text-[13px] font-normal text-[var(--tt-text-2)] border-[var(--tt-grey03)]">
+            className="gap-2 text-[14px] font-normal text-[var(--tt-text-2)] border-[var(--tt-grey03)]">
             <Icon size={14} strokeWidth={SW} className={iconSplitClassFor(Icon)} /> {label}
           </Button>
         ))}
@@ -907,7 +907,7 @@ function TasksTab() {
         <div className="flex items-center justify-between py-[10px] border-b border-[var(--tt-grey03)]">
           <div className="flex items-center gap-2 text-[14px] font-semibold text-[var(--tt-text-1)]">
             Current
-            <Badge className="w-5 h-5 rounded-full p-0 flex items-center justify-center text-[11px] font-semibold bg-[var(--tt-grey03)] text-[var(--tt-text-2)]">1</Badge>
+            <Badge className="w-5 h-5 rounded-full p-0 flex items-center justify-center text-[12px] font-semibold bg-[var(--tt-grey03)] text-[var(--tt-text-2)]">1</Badge>
           </div>
           <ChevronUp size={16} color="var(--tt-grey05)" strokeWidth={SW} />
         </div>
@@ -953,7 +953,7 @@ function ReportCheckbox({ active, label, onClick }) {
         display: "flex", alignItems: "center", gap: 8,
         height: 40, padding: 0, flexShrink: 0,
         background: "none", border: "none",
-        fontSize: 13, fontWeight: 500,
+        fontSize: 14, fontWeight: 500,
         color: "var(--tt-text-2)",
         cursor: "pointer", whiteSpace: "nowrap",
       }}
@@ -1187,13 +1187,13 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
             style={{ fontFamily: "inherit", paddingBottom: counter ? 22 : undefined, resize: "none", overflow: "hidden", ...(liveError ? { borderColor: "var(--tt-red)" } : {}), ...inputStyle }}
           />
           {counter && maxLength && (
-            <span style={{ position: "absolute", right: 12, bottom: 9, fontSize: 11, fontWeight: 500, color: current.length >= maxLength ? "var(--tt-red)" : "var(--tt-grey05)" }}>
+            <span style={{ position: "absolute", right: 12, bottom: 9, fontSize: 12, fontWeight: 500, color: current.length >= maxLength ? "var(--tt-red)" : "var(--tt-grey05)" }}>
               {maxLength - current.length}
             </span>
           )}
         </div>
         {liveError && (
-          <p style={{ color: "var(--tt-red)", fontSize: 10, fontWeight: 500, margin: "4px 0 0", textAlign: "left" }}>{liveError}</p>
+          <p style={{ color: "var(--tt-red)", fontSize: 12, fontWeight: 500, margin: "4px 0 0", textAlign: "left" }}>{liveError}</p>
         )}
       </div>
     ) : (
@@ -1228,13 +1228,13 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
             style={{ fontFamily: "inherit", paddingLeft: leadingIcon ? 34 : 12, paddingRight: counter && maxLength ? 44 : 12, ...(liveError ? { borderColor: "var(--tt-red)" } : {}), ...inputStyle, margin: 0 }}
           />
           {counter && maxLength && (
-            <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", fontSize: 11, fontWeight: 500, color: current.length >= maxLength ? "var(--tt-red)" : "var(--tt-grey05)" }}>
+            <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", fontSize: 12, fontWeight: 500, color: current.length >= maxLength ? "var(--tt-red)" : "var(--tt-grey05)" }}>
               {maxLength - current.length}
             </span>
           )}
         </div>
         {liveError && (
-          <p style={{ color: "var(--tt-red)", fontSize: 10, fontWeight: 500, margin: "4px 0 0", textAlign: "left" }}>{liveError}</p>
+          <p style={{ color: "var(--tt-red)", fontSize: 12, fontWeight: 500, margin: "4px 0 0", textAlign: "left" }}>{liveError}</p>
         )}
       </div>
     );
@@ -1325,7 +1325,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
                 </button>
               </div>
               {error && (
-                <p style={{ color: "var(--tt-red)", fontSize: 10, fontWeight: 500, margin: "4px 0 0", textAlign: "left" }}>
+                <p style={{ color: "var(--tt-red)", fontSize: 12, fontWeight: 500, margin: "4px 0 0", textAlign: "left" }}>
                   {errorMessage || "That doesn't look right."}
                 </p>
               )}
@@ -1482,7 +1482,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
               counts down as you type, same bottom-left corner/style the
               photo caption's own counter uses in PhotoLightbox. */}
           {counter && maxLength && (
-            <span style={{ position: "absolute", right: showConfirm ? 40 : 12, bottom: 9, fontSize: 11, fontWeight: 500, color: draft.length >= maxLength ? "var(--tt-red)" : "var(--tt-grey05)" }}>
+            <span style={{ position: "absolute", right: showConfirm ? 40 : 12, bottom: 9, fontSize: 12, fontWeight: 500, color: draft.length >= maxLength ? "var(--tt-red)" : "var(--tt-grey05)" }}>
               {maxLength - draft.length}
             </span>
           )}
@@ -1517,7 +1517,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
           <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>{showConfirm && confirmButton}</div>
         </div>
         {error && (
-          <p style={{ color: "var(--tt-red)", fontSize: 10, fontWeight: 500, margin: "4px 0 0", textAlign: "left" }}>
+          <p style={{ color: "var(--tt-red)", fontSize: 12, fontWeight: 500, margin: "4px 0 0", textAlign: "left" }}>
             {errorMessage || "That doesn't look right."}
           </p>
         )}
@@ -1600,7 +1600,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
           </div>
         )}
         {error && (
-          <p style={{ color: "var(--tt-red)", fontSize: 11, fontWeight: 500, margin: "8px 0 0" }}>
+          <p style={{ color: "var(--tt-red)", fontSize: 12, fontWeight: 500, margin: "8px 0 0" }}>
             {errorMessage || "This can't be empty."}
           </p>
         )}
@@ -1833,7 +1833,7 @@ function LogoUploadBox({ src, onChange, disabled, size = 120, resizeTo = 360, hi
       )}
     </div>
     {error && (
-      <p style={{ color: "var(--tt-red)", fontSize: 10, fontWeight: 500, margin: "4px 0 0", textAlign: "center" }}>{error}</p>
+      <p style={{ color: "var(--tt-red)", fontSize: 12, fontWeight: 500, margin: "4px 0 0", textAlign: "center" }}>{error}</p>
     )}
     </div>
   );
@@ -1866,7 +1866,7 @@ function NavSidebar({ items, activeKey, onSelect, footer }) {
           display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left",
           padding: "8px 12px", marginTop: gi === 0 ? 0 : 14, borderRadius: 8, border: "none",
           background: active ? "var(--tt-grey02)" : "transparent",
-          color: "var(--tt-text-1)", fontSize: 13, fontWeight: 700,
+          color: "var(--tt-text-1)", fontSize: 14, fontWeight: 700,
           cursor: "pointer", transition: "background 0.15s",
         });
         const Icon = group.icon;
@@ -1899,7 +1899,7 @@ function NavSidebar({ items, activeKey, onSelect, footer }) {
                 return (
                   <div key={child.key}>
                     {child.groupLabel && (
-                      <p style={{ margin: ci === 0 ? "0 0 4px" : "12px 0 4px", padding: "0 10px", fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--tt-text-1)" }}>
+                      <p style={{ margin: ci === 0 ? "0 0 4px" : "12px 0 4px", padding: "0 10px", fontSize: 12, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--tt-text-1)" }}>
                         {child.groupLabel}
                       </p>
                     )}
@@ -2000,7 +2000,7 @@ function FixedTooltipBtn({ children, label, onAction }) {
           top: tip.top, left: tip.left,
           transform: "translateX(-100%)",
           background: "var(--tt-text-1)", color: "white",
-          fontSize: 11, fontWeight: 500, whiteSpace: "nowrap",
+          fontSize: 12, fontWeight: 500, whiteSpace: "nowrap",
           padding: "4px 8px", borderRadius: 4,
           pointerEvents: "none",
         }}>
@@ -2155,7 +2155,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, onDeletePhoto, ca
             )}
             {deleteTooltipIdx === i && createPortal(
               <div style={{ position: "fixed", top: deleteTooltipPos.top, left: deleteTooltipPos.left, zIndex: 5300, maxWidth: 200, pointerEvents: "none" }}>
-                <div style={{ background: "var(--tt-text-1)", color: "white", fontSize: 11, fontWeight: 500, lineHeight: 1.4, padding: "6px 10px", borderRadius: 6, boxShadow: "0 8px 24px rgba(10,22,41,0.24)" }}>
+                <div style={{ background: "var(--tt-text-1)", color: "white", fontSize: 12, fontWeight: 500, lineHeight: 1.4, padding: "6px 10px", borderRadius: 6, boxShadow: "0 8px 24px rgba(10,22,41,0.24)" }}>
                   Only removed from this report.
                 </div>
               </div>,
@@ -2191,7 +2191,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, onDeletePhoto, ca
                 style={{
                   position: "absolute", inset: 0, background: "rgba(10,22,41,0.55)",
                   border: "none", borderRadius: 4, color: "white",
-                  fontSize: 13, fontWeight: 600, cursor: "pointer",
+                  fontSize: 14, fontWeight: 600, cursor: "pointer",
                 }}
               >
                 +{remaining} more
@@ -2207,7 +2207,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, onDeletePhoto, ca
               // instead of a tall, narrow column of short ones; no
               // truncation either way, it just wraps.
               <div style={{ position: "fixed", top: captionTooltipPos.top, left: captionTooltipPos.left, zIndex: 5300, maxWidth: 280, pointerEvents: "none" }}>
-                <div style={{ background: "var(--tt-text-1)", color: "white", fontSize: 11, fontWeight: 500, lineHeight: 1.4, padding: "6px 10px", borderRadius: 6, boxShadow: "0 8px 24px rgba(10,22,41,0.24)", whiteSpace: "pre-wrap" }}>
+                <div style={{ background: "var(--tt-text-1)", color: "white", fontSize: 12, fontWeight: 500, lineHeight: 1.4, padding: "6px 10px", borderRadius: 6, boxShadow: "0 8px 24px rgba(10,22,41,0.24)", whiteSpace: "pre-wrap" }}>
                   {caption}
                 </div>
               </div>,
@@ -2400,7 +2400,7 @@ function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoE
           position: "fixed", zIndex: 5200,
           top: cappedTooltipPos.top + 16, left: cappedTooltipPos.left + 12,
           background: "var(--tt-text-1)", color: "white",
-          fontSize: 11, fontWeight: 500, whiteSpace: "nowrap",
+          fontSize: 12, fontWeight: 500, whiteSpace: "nowrap",
           padding: "4px 8px", borderRadius: 4,
           pointerEvents: "none",
         }}>
@@ -2450,7 +2450,7 @@ function LightboxIconBtn({ label, onClick, disabled, children }) {
       {tip && (
         <div style={{
           position: "fixed", zIndex: 9999, top: tip.top, left: tip.left, transform: "translateX(-100%)",
-          background: "var(--tt-text-1)", color: "white", fontSize: 11, fontWeight: 500, whiteSpace: "nowrap",
+          background: "var(--tt-text-1)", color: "white", fontSize: 12, fontWeight: 500, whiteSpace: "nowrap",
           padding: "4px 8px", borderRadius: 4, pointerEvents: "none",
         }}>
           {label}
@@ -2592,13 +2592,13 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
             <span style={{ fontSize: 12, fontWeight: 700, color: "white" }}>MJ</span>
           </div>
           <div style={{ lineHeight: 1.3 }}>
-            <p style={{ fontSize: 13, fontWeight: 600, color: "white", margin: 0 }}>You</p>
-            <p style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", margin: 0, whiteSpace: "nowrap" }}>{uploadedAt}</p>
+            <p style={{ fontSize: 14, fontWeight: 600, color: "white", margin: 0 }}>You</p>
+            <p style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", margin: 0, whiteSpace: "nowrap" }}>{uploadedAt}</p>
           </div>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 4, minWidth: 0, justifySelf: "center" }}>
-          <span style={{ fontSize: 13, fontWeight: 500, color: "white", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{fileName}</span>
+          <span style={{ fontSize: 14, fontWeight: 500, color: "white", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{fileName}</span>
           <LightboxIconBtn label="Rename">
             <Pencil size={16} strokeWidth={SW} className="tt-split-pencil" />
           </LightboxIconBtn>
@@ -2667,13 +2667,13 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px 16px", flexShrink: 0, background: "var(--tt-grey06)" }}>
         <span style={{
           display: "inline-flex", alignItems: "center", gap: 6, height: 22, padding: "0 10px",
-          borderRadius: 4, background: "var(--tt-secondary)", color: "white", fontSize: 10, fontWeight: 600,
+          borderRadius: 4, background: "var(--tt-secondary)", color: "white", fontSize: 12, fontWeight: 600,
         }}>
           <Folder size={11} strokeWidth={2} /> {truncateLabel(PROJECT_NAME)}
         </span>
         <span style={{
           display: "inline-flex", alignItems: "center", gap: 6, height: 22, padding: "0 10px",
-          borderRadius: 4, background: "var(--tt-text-1)", color: "white", fontSize: 10, fontWeight: 600,
+          borderRadius: 4, background: "var(--tt-text-1)", color: "white", fontSize: 12, fontWeight: 600,
         }}>
           <Hash size={11} strokeWidth={2} /> {truncateLabel(taskName)}
         </span>
@@ -2743,7 +2743,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
               <span style={{
                 background: "var(--tt-secondary)", color: "white", borderRadius: "50%",
                 width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 11, fontWeight: 700, flexShrink: 0,
+                fontSize: 12, fontWeight: 700, flexShrink: 0,
               }}>
                 {Object.keys(selectedFilmstrip).length}
               </span>
@@ -2772,7 +2772,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
             already sits at 5500. */}
         {deleteActionTooltip && createPortal(
           <div style={{ position: "fixed", ...deleteActionTooltip, zIndex: 5600, maxWidth: 200, pointerEvents: "none" }}>
-            <div style={{ background: "var(--tt-text-1)", color: "white", fontSize: 11, fontWeight: 500, lineHeight: 1.4, padding: "6px 10px", borderRadius: 6, boxShadow: "0 8px 24px rgba(10,22,41,0.24)" }}>
+            <div style={{ background: "var(--tt-text-1)", color: "white", fontSize: 12, fontWeight: 500, lineHeight: 1.4, padding: "6px 10px", borderRadius: 6, boxShadow: "0 8px 24px rgba(10,22,41,0.24)" }}>
               Only removed from this report.
             </div>
           </div>,
@@ -2867,7 +2867,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
               />
               {/* Remaining count, not "used/max" — starts at CAPTION_MAX_LEN
                   and counts down (250, 249, 248, ...) as you type. */}
-              <span style={{ position: "absolute", left: 12, bottom: 9, fontSize: 11, fontWeight: 500, color: (caption || "").length >= CAPTION_MAX_LEN ? "var(--tt-red)" : "var(--tt-grey05)" }}>
+              <span style={{ position: "absolute", left: 12, bottom: 9, fontSize: 12, fontWeight: 500, color: (caption || "").length >= CAPTION_MAX_LEN ? "var(--tt-red)" : "var(--tt-grey05)" }}>
                 {CAPTION_MAX_LEN - (caption || "").length}
               </span>
               {showCheck && (
@@ -2995,7 +2995,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
             ].map(([label, value], i, arr) => (
               <div key={label} style={{ marginBottom: i === arr.length - 1 ? 0 : 16 }}>
                 <p style={{ fontSize: 12, color: "var(--tt-grey05)", margin: "0 0 2px" }}>{label}</p>
-                <p style={{ fontSize: 15, fontWeight: 500, color: "var(--tt-text-1)", margin: 0, wordBreak: "break-all" }}>{value}</p>
+                <p style={{ fontSize: 16, fontWeight: 500, color: "var(--tt-text-1)", margin: 0, wordBreak: "break-all" }}>{value}</p>
               </div>
             ))}
           </div>
@@ -3758,7 +3758,7 @@ const buildReportHTML = async (report) => {
   // (status pills, meta lines, section/footer chrome) stay on the sans
   // stack and re-declare it explicitly, since the body default below is
   // what's switching to serif.
-  const SANS = "-apple-system,BlinkMacSystemFont,'Inter',sans-serif";
+  const SANS = "'Inter',-apple-system,BlinkMacSystemFont,sans-serif";
   const SERIF = "'Lora',Georgia,serif";
 
   // Orientation-grouped rows — every photo shows here (no "+N more" cap;
@@ -4566,6 +4566,10 @@ const buildReportHTML = async (report) => {
         selfClose("link", { rel: "preconnect", href: "https://fonts.googleapis.com" }),
         selfClose("link", { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "" }),
         selfClose("link", { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400;1,600;1,700&display=swap" }),
+        // Inter is the sans face of the output (labels, body, UI-ish text) —
+        // it has to be loaded here too: the exported document is its own
+        // standalone page and doesn't inherit the app's font link.
+        selfClose("link", { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" }),
         h("style", {}, css)
       ),
       h("body", {}, cardsHTML)
@@ -5221,11 +5225,11 @@ function ReportsTab({ demoCase }) {
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: statusMeta.color, flexShrink: 0 }} />
           {kind === "completed" ? (
-            <span style={{ fontSize: 11, fontWeight: 700, color: statusMeta.color }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: statusMeta.color }}>
               {statusMeta.label} {fmtDate(parseDate(e.date))}
             </span>
           ) : (
-            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: statusMeta.color }}>
+            <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: statusMeta.color }}>
               {statusMeta.label}
             </span>
           )}
@@ -5235,7 +5239,7 @@ function ReportsTab({ demoCase }) {
               {/* Plain text always now — Manage Photos moved to a single,
                   report-wide entry point (the Photo Limit indicator), not
                   triggered per task item from here anymore. */}
-              <span style={{ fontSize: 11, fontWeight: 500, color: "var(--tt-grey05)" }}>
+              <span style={{ fontSize: 12, fontWeight: 500, color: "var(--tt-grey05)" }}>
                 {visiblePhotoCount} photo{visiblePhotoCount === 1 ? "" : "s"}
               </span>
             </>
@@ -5247,11 +5251,11 @@ function ReportsTab({ demoCase }) {
           // needs a real DOM node to scope its post-add focus query to
           // this task's own checklist, not any other task's.
           <div data-checklist-list={entryKey}>
-            <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-text-2)", margin: "16px 0 8px" }}>
+            <p style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--tt-text-2)", margin: "16px 0 8px" }}>
               Checklist items completed as of this update
             </p>
             {!previewSaved && checklistItems.length >= 10 && (
-              <p style={{ margin: "-4px 0 8px", color: "var(--tt-grey05)", fontSize: 11, fontWeight: 400 }}>
+              <p style={{ margin: "-4px 0 8px", color: "var(--tt-grey05)", fontSize: 12, fontWeight: 400 }}>
                 Up to 10 items
               </p>
             )}
@@ -5336,7 +5340,7 @@ function ReportsTab({ demoCase }) {
                     </div>
                   )}
                   {previewSaved ? (
-                    <span style={{ fontSize: 13, color: "var(--tt-text-2)" }}>{item.text}</span>
+                    <span style={{ fontSize: 14, color: "var(--tt-text-2)" }}>{item.text}</span>
                   ) : (
                     // Same edit mode as the task note (renderNoteSlot) —
                     // alwaysEditing, so an empty item still starts as a
@@ -5353,8 +5357,8 @@ function ReportsTab({ demoCase }) {
                         placeholder="Checklist item"
                         alwaysEditing
                         onSave={v => updateChecklistItem(entryKey, e, idx, v)}
-                        textStyle={{ fontSize: 13, color: "var(--tt-text-2)", margin: 0 }}
-                        inputStyle={{ fontSize: 13, height: 48 }}
+                        textStyle={{ fontSize: 14, color: "var(--tt-text-2)", margin: 0 }}
+                        inputStyle={{ fontSize: 14, height: 48 }}
                       />
                     </div>
                   )}
@@ -5776,7 +5780,7 @@ function ReportsTab({ demoCase }) {
           )}
         </div>
         {coverImageError && (
-          <p style={{ color: "var(--tt-red)", fontSize: 10, fontWeight: 500, margin: "4px 0 0", textAlign: "center" }}>{coverImageError}</p>
+          <p style={{ color: "var(--tt-red)", fontSize: 12, fontWeight: 500, margin: "4px 0 0", textAlign: "center" }}>{coverImageError}</p>
         )}
       </div>
     );
@@ -5824,7 +5828,7 @@ function ReportsTab({ demoCase }) {
           live
           aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Address</p>}
           onSave={v => setPreview(p => ({ ...p, address: v }))}
-          textStyle={{ fontSize: 15, fontWeight: 400, fontStyle: "italic", color: "var(--tt-grey05)", lineHeight: 1.3, margin: "0 0 32px" }}
+          textStyle={{ fontSize: 16, fontWeight: 400, fontStyle: "italic", color: "var(--tt-grey05)", lineHeight: 1.3, margin: "0 0 32px" }}
           // Same reasoning as projectName above — plain, normal-sized
           // input text while editing, not the italic display style.
           // margin matches textStyle's own — without it, the 32px gap
@@ -5908,7 +5912,7 @@ function ReportsTab({ demoCase }) {
           aboveWhenEditing={
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 8 }}>
               <p style={{ fontSize: 14, fontWeight: 500, color: "var(--tt-text-2)", margin: 0 }}>Additional Information</p>
-              <span style={{ fontSize: 10, fontWeight: 400, color: "var(--tt-grey05)", lineHeight: 1 }}>Optional</span>
+              <span style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)", lineHeight: 1 }}>Optional</span>
             </div>
           }
           onSave={v => setPreview(p => ({ ...p, additionalInfo: v }))}
@@ -6016,7 +6020,7 @@ function ReportsTab({ demoCase }) {
             up being — wide enough to read as a bar, not so wide it
             dominates the row. */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, maxWidth: 260 }}>
-          <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: 0, whiteSpace: "nowrap", flexShrink: 0 }}>
+          <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", margin: 0, whiteSpace: "nowrap", flexShrink: 0 }}>
             {previewData.completed} of {previewData.total} complete
           </p>
           <div style={{ flex: 1, minWidth: 0, height: 6, background: "var(--tt-grey03)", borderRadius: 99, overflow: "hidden" }}>
@@ -6571,7 +6575,7 @@ function ReportsTab({ demoCase }) {
               style={{
                 width: "100%", height: 40, padding: "0 12px",
                 background: "white", border: `1px solid ${openPeriod ? "var(--tt-text-1)" : "var(--tt-grey03)"}`,
-                borderRadius: 8, fontSize: 13, fontWeight: 500,
+                borderRadius: 8, fontSize: 14, fontWeight: 500,
                 color: "var(--tt-text-1)", cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "space-between",
                 userSelect: "none", transition: "border-color 0.15s",
@@ -6605,7 +6609,7 @@ function ReportsTab({ demoCase }) {
                       onMouseEnter={e => { if (dateRange !== id) e.currentTarget.style.background = "var(--tt-grey02)"; }}
                       onMouseLeave={e => { e.currentTarget.style.background = dateRange === id ? "var(--tt-grey02)" : "white"; }}
                     >
-                      <span style={{ fontSize: 13, fontWeight: 500, color: "var(--tt-text-1)", whiteSpace: "nowrap" }}>
+                      <span style={{ fontSize: 14, fontWeight: 500, color: "var(--tt-text-1)", whiteSpace: "nowrap" }}>
                         {renderPeriodLabel(id)}
                       </span>
                       {dateRange === id && <Check size={14} color="var(--tt-secondary)" strokeWidth={2} style={{ flexShrink: 0, marginLeft: 12 }} />}
@@ -6639,7 +6643,7 @@ function ReportsTab({ demoCase }) {
                 minWidth: isWide ? 120 : "auto",
                 background: "var(--tt-text-1)", color: "white",
                 border: "none", borderRadius: 8,
-                fontSize: 13, fontWeight: 500, cursor: generating ? "not-allowed" : "pointer",
+                fontSize: 14, fontWeight: 500, cursor: generating ? "not-allowed" : "pointer",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 whiteSpace: "nowrap", transition: "opacity 0.15s",
                 opacity: generating ? 0.7 : 1,
@@ -6719,7 +6723,7 @@ function ReportsTab({ demoCase }) {
                     <BarChart2 size={32} color="var(--tt-grey06)" strokeWidth={SW} className="tt-split-barchart2" />
                   </div>
                   <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", marginBottom: 4 }}>No reports yet</p>
-                  <p style={{ fontSize: 13, color: "var(--tt-grey05)", lineHeight: "20px", marginTop: 4 }}>
+                  <p style={{ fontSize: 14, color: "var(--tt-grey05)", lineHeight: "20px", marginTop: 4 }}>
                     {paywalled
                       ? "Generate your first report free — download or share it anytime"
                       : "Configure your report first and click Generate to create your report."}
@@ -6732,17 +6736,17 @@ function ReportsTab({ demoCase }) {
                    highlight off to (see lastSavedId), so it would just
                    sit there permanently instead of reading as recent. */
                 <tr key={r.id} style={{ background: (!paywalled && r.id === lastSavedId) ? "var(--tt-mint)" : "white", borderTop: i > 0 ? `1px solid var(--tt-grey03)` : "none", transition: "background 0.6s ease" }}>
-                  <td style={{ padding: "0 16px", fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", height: 52, verticalAlign: "middle", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.projectName || PROJECT_NAME}</td>
-                  <td style={{ padding: "0 16px", fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", height: 52, verticalAlign: "middle", whiteSpace: "nowrap" }}>
+                  <td style={{ padding: "0 16px", fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", height: 52, verticalAlign: "middle", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.projectName || PROJECT_NAME}</td>
+                  <td style={{ padding: "0 16px", fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", height: 52, verticalAlign: "middle", whiteSpace: "nowrap" }}>
                     {/* Update No. shown alongside the period since the same
                         period can be regenerated and saved more than once —
                         the period alone can't tell those saves apart. */}
                     Update No. {r.version} · {r.period}
                   </td>
-                  <td style={{ padding: "0 16px", fontSize: 13, color: "var(--tt-text-2)", whiteSpace: "nowrap", height: 52, verticalAlign: "middle" }}>{r.date}</td>
+                  <td style={{ padding: "0 16px", fontSize: 14, color: "var(--tt-text-2)", whiteSpace: "nowrap", height: 52, verticalAlign: "middle" }}>{r.date}</td>
                   <td style={{ padding: "0 14px 0 16px", textAlign: "right", height: 52, verticalAlign: "middle", width: 190 }}>
                     {r.status === "in_progress" ? (
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--tt-text-2)" }}>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 14, color: "var(--tt-text-2)" }}>
                         In progress
                         <Loader size={14} strokeWidth={SW} color="var(--tt-grey05)" className="tt-split-loader" style={{ display: "block", animation: "tt-spin 0.75s linear infinite" }} />
                       </span>
@@ -6876,7 +6880,7 @@ function ReportsTab({ demoCase }) {
                       display: "flex", alignItems: "center",
                       background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8,
                       height: 40, padding: "0 12px",
-                      fontSize: 13, fontWeight: 500, color: "var(--tt-text-1)",
+                      fontSize: 14, fontWeight: 500, color: "var(--tt-text-1)",
                     }}>
                       <span>{preview.period}</span>
                     </div>
@@ -6892,7 +6896,7 @@ function ReportsTab({ demoCase }) {
                       onClick={handlePreviewDownload}
                       onMouseEnter={e => !previewLoading && (e.currentTarget.style.background = "var(--tt-grey02)")}
                       onMouseLeave={e => e.currentTarget.style.background = "white"}
-                      style={{ height: 40, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "0 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "background 0.15s" }}
+                      style={{ height: 40, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "0 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 14, fontWeight: 500, color: "var(--tt-text-2)", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "background 0.15s" }}
                     >
                       <LockedIcon locked={paywalled}><Download size={14} strokeWidth={SW} className="tt-split-download" /></LockedIcon> Download
                     </button>
@@ -6901,7 +6905,7 @@ function ReportsTab({ demoCase }) {
                       onClick={handlePreviewCopy}
                       onMouseEnter={e => !previewLoading && (e.currentTarget.style.background = "var(--tt-grey02)")}
                       onMouseLeave={e => e.currentTarget.style.background = "white"}
-                      style={{ height: 40, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "0 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "background 0.15s" }}
+                      style={{ height: 40, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "0 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 14, fontWeight: 500, color: "var(--tt-text-2)", cursor: previewLoading ? "not-allowed" : "pointer", opacity: previewLoading ? 0.5 : 1, transition: "background 0.15s" }}
                     >
                       {previewCopied
                         ? <><Check size={14} strokeWidth={SW} /> Link copied</>
@@ -6917,7 +6921,7 @@ function ReportsTab({ demoCase }) {
                       onMouseLeave={e => e.currentTarget.style.background = "white"}
                       style={{
                         height: 40, padding: "0 20px", borderRadius: 8, border: "1px solid var(--tt-grey03)",
-                        background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)",
+                        background: "white", fontSize: 14, fontWeight: 500, color: "var(--tt-text-2)",
                         cursor: (previewLoading || saving) ? "not-allowed" : "pointer",
                         opacity: (previewLoading || saving) ? 0.5 : 1, transition: "background 0.15s",
                       }}
@@ -6932,7 +6936,7 @@ function ReportsTab({ demoCase }) {
                       style={{
                         position: "relative",
                         height: 40, padding: "0 24px", minWidth: isWide ? 120 : "auto", borderRadius: 8, border: "none",
-                        background: "var(--tt-text-1)", fontSize: 13, fontWeight: 500, color: "white",
+                        background: "var(--tt-text-1)", fontSize: 14, fontWeight: 500, color: "white",
                         display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center",
                         cursor: (previewLoading || saving) ? "not-allowed" : "pointer",
                         opacity: (previewLoading || saving) ? 0.5 : 1, transition: "opacity 0.15s",
@@ -7090,7 +7094,7 @@ function ReportsTab({ demoCase }) {
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, margin: skeletonGroupHeadingStyle.margin }}>
                         <p style={{ ...skeletonGroupHeadingStyle, margin: 0 }}>{group.label}</p>
                         <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, maxWidth: 260 }}>
-                          <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: 0, whiteSpace: "nowrap", flexShrink: 0 }}>
+                          <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", margin: 0, whiteSpace: "nowrap", flexShrink: 0 }}>
                             {previewData.completed} of {previewData.total} complete
                           </p>
                           <div style={{ flex: 1, minWidth: 0, height: 6, background: "var(--tt-grey03)", borderRadius: 99, overflow: "hidden" }}>
@@ -7400,7 +7404,7 @@ function ReportsTab({ demoCase }) {
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button
                 onClick={handleDeleteReport}
-                style={{ height: 40, padding: "0 20px", borderRadius: 8, border: "none", background: "var(--tt-text-1)", color: "white", fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "opacity 0.15s" }}
+                style={{ height: 40, padding: "0 20px", borderRadius: 8, border: "none", background: "var(--tt-text-1)", color: "white", fontSize: 14, fontWeight: 600, cursor: "pointer", transition: "opacity 0.15s" }}
                 onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
                 onMouseLeave={e => e.currentTarget.style.opacity = "1"}
               >
@@ -7447,7 +7451,7 @@ function ReportsTab({ demoCase }) {
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button
                 onClick={handleSaveConfirmed}
-                style={{ height: 40, padding: "0 20px", borderRadius: 8, border: "none", background: "var(--tt-text-1)", color: "white", fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "opacity 0.15s" }}
+                style={{ height: 40, padding: "0 20px", borderRadius: 8, border: "none", background: "var(--tt-text-1)", color: "white", fontSize: 14, fontWeight: 600, cursor: "pointer", transition: "opacity 0.15s" }}
                 onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
                 onMouseLeave={e => e.currentTarget.style.opacity = "1"}
               >
@@ -7565,11 +7569,11 @@ function ReportPaywall() {
       </p>
 
       <div style={{ background: "var(--tt-grey02)", borderRadius: 12, padding: "20px 24px", textAlign: "left", margin: "0 0 24px" }}>
-        <p style={{ fontSize: 13, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 12px" }}>What you unlock:</p>
+        <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 12px" }}>What you unlock:</p>
         {unlockItems.map((t, i) => (
           <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: i === unlockItems.length - 1 ? 0 : 10 }}>
             <Check size={16} color="var(--tt-secondary)" strokeWidth={SW} style={{ flexShrink: 0, marginTop: 2 }} />
-            <span style={{ fontSize: 13, color: "var(--tt-text-2)", lineHeight: 1.5 }}>{t}</span>
+            <span style={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.5 }}>{t}</span>
           </div>
         ))}
       </div>
@@ -7850,7 +7854,7 @@ function ReportPreviewChrome({ reportPageProps, period, dateLabel, paywalled }) 
     updateActiveFromScroll();
   };
 
-  const btnStyle = { height: 40, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "0 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 13, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s" };
+  const btnStyle = { height: 40, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "0 14px", borderRadius: 8, border: "1px solid var(--tt-grey03)", background: "white", fontSize: 14, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s" };
 
   // Same NAV_W as the draft modal (the chrome bar centers to sidebar +
   // document width combined), and the same module-level CONTENT_BUFFER
@@ -8050,7 +8054,7 @@ export default function ProjectDetail() {
                   height: 30, padding: "0 14px", borderRadius: 8, border: "none",
                   background: active ? "white" : "transparent",
                   color: active ? "var(--tt-text-1)" : "rgba(255,255,255,0.65)",
-                  fontSize: 13, fontWeight: 500, cursor: "pointer",
+                  fontSize: 14, fontWeight: 500, cursor: "pointer",
                   transition: "background 0.15s, color 0.15s",
                 }}
                 onMouseEnter={e => { if (!active) e.currentTarget.style.color = "white"; }}
@@ -8073,7 +8077,7 @@ export default function ProjectDetail() {
           </Button>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <p className="text-[18px] font-semibold leading-[1.1] text-[var(--tt-text-1)] truncate">
+              <p className="text-[24px] font-bold leading-[1.1] text-[var(--tt-text-1)] truncate">
                 {PROJECT_NAME}
               </p>
               <Button variant="ghost" size="icon" className="w-6 h-6 shrink-0 text-[var(--tt-text-2)] hover:bg-[var(--tt-grey02)]" style={{ borderRadius: 12 }}>
@@ -8081,29 +8085,29 @@ export default function ProjectDetail() {
               </Button>
             </div>
             <div className="flex items-center gap-3 mt-[2px]">
-              <span className="flex items-center gap-1 text-[12px] text-[var(--tt-grey05)]">
-                <LayoutGrid size={11} strokeWidth={SW} className="tt-split-layoutgrid" /> Personal Projects
+              <span className="flex items-center gap-1 text-[12px] text-[var(--tt-text-2)]">
+                <LayoutGrid size={12} strokeWidth={SW} className="tt-split-layoutgrid" /> Personal Projects
               </span>
-              <span className="flex items-center gap-1 text-[12px] text-[var(--tt-grey05)]">
-                <MapPin size={11} strokeWidth={SW} className="tt-split-mappin" /> {PROJECT_ADDRESS}
+              <span className="flex items-center gap-1 text-[12px] text-[var(--tt-text-2)]">
+                <MapPin size={12} strokeWidth={SW} className="tt-split-mappin" /> {PROJECT_ADDRESS}
               </span>
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Button variant="ghost" size="icon" className="w-8 h-8 text-[var(--tt-text-2)] hover:bg-[var(--tt-grey02)]" style={{ borderRadius: 12 }}>
-            <Search size={16} strokeWidth={SW} className="tt-split-search" />
+            <Search size={20} strokeWidth={SW} className="tt-split-search" />
           </Button>
-          <Button className="gap-2 bg-[var(--tt-text-1)] hover:bg-black text-white text-[14px] font-medium h-9 px-4 !rounded-xl">
+          <Button className="gap-2 bg-[var(--tt-text-1)] hover:bg-black text-white text-[14px] font-medium h-8 px-4 !rounded-full">
             <Plus size={16} strokeWidth={SW} className="tt-split-plus" /> New Task
           </Button>
         </div>
       </div>
 
       {/* Description */}
-      <div className="px-4 py-4">
-        <div className="rounded-xl px-5 py-4" style={{ background: "var(--tt-grey02)" }}>
-          <p className="text-[14px] font-semibold text-[var(--tt-text-1)] mb-1">Description</p>
+      <div className="px-4 pt-3 pb-4">
+        <div className="p-4" style={{ background: "var(--tt-grey02)", borderRadius: 16 }}>
+          <p className="text-[16px] font-semibold leading-6 text-[var(--tt-text-1)] mb-3">Description</p>
           <p className="text-[14px] text-[var(--tt-text-2)] leading-6 max-w-[680px]">
             This project focuses on conducting a comprehensive assessment and improvement.
           </p>
@@ -8127,14 +8131,14 @@ export default function ProjectDetail() {
             </div>
             <div>
               <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", margin: 0 }}>16h logged this week</p>
-              <p style={{ fontSize: 13, color: "var(--tt-grey05)", margin: 0 }}>Across 4 members</p>
+              <p style={{ fontSize: 14, color: "var(--tt-grey05)", margin: 0 }}>Across 4 members</p>
             </div>
           </div>
           <button style={{
             display: "flex", alignItems: "center", gap: 6,
             height: 40, padding: "0 12px", border: "none",
             borderRadius: 12, background: "transparent", cursor: "pointer",
-            fontSize: 13, fontWeight: 500, color: "var(--tt-text-1)",
+            fontSize: 14, fontWeight: 500, color: "var(--tt-text-1)",
             transition: "background 0.15s",
           }}
             onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
@@ -8175,7 +8179,7 @@ export default function ProjectDetail() {
                     display: "inline-flex", alignItems: "center", justifyContent: "center",
                     width: 18, height: 18, borderRadius: "50%",
                     background: "var(--tt-grey06)", color: "white",
-                    fontSize: 11, fontWeight: 600, lineHeight: 1, flexShrink: 0,
+                    fontSize: 12, fontWeight: 600, lineHeight: 1, flexShrink: 0,
                   }}>4</span>
                 )}
               </TabsTrigger>
@@ -8196,7 +8200,7 @@ export default function ProjectDetail() {
             </Button>
             <Button
               variant="outline" size="sm"
-              className="gap-2 h-8 px-4 text-[13px] font-medium bg-white"
+              className="gap-2 h-8 px-4 text-[14px] font-medium bg-white"
               style={{ color: "var(--tt-text-1)", borderColor: "var(--tt-text-1)", borderWidth: "1.5px", borderRadius: "9999px" }}
             >
               <UserPlus size={14} strokeWidth={SW} className="tt-split-userplus" />
