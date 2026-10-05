@@ -4165,17 +4165,19 @@ const buildReportHTML = async (report) => {
         return groupBlocks;
       });
 
-  const progressHTML = report.includeSummary
-    ? h("div", { style: "display:flex;align-items:center;gap:16px;margin-bottom:48px;" },
-        h("div", { style: "flex:1;min-width:0;" },
-          h("p", { style: `font-family:${SANS};font-size:13px;font-weight:600;color:#0a1629;line-height:1.4;margin:0 0 8px;` }, `${completed} of ${total} tasks complete`),
-          h("div", { style: "height:6px;background:#e8e8e6;border-radius:99px;overflow:hidden;" },
-            h("div", { style: `width:${pct}%;height:100%;background:#16a97d;border-radius:99px;` }, "")
-          )
-        ),
-        h("span", { style: `font-family:${SERIF};font-size:28px;font-weight:700;font-style:italic;color:#0a1629;flex-shrink:0;line-height:1;` }, `${pct}%`)
+  // Always shown, independent of includeSummary — that toggle is about
+  // the per-task checklist item lists specifically now (see
+  // checklistItems below), a different thing from this task-completion
+  // count.
+  const progressHTML = h("div", { style: "display:flex;align-items:center;gap:16px;margin-bottom:48px;" },
+    h("div", { style: "flex:1;min-width:0;" },
+      h("p", { style: `font-family:${SANS};font-size:13px;font-weight:600;color:#0a1629;line-height:1.4;margin:0 0 8px;` }, `${completed} of ${total} tasks complete`),
+      h("div", { style: "height:6px;background:#e8e8e6;border-radius:99px;overflow:hidden;" },
+        h("div", { style: `width:${pct}%;height:100%;background:#16a97d;border-radius:99px;` }, "")
       )
-    : "";
+    ),
+    h("span", { style: `font-family:${SERIF};font-size:28px;font-weight:700;font-style:italic;color:#0a1629;flex-shrink:0;line-height:1;` }, `${pct}%`)
+  );
   // Its own pagination block (not part of any header) — see the
   // pagination pass below, which always packs blocks fresh onto their
   // own running-header pages, after the cover and (when present) the
@@ -5987,9 +5989,13 @@ function ReportsTab({ demoCase }) {
     // "Task List" also carries the progress indicator (X of Y tasks
     // complete + bar + percentage) — moved here from its old spot above
     // Summary (see the removed renderProgressBlock call) since it's
-    // about the task list itself, not the summary text.
+    // about the task list itself, not the summary text. Always shown
+    // regardless of the "Checklist items" toggle — that toggle is about
+    // the per-task checklist item lists specifically now (see
+    // previewChecklistItemCount/the no-items banner), a different thing
+    // from this task-completion count.
     const groupHeadingStyle = { fontSize: 22, fontWeight: 700, color: "var(--tt-text-1)", margin: isFirst ? "0 0 12px" : "40px 0 12px" };
-    const groupHeading = !showGroupHeading ? null : (section.type === "task" && preview.includeSummary) ? (
+    const groupHeading = !showGroupHeading ? null : section.type === "task" ? (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, margin: groupHeadingStyle.margin }}>
         <p style={{ ...groupHeadingStyle, margin: 0 }}>{group.label}</p>
         {/* One row — text, bar, and percentage side by side, not the bar
@@ -7095,7 +7101,7 @@ function ReportsTab({ demoCase }) {
                     // already known synchronously too, per this block's
                     // own comment above.
                     const skeletonGroupHeadingStyle = { fontSize: 22, fontWeight: 700, color: "var(--tt-text-1)", margin: si === 0 ? "0 0 12px" : "40px 0 12px" };
-                    const groupHeading = !showGroupHeading ? null : (section.type === "task" && preview.includeSummary) ? (
+                    const groupHeading = !showGroupHeading ? null : section.type === "task" ? (
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, margin: skeletonGroupHeadingStyle.margin }}>
                         <p style={{ ...skeletonGroupHeadingStyle, margin: 0 }}>{group.label}</p>
                         <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, maxWidth: 260 }}>
