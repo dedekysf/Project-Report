@@ -8260,7 +8260,7 @@ export default function ProjectDetail() {
                 onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
                 onMouseLeave={e => e.currentTarget.style.background = "transparent"}
               >
-                <span style={{ lineHeight: "14px" }}>Open Timesheet</span>
+                <span style={{ lineHeight: "14px" }}>View Timesheet</span>
                 <ChevronDown size={16} strokeWidth={SW} color="var(--tt-grey05)" style={{ transform: "rotate(-90deg)" }} />
               </button>
             </div>
