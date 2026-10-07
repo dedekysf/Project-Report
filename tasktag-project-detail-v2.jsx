@@ -3061,9 +3061,9 @@ const DUMMY_ENTRIES = [
     checklist: [
       { text: "Remove old flooring throughout the ground floor" },
       { text: "Level and inspect subfloor for damage" },
-      { text: "Acclimate hardwood planks to room humidity for seventy two hours before installation begins on the ground floor and garage" },
-      { text: "Order hardwood plank materials, underlayment, transition strips and finishing supplies from the approved supplier before the next visit" },
-      { text: "Begin hardwood plank installation in living room" },
+      { text: "Acclimate hardwood planks to room humidity" },
+      { text: "Order hardwood plank materials" },
+      { text: "Begin hardwood plank installation in the living room, dining room and hallway following the layout approved by the client" },
       { text: "Install hardwood in dining room" },
       { text: "Install underlayment in hallway" },
       { text: "Fit transition strips between rooms" },
@@ -5170,12 +5170,12 @@ function ReportsTab({ demoCase }) {
     // same idea as PhotoGrid's own "+N more" but simpler (no chunking
     // needed — a checklist has no page-fitting concern to chunk around).
     const checklistItems = getChecklist(entryKey, e);
-    // Over-limit items hiding behind "Show more" (4th item onwards) force the
-    // list open so they can't go unnoticed; while any exist the toggle is
-    // hidden (collapsing would just hide the problem again). It collapses
-    // normally once they're fixed.
-    const hiddenOverLimit = !previewSaved && checklistItems.slice(CHECKLIST_COLLAPSE_COUNT).some(it => it.text.length > CHECKLIST_SOFT_MAX);
-    const checklistExpanded = !!expandedChecklists[entryKey] || hiddenOverLimit;
+    // If ANY checklist item is over the limit — even just one, wherever it
+    // sits — the whole list expands so every problem is visible. While one
+    // exists the toggle is hidden (collapsing would just hide it again); the
+    // list collapses normally once it's fixed.
+    const anyOverLimit = !previewSaved && checklistItems.some(it => it.text.length > CHECKLIST_SOFT_MAX);
+    const checklistExpanded = !!expandedChecklists[entryKey] || anyOverLimit;
     const visibleChecklistItems = checklistExpanded ? checklistItems : checklistItems.slice(0, CHECKLIST_COLLAPSE_COUNT);
     const hasRevealedContinuation = (expandedPhotoGroups[entryKey] || 0) > 0 && visiblePhotoCount > PHOTO_GRID_CAP;
     // Every chunk beyond the first CAP-sized one, once "+N more" has been
@@ -5383,7 +5383,7 @@ function ReportsTab({ demoCase }) {
                 row of its own. Add item then sits below THAT, flush left
                 instead (no indent) so it lines up with the icon column —
                 it's adding a new row, not more text under the last one. */}
-            {checklistItems.length > CHECKLIST_COLLAPSE_COUNT && !hiddenOverLimit && (
+            {checklistItems.length > CHECKLIST_COLLAPSE_COUNT && !anyOverLimit && (
               <button
                 onClick={() => setExpandedChecklists(p => ({ ...p, [entryKey]: !checklistExpanded }))}
                 style={{ marginTop: lastItemEditing ? 12 : 8, marginLeft: 22, display: "flex", alignItems: "center", gap: 4, border: "none", background: "none", padding: 0, cursor: "pointer", color: "var(--tt-grey05)", fontSize: 12, fontWeight: 500 }}
