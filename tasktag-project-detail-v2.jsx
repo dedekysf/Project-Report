@@ -8033,19 +8033,10 @@ export default function ProjectDetail() {
   const [activeTab, setActiveTab] = useState("reports");
   const [demoCase, setDemoCase] = useState("happy");
 
-  // Description — single line by default (truncated with an ellipsis),
-  // only grows an expand/collapse action once its own text actually
-  // overflows that one line; a short description never gets a "Show
-  // more" it doesn't need. descRef measures that overflow once after
-  // mount (scrollWidth > clientWidth on a nowrap/truncated line reveals
-  // it didn't all fit on one line).
+  const DESCRIPTION_PREVIEW_LIMIT = 100;
+  const PROJECT_DESCRIPTION = "This project focuses on conducting a comprehensive assessment and improvement of the residential property located at 123 Main St, covering structural integrity, electrical systems, plumbing, roofing, and interior finishes, with the goal of identifying deferred maintenance items, code compliance gaps, and opportunities for energy-efficiency upgrades ahead of the upcoming renovation phase.";
   const [descExpanded, setDescExpanded] = useState(false);
-  const [descNeedsToggle, setDescNeedsToggle] = useState(false);
-  const descRef = useRef(null);
-  useLayoutEffect(() => {
-    const el = descRef.current;
-    if (el) setDescNeedsToggle(el.scrollWidth > el.clientWidth);
-  }, []);
+  const descNeedsToggle = PROJECT_DESCRIPTION.length > DESCRIPTION_PREVIEW_LIMIT;
 
   const demoCases = [
     { id: "happy",      label: "Happy Flow" },
@@ -8139,10 +8130,11 @@ export default function ProjectDetail() {
       <div className="pl-12 pr-4 pt-3 pb-4 mb-6">
         <div className="flex items-baseline">
           <p
-            ref={descRef}
             className={descExpanded ? "text-[12px] text-[var(--tt-text-2)] leading-6" : "text-[12px] text-[var(--tt-text-2)] leading-6 truncate min-w-0"}
           >
-            This project focuses on conducting a comprehensive assessment and improvement of the residential property located at 123 Main St, covering structural integrity, electrical systems, plumbing, roofing, and interior finishes, with the goal of identifying deferred maintenance items, code compliance gaps, and opportunities for energy-efficiency upgrades ahead of the upcoming renovation phase.
+            {descExpanded
+              ? PROJECT_DESCRIPTION
+              : descNeedsToggle ? PROJECT_DESCRIPTION.slice(0, DESCRIPTION_PREVIEW_LIMIT).trimEnd() + "…" : PROJECT_DESCRIPTION}
             {descExpanded && descNeedsToggle && (
               <button
                 onClick={() => setDescExpanded(false)}
