@@ -431,6 +431,10 @@ style.textContent = `
 document.head.appendChild(style);
 
 const SW = 1.6;
+// Hides the "16h logged this week" banner at the top of the Tasks tab —
+// the banner/button markup stays in place rather than being deleted, so
+// it's a one-line flip to bring back.
+const SHOW_TASKS_TIMESHEET_BANNER = false;
 
 // Maps an icon COMPONENT (not its name — these are passed around as bare
 // component references, e.g. navGroups' own `icon` field, or iconFor's
@@ -8221,9 +8225,9 @@ export default function ProjectDetail() {
         </TabsList>
 
         <TabsContent value="tasks" className="mt-0 px-4" style={{ paddingTop: 16 }}>
-          {/* Timesheet summary banner — Tasks tab only, so it reads as
-              "hours logged on this project's tasks", not a global page
-              header shown the same way under every other tab too. */}
+          {/* Timesheet summary banner — hidden for now, kept here (not
+              deleted) in case it comes back later. */}
+          {SHOW_TASKS_TIMESHEET_BANNER && (
           <div className="pb-6">
             <div style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -8257,6 +8261,7 @@ export default function ProjectDetail() {
               </button>
             </div>
           </div>
+          )}
         </TabsContent>
         <TabsContent value="reports"   className="mt-0 px-4" style={{ paddingTop: 16 }}>
           {/* "Paywall" no longer swaps out the whole tab for a static
