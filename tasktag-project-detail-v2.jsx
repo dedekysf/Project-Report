@@ -8169,7 +8169,7 @@ export default function ProjectDetail() {
             {descExpanded && descNeedsToggle && (
               <button
                 onClick={() => setDescExpanded(false)}
-                className="ml-1 text-[12px] font-medium underline"
+                className="ml-1 text-[12px] font-normal underline"
                 style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--tt-text-2)" }}
               >
                 Show less
@@ -8183,7 +8183,7 @@ export default function ProjectDetail() {
           {!descExpanded && descNeedsToggle && (
             <button
               onClick={() => setDescExpanded(true)}
-              className="ml-2 flex-shrink-0 text-[12px] font-medium underline"
+              className="ml-2 flex-shrink-0 text-[12px] font-normal underline"
               style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--tt-text-2)" }}
             >
               Show more
