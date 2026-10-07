@@ -6610,7 +6610,7 @@ function ReportsTab({ demoCase }) {
         <div style={{ display: "flex", alignItems: "flex-end", gap: 24, width: "100%" }}>
 
           {/* Period — custom div dropdown */}
-          <div style={{ flex: "1 1 auto", minWidth: 0, position: "relative" }} ref={periodRef}>
+          <div style={{ width: 264, flexShrink: 0, position: "relative" }} ref={periodRef}>
             <Label style={{ fontSize: 12, fontWeight: 400, color: "var(--tt-grey05)", marginBottom: 6, display: "block" }}>Period</Label>
             <div
               onClick={() => setOpenPeriod(o => !o)}
@@ -6623,13 +6623,13 @@ function ReportsTab({ demoCase }) {
                 userSelect: "none", transition: "border-color 0.15s",
               }}
             >
-              <span>{renderPeriodLabel(dateRange)}</span>
+              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{renderPeriodLabel(dateRange)}</span>
               <ChevronDown size={14} strokeWidth={SW} color="var(--tt-grey05)"
                 style={{ flexShrink: 0, transform: `rotate(${openPeriod ? "180deg" : "0deg"})`, transition: "transform 0.15s" }} />
             </div>
             {openPeriod && (
               <div style={{
-                position: "fixed", top: openPeriodPos.top, left: openPeriodPos.left, zIndex: 200, minWidth: 220,
+                position: "fixed", top: openPeriodPos.top, left: openPeriodPos.left, zIndex: 200, width: 264,
                 background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, overflow: "hidden",
                 boxShadow: "0 8px 24px rgba(10,22,41,0.16)",
               }}>
@@ -6674,6 +6674,8 @@ function ReportsTab({ demoCase }) {
               <ReportCheckbox active={includeNoPhotoTasks} label="Tasks without photos" onClick={() => setIncludeNoPhotoTasks(v => !v)} />
             </div>
           </div>
+
+          <div style={{ flex: 1 }} />
 
           {/* Generate button */}
           <div style={{ flexShrink: 0 }}>
