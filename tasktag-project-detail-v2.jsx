@@ -45,6 +45,7 @@ style.textContent = `
     --tt-mint:       #dcf2ec;
     --tt-red:        #e5484d;
     --tt-blue:       #138eff;
+    --tt-orange:     #fc7f5b; /* design-system "orange" — used for soft warnings */
     --tt-pastel-magenta: #a85796;
     --radius: 0.5rem;
   }
@@ -1075,7 +1076,7 @@ function focusAtEnd(el) {
 // handleSaveReportClick, which also runs the required/format checks that
 // `required`/`validate` describe here). Once the report is saved the
 // `disabled` branch below shows it as plain text, as before.
-function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPlaceholder, filterInput, onSave, onCancel, multiline, disabled, boxed, required, validate, errorMessage, textStyle, inputStyle, as: Tag = "p", alwaysEditing, live, gap = 0, popover, popoverAlign = "left", aboveWhenEditing, counter, maxLength, rows = 2, leadingIcon }) {
+function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPlaceholder, filterInput, onSave, onCancel, multiline, disabled, boxed, required, validate, errorMessage, textStyle, inputStyle, as: Tag = "p", alwaysEditing, live, gap = 0, softMax, onEmptyBlur, popover, popoverAlign = "left", aboveWhenEditing, counter, maxLength, rows = 2, leadingIcon }) {
   const { activeField, setActiveField } = useContext(ActiveEditContext);
   const { errors: formErrors, clearError: clearFormError } = useContext(FormErrorsContext);
   const [draft, setDraft] = useState(value || "");
@@ -1224,16 +1225,19 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
             }}
             placeholder={placeholder}
             maxLength={maxLength}
-            style={{ fontFamily: "inherit", paddingLeft: leadingIcon ? 34 : 12, paddingRight: counter && maxLength ? 44 : 12, ...(liveError ? { borderColor: "var(--tt-red)" } : {}), ...inputStyle, margin: 0 }}
+            style={{ fontFamily: "inherit", paddingLeft: leadingIcon ? 34 : 12, paddingRight: counter && (maxLength || softMax) ? 48 : 12, ...(liveError ? { borderColor: "var(--tt-red)" } : {}), ...inputStyle, margin: 0 }}
           />
-          {counter && maxLength && (
-            <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", fontSize: 12, fontWeight: 500, color: current.length >= maxLength ? "var(--tt-red)" : "var(--tt-grey05)" }}>
-              {maxLength - current.length}
+          {counter && (maxLength || softMax) && (
+            <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", fontSize: 12, fontWeight: 500, color: counterColor(current.length, maxLength, softMax) }}>
+              {(maxLength || softMax) - current.length}
             </span>
           )}
         </div>
         {liveError && (
           <p style={{ color: "var(--tt-red)", fontSize: 12, fontWeight: 500, margin: "4px 0 0", textAlign: "left" }}>{liveError}</p>
+        )}
+        {!liveError && softMax && current.length > softMax && (
+          <p style={{ color: SOFT_WARNING_COLOR, fontSize: 12, fontWeight: 500, margin: "4px 0 0", textAlign: "left" }}>{SOFT_LIMIT_MESSAGE}</p>
         )}
       </div>
     );
@@ -1376,6 +1380,9 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
       }
       const trimmed = draft.trim();
       const startTrimmed = (editStartValueRef.current || "").trim();
+      // A brand-new field the user never typed into (empty before AND after)
+      // isn't allowed to just sit there blank — let the owner discard it.
+      if (!trimmed && !startTrimmed && onEmptyBlur) { setError(false); onEmptyBlur(); return; }
       const invalid = (required && !trimmed) || (trimmed && validate && !validate(trimmed));
       if (invalid) { setDraft(editStartValueRef.current || ""); setError(false); return; }
       if (trimmed !== startTrimmed) onSave(trimmed);
@@ -1391,34 +1398,27 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
     // cleared back to empty, so clearing existing content and explicitly
     // saving that empty state is still possible — not just left to
     // blur-cancel, which would revert to the old text instead.
-    const showConfirm = !!(editStartValueRef.current && editStartValueRef.current.trim()) || draft.trim().length > 0;
-    const buttonReserve = showConfirm ? 44 : 12;
-    const confirmButton = (
-      <button
-        // Without this, clicking the button first fires a native blur on
-        // the still-focused textarea/input (mousedown moves focus to the
-        // button before its own click event fires) — which would run
-        // onBlur's cancel-reset (setDraft back to editStartValueRef)
-        // BEFORE commit() ever reads `draft`, wiping out what was just
-        // typed and saving blank instead. preventDefault on mousedown
-        // stops the browser from shifting focus at all, so no blur (and
-        // no reset) happens before the click's own commit() runs.
-        onMouseDown={ev => ev.preventDefault()}
-        onClick={commit}
-        onMouseEnter={ev => ev.currentTarget.style.opacity = "0.85"}
-        onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
-        style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "opacity 0.15s" }}
-      >
-        <Check size={15} strokeWidth={SW} color="white" />
-      </button>
-    );
+    // No in-field save button: leaving the field (click away) or pressing
+    // Enter saves, Escape cancels (see handleBlurSave / cancelBlurRef). The
+    // right padding only has to make room for the counter now.
+    const buttonReserve = 12;
 
     // Once it holds a value and isn't actively focused, it reads as plain,
     // clickable text — same hover-then-click affordance as every other
     // EditableField (see the plain "display" branch below). An empty field
     // skips this and always shows the live textarea/input instead of
     // hiding behind a placeholder click.
-    if (!isEmpty && !alwaysEditingFocused) {
+    // A value over softMax never rests as plain text: it opens as an edit
+    // field with a warning underneath (without stealing focus — focusAtEnd
+    // below only fires for the field the user is actually working in).
+    const valueOver = !!softMax && (value || "").length > softMax;
+    const draftOver = !!softMax && draft.length > softMax;
+    const softWarning = draftOver ? (
+      <p style={{ color: SOFT_WARNING_COLOR, fontSize: 12, fontWeight: 500, margin: "4px 0 0", textAlign: "left" }}>
+        {SOFT_LIMIT_MESSAGE}
+      </p>
+    ) : null;
+    if (!isEmpty && !alwaysEditingFocused && !valueOver) {
       const textTag = (
         <Tag
           onClick={() => { editStartValueRef.current = value; setDraft(value || ""); setActiveField(fieldId); }}
@@ -1442,7 +1442,11 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
     // Information"/"Optional" label row) only makes sense while the field is actually live — it
     // disappears along with the textarea once the value flips to plain
     // text above.
-    return multiline ? (
+    // Task names and checklist items stay a single-line text input even when
+    // over their limit (the warning + counter carry the message); only
+    // fields that opt into `multiline` use a textarea.
+    const useArea = multiline;
+    return useArea ? (
       <div style={boxStyle}>
         {aboveWhenEditing}
         <div style={{ position: "relative" }}>
@@ -1459,7 +1463,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
             ref={el => {
               alwaysEditingRef.current = el;
               if (!el) return;
-              if (!isEmpty && el !== document.activeElement) focusAtEnd(el);
+              if (!isEmpty && alwaysEditingFocused && el !== document.activeElement) focusAtEnd(el);
               el.style.height = "auto";
               el.style.height = el.scrollHeight + "px";
             }}
@@ -1493,25 +1497,25 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
             // paddingBottom reserves room for the counter below (same
             // "controls live inside the textarea" idea as buttonReserve
             // does for the confirm button) so typed text never runs under it.
-            style={{ fontFamily: "inherit", paddingRight: buttonReserve, paddingBottom: counter ? 22 : undefined, resize: "none", overflow: "hidden", ...inputStyle }}
+            style={{ fontFamily: "inherit", paddingRight: buttonReserve + (counter && !multiline && softMax ? 40 : 0), paddingBottom: counter && multiline ? 22 : undefined, resize: "none", overflow: "hidden", ...(valueOver && !multiline ? { minHeight: 0 } : {}), ...inputStyle }}
           />
           {/* Remaining count, not "used/max" — starts at maxLength and
               counts down as you type, same bottom-left corner/style the
               photo caption's own counter uses in PhotoLightbox. */}
-          {counter && maxLength && (
-            <span style={{ position: "absolute", right: showConfirm ? 40 : 12, bottom: 9, fontSize: 12, fontWeight: 500, color: draft.length >= maxLength ? "var(--tt-red)" : "var(--tt-grey05)" }}>
-              {maxLength - draft.length}
+          {counter && (maxLength || softMax) && (
+            <span style={{ position: "absolute", right: 12, ...(multiline ? { bottom: 9 } : { top: 14 }), fontSize: 12, fontWeight: 500, color: counterColor(draft.length, maxLength, softMax) }}>
+              {(maxLength || softMax) - draft.length}
             </span>
           )}
-          <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>{showConfirm && confirmButton}</div>
         </div>
+        {softWarning}
       </div>
     ) : (
       <div>
         {aboveWhenEditing}
         <div style={{ position: "relative" }}>
           <Input
-            ref={el => { alwaysEditingRef.current = el; if (el && !isEmpty && el !== document.activeElement) focusAtEnd(el); }}
+            ref={el => { alwaysEditingRef.current = el; if (el && !isEmpty && alwaysEditingFocused && el !== document.activeElement) focusAtEnd(el); }}
             type="text"
             value={draft}
             // filterInput (e.g. companyPhone's auto-formatter) applies as
@@ -1525,20 +1529,20 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
               if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); cancelBlurRef.current = true; alwaysEditingRef.current?.blur(); }
             }}
             placeholder={placeholder}
-            style={{ fontFamily: "inherit", padding: `0 ${buttonReserve}px 0 12px`, ...(error ? { borderColor: "var(--tt-red)" } : {}), ...inputStyle }}
+            style={{ fontFamily: "inherit", padding: `0 ${buttonReserve + (counter && softMax ? 40 : 0)}px 0 12px`, ...(error ? { borderColor: "var(--tt-red)" } : {}), ...inputStyle }}
           />
-          {/* Vertically centered (not bottom-anchored like the multiline
-              branch's own confirm button, which tracks a growing
-              textarea's bottom edge) — this is a fixed-height single-line
-              input, so centering is what actually fills it instead of
-              leaving an uneven gap above the button. */}
-          <div style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center", gap: 4 }}>{showConfirm && confirmButton}</div>
+          {counter && softMax && (
+            <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", fontSize: 12, fontWeight: 500, color: counterColor(draft.length, undefined, softMax) }}>
+              {softMax - draft.length}
+            </span>
+          )}
         </div>
         {error && (
           <p style={{ color: "var(--tt-red)", fontSize: 12, fontWeight: 500, margin: "4px 0 0", textAlign: "left" }}>
             {errorMessage || "That doesn't look right."}
           </p>
         )}
+        {softWarning}
       </div>
     );
   }
@@ -1564,7 +1568,6 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
     // from an existing non-blank value OR the draft has anything typed,
     // so clearing existing content can still be explicitly saved rather
     // than only ever left to blur-cancel (which reverts instead).
-    const showConfirm = !!(value && value.trim()) || draft.trim().length > 0;
     return (
       <div key="editing" style={{ position: "relative", maxWidth: "100%", minWidth: 0, ...(!boxed ? { marginBottom: 8 } : {}), ...boxStyle }}>
         {multiline ? (
@@ -1599,23 +1602,8 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
               if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); setActiveField(prev => prev === fieldId ? null : prev); }
             }}
             placeholder={placeholder}
-            style={{ fieldSizing: "content", width: "100%", maxWidth: "100%", minWidth: 120, height: 40, padding: `0 ${showConfirm ? 44 : 12}px 0 12px`, border: `1px solid ${error ? "var(--tt-red)" : "var(--tt-text-1)"}`, borderRadius: 8, fontFamily: "inherit", outline: "none", boxSizing: "border-box", ...inputStyle }}
+            style={{ fieldSizing: "content", width: "100%", maxWidth: "100%", minWidth: 120, height: 40, padding: "0 12px", border: `1px solid ${error ? "var(--tt-red)" : "var(--tt-text-1)"}`, borderRadius: 8, fontFamily: "inherit", outline: "none", boxSizing: "border-box", ...inputStyle }}
           />
-        )}
-        {showConfirm && (
-          <div style={multiline
-            ? { display: "flex", justifyContent: "flex-end", gap: 4, marginTop: 8 }
-            : { position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }
-          }>
-            <button
-              onClick={commit}
-              onMouseEnter={ev => ev.currentTarget.style.opacity = "0.85"}
-              onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
-              style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: "pointer", padding: 0, transition: "opacity 0.15s" }}
-            >
-              <Check size={15} strokeWidth={SW} color="white" />
-            </button>
-          </div>
         )}
         {error && (
           <p style={{ color: "var(--tt-red)", fontSize: 12, fontWeight: 500, margin: "8px 0 0" }}>
@@ -2845,7 +2833,6 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
             // "cancel" means reverting to captionStartRef (this session's
             // starting caption) since every keystroke already commits
             // live via onCaptionChange, same as Escape already did.
-            const showCheck = !!(captionStartRef.current && captionStartRef.current.trim()) || (caption || "").trim().length > 0;
             const revertAndClose = () => { onCaptionChange && onCaptionChange(originalIdx, captionStartRef.current); setCaptionEditing(false); };
             return (
             <div className="tt-caption-box" style={{ position: "relative" }}>
@@ -2890,26 +2877,13 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
                 // Bottom carve out room for the counter (bottom-left) and
                 // the check button (bottom-right, only once it's shown)
                 // overlaid on top of the text.
-                style={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, resize: "none", overflow: "hidden", paddingLeft: 12, paddingRight: showCheck ? 40 : 12, paddingBottom: 30 }}
+                style={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, resize: "none", overflow: "hidden", paddingLeft: 12, paddingRight: 12, paddingBottom: 30 }}
               />
               {/* Remaining count, not "used/max" — starts at CAPTION_MAX_LEN
                   and counts down (250, 249, 248, ...) as you type. */}
               <span style={{ position: "absolute", left: 12, bottom: 9, fontSize: 12, fontWeight: 500, color: (caption || "").length >= CAPTION_MAX_LEN ? "var(--tt-red)" : "var(--tt-grey05)" }}>
                 {CAPTION_MAX_LEN - (caption || "").length}
               </span>
-              {showCheck && (
-                <div style={{ position: "absolute", right: 6, bottom: 6, display: "flex", alignItems: "center", gap: 4 }}>
-                  <button
-                    onMouseDown={ev => ev.preventDefault()}
-                    onClick={() => setCaptionEditing(false)}
-                    onMouseEnter={ev => ev.currentTarget.style.opacity = "0.85"}
-                    onMouseLeave={ev => ev.currentTarget.style.opacity = "1"}
-                    style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: "var(--tt-text-1)", border: "none", borderRadius: 6, cursor: "pointer", padding: 0 }}
-                  >
-                    <Check size={15} strokeWidth={SW} color="white" />
-                  </button>
-                </div>
-              )}
             </div>
             );
           })() : caption ? (
@@ -3080,15 +3054,15 @@ const DUMMY_ENTRIES = [
   // prototype's default/first-load state stays manageable to click
   // through.
   {
-    date: "2026-09-10", note: "Flooring installation started on the ground floor.",
+    date: "2026-09-10", note: "Flooring installation started on the ground floor and the first coats of finish were applied to the hallway",
     // Deliberately 12 items — over the 10-item cap, to demo the "(limited
     // to the 10 most recent)" truncation note on the first (most visible)
     // entry's checklist.
     checklist: [
       { text: "Remove old flooring throughout the ground floor" },
       { text: "Level and inspect subfloor for damage" },
-      { text: "Acclimate hardwood planks to room humidity" },
-      { text: "Order hardwood plank materials" },
+      { text: "Acclimate hardwood planks to room humidity for seventy two hours before installation begins on the ground floor and garage" },
+      { text: "Order hardwood plank materials, underlayment, transition strips and finishing supplies from the approved supplier before the next visit" },
       { text: "Begin hardwood plank installation in living room" },
       { text: "Install hardwood in dining room" },
       { text: "Install underlayment in hallway" },
@@ -3452,6 +3426,28 @@ const PER_ENTRY_PHOTO_LIMIT = 15;
 // see PhotoLightbox's caption field) rather than by cutting an
 // already-saved caption short later.
 const CAPTION_MAX_LEN = 250;
+
+// Soft limits (character counts) for text that must stay on ONE line in the
+// report output. Values over the limit are NOT blocked or trimmed — the
+// field just opens in edit mode with a warning (see EditableField's
+// softMax) and the output clips to one line with an ellipsis.
+const TASK_NAME_SOFT_MAX = 80;
+// Company name/address are typed by the user, so they are HARD limits
+// (the field stops accepting characters); project name/address arrive from
+// the system (up to 255 / 1000 chars), so theirs are SOFT limits.
+const COMPANY_NAME_MAX = 60;
+const COMPANY_ADDRESS_MAX = 120;
+const PROJECT_NAME_SOFT_MAX = 100;
+const PROJECT_ADDRESS_SOFT_MAX = 120;
+const CHECKLIST_SOFT_MAX = 100;
+const SOFT_WARNING_COLOR = "var(--tt-orange)";
+// One short message for every soft limit — the counter inside the field
+// already shows by how much the text is over.
+const SOFT_LIMIT_MESSAGE = "Character limit exceeded.";
+// Counter colour for a character indicator: grey normally, red when a HARD
+// limit is reached, warning colour once a SOFT limit is exceeded.
+const counterColor = (len, hardMax, softMax) =>
+  softMax && len > softMax ? SOFT_WARNING_COLOR : (hardMax && len >= hardMax ? "var(--tt-red)" : "var(--tt-grey05)");
 
 // Summary and Additional Information's own caps (EditableField's
 // maxLength) — same "enforced at the source" idea as CAPTION_MAX_LEN above.
@@ -4027,7 +4023,7 @@ const buildReportHTML = async (report) => {
     // ReportPreviewChrome/buildReportHTMLFromParams' navItems); a plain
     // shared-link recipient never sees or uses it, it's just inert markup
     // to them.
-    return h("p", { id: `report-task-${e.entryKey}`, style: `font-family:${SERIF};font-size:18px;font-weight:600;color:#0a1629;line-height:1.4;margin:0;` }, e.note) +
+    return h("p", { id: `report-task-${e.entryKey}`, style: `font-family:${SERIF};font-size:18px;font-weight:600;color:#0a1629;line-height:1.4;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;` }, e.note) +
       h("div", { style: "margin-top:8px;" }, metaLine) +
       dividerHTML;
   };
@@ -4042,7 +4038,7 @@ const buildReportHTML = async (report) => {
   const checklistItemRowHTML = (item) =>
     h("div", { style: "display:flex;align-items:center;gap:8px;" },
       h("span", { style: "flex-shrink:0;color:#16a97d;font-size:12px;font-weight:700;" }, "✓"),
-      h("span", { style: `font-family:${SANS};font-size:14px;color:#303742;line-height:1.4;` }, item.text)
+      h("span", { style: `font-family:${SANS};font-size:14px;color:#303742;line-height:1.4;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;` }, item.text)
     );
 
   // Whole-entry block — used only when the entry has no checklist, so
@@ -5174,7 +5170,12 @@ function ReportsTab({ demoCase }) {
     // same idea as PhotoGrid's own "+N more" but simpler (no chunking
     // needed — a checklist has no page-fitting concern to chunk around).
     const checklistItems = getChecklist(entryKey, e);
-    const checklistExpanded = !!expandedChecklists[entryKey];
+    // Over-limit items hiding behind "Show more" (4th item onwards) force the
+    // list open so they can't go unnoticed; while any exist the toggle is
+    // hidden (collapsing would just hide the problem again). It collapses
+    // normally once they're fixed.
+    const hiddenOverLimit = !previewSaved && checklistItems.slice(CHECKLIST_COLLAPSE_COUNT).some(it => it.text.length > CHECKLIST_SOFT_MAX);
+    const checklistExpanded = !!expandedChecklists[entryKey] || hiddenOverLimit;
     const visibleChecklistItems = checklistExpanded ? checklistItems : checklistItems.slice(0, CHECKLIST_COLLAPSE_COUNT);
     const hasRevealedContinuation = (expandedPhotoGroups[entryKey] || 0) > 0 && visiblePhotoCount > PHOTO_GRID_CAP;
     // Every chunk beyond the first CAP-sized one, once "+N more" has been
@@ -5184,6 +5185,12 @@ function ReportsTab({ demoCase }) {
     if (hasRevealedContinuation) {
       for (let chunk = 1; chunk * PHOTO_GRID_CAP < visiblePhotoCount; chunk++) chunkNums.push(chunk);
     }
+    // Edit mode (or an error showing) for the task name / a checklist item:
+    // the gap to the content right below it is 16px instead of the resting
+    // spacing. Same "is it a live input" test EditableField uses.
+    const titleEditing = !previewSaved && (activeEditField === `title_${entryKey}` || displayTitle.length > TASK_NAME_SOFT_MAX);
+    const isItemEditing = (it, i) => !previewSaved && (!it.text.trim() || activeEditField === `checklist_${entryKey}_${i}` || it.text.length > CHECKLIST_SOFT_MAX);
+    const lastItemEditing = visibleChecklistItems.length > 0 && isItemEditing(visibleChecklistItems[visibleChecklistItems.length - 1], visibleChecklistItems.length - 1);
     const onOpenPhoto = (photos, idx, originalIndices) => setLightbox({ photos, index: idx, entryDate: e.date, taskName: displayTitle, entryKey, originalIndices });
     const onExpandPhotos = () => setExpandedPhotoGroups(p => ({ ...p, [entryKey]: Infinity }));
     return (
@@ -5194,6 +5201,10 @@ function ReportsTab({ demoCase }) {
         <EditableField
           fieldId={`title_${entryKey}`}
           value={displayTitle}
+          required
+          errorMessage="Task name can't be empty."
+          softMax={TASK_NAME_SOFT_MAX}
+          counter
           placeholder="Enter task name..."
           disabled={previewSaved}
           // Same independent-save flow as a checklist item (plain text →
@@ -5213,7 +5224,7 @@ function ReportsTab({ demoCase }) {
             directly into the status text ("Completed Sep 9", no
             separator dot, no uppercase); Open (blue) shows only the
             status, no date at all. */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: titleEditing ? 16 : 8 }}>
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: statusMeta.color, flexShrink: 0 }} />
           {kind === "completed" ? (
             <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: statusMeta.color }}>
@@ -5257,14 +5268,17 @@ function ReportsTab({ demoCase }) {
               // activeField) — while true, no check/edit/trash icon shows
               // at all, there's nothing to act on while the row is already
               // a live input.
-              const isEditingThisItem = !previewSaved && (!item.text.trim() || activeEditField === checklistFieldId);
+              const isEditingThisItem = isItemEditing(item, idx);
+              // Each row carries 4px of its own bottom padding + border, so 12px
+              // here makes the gap below an editing row a full 16px.
+              const prevEditing = idx > 0 && isItemEditing(visibleChecklistItems[idx - 1], idx - 1);
               const isBeingDragged = draggedChecklist?.entryKey === entryKey && draggedChecklist?.idx === idx;
               return (
                 <div
                   key={idx}
                   className="group"
                   style={{
-                    marginTop: idx === 0 ? 0 : 6, display: "flex", alignItems: "center", gap: 8,
+                    marginTop: idx === 0 ? 0 : (prevEditing ? 12 : 6), display: "flex", alignItems: "center", gap: 8,
                     paddingBottom: 2, transition: "border-color 0.15s",
                     // Just the line accent (no background fill) — the
                     // reference screenshot's own highlight, marking which
@@ -5345,6 +5359,11 @@ function ReportsTab({ demoCase }) {
                       <EditableField
                         fieldId={checklistFieldId}
                         value={item.text}
+                        required
+                        errorMessage="Checklist item can't be empty."
+                        onEmptyBlur={() => deleteChecklistItem(entryKey, e, idx)}
+                        softMax={CHECKLIST_SOFT_MAX}
+                        counter
                         placeholder="Checklist item"
                         alwaysEditing
                         onSave={v => updateChecklistItem(entryKey, e, idx, v)}
@@ -5364,10 +5383,10 @@ function ReportsTab({ demoCase }) {
                 row of its own. Add item then sits below THAT, flush left
                 instead (no indent) so it lines up with the icon column —
                 it's adding a new row, not more text under the last one. */}
-            {checklistItems.length > CHECKLIST_COLLAPSE_COUNT && (
+            {checklistItems.length > CHECKLIST_COLLAPSE_COUNT && !hiddenOverLimit && (
               <button
                 onClick={() => setExpandedChecklists(p => ({ ...p, [entryKey]: !checklistExpanded }))}
-                style={{ marginTop: 8, marginLeft: 22, display: "flex", alignItems: "center", gap: 4, border: "none", background: "none", padding: 0, cursor: "pointer", color: "var(--tt-grey05)", fontSize: 12, fontWeight: 500 }}
+                style={{ marginTop: lastItemEditing ? 12 : 8, marginLeft: 22, display: "flex", alignItems: "center", gap: 4, border: "none", background: "none", padding: 0, cursor: "pointer", color: "var(--tt-grey05)", fontSize: 12, fontWeight: 500 }}
               >
                 {checklistExpanded ? "Show less" : `Show ${checklistItems.length - CHECKLIST_COLLAPSE_COUNT} more`}
                 {checklistExpanded ? <ChevronUp size={14} strokeWidth={SW} /> : <ChevronDown size={14} strokeWidth={SW} />}
@@ -5569,6 +5588,8 @@ function ReportsTab({ demoCase }) {
       <EditableField
         fieldId="companyName"
         value={preview.companyName}
+        maxLength={COMPANY_NAME_MAX}
+        counter
         placeholder="E.g. Acme Construction Co."
         disabled={previewSaved}
         live
@@ -5583,6 +5604,8 @@ function ReportsTab({ demoCase }) {
       <EditableField
         fieldId="companyAddress"
         value={preview.companyAddress}
+        maxLength={COMPANY_ADDRESS_MAX}
+        counter
         placeholder="E.g. 123 Main St, Austin, TX"
         disabled={previewSaved}
         live
@@ -5790,6 +5813,8 @@ function ReportsTab({ demoCase }) {
         <EditableField
           fieldId="projectName"
           value={preview.projectName}
+          softMax={PROJECT_NAME_SOFT_MAX}
+          counter
           placeholder={`E.g. ${PROJECT_NAME}`}
           disabled={previewSaved}
           live
@@ -5809,6 +5834,8 @@ function ReportsTab({ demoCase }) {
         <EditableField
           fieldId="address"
           value={preview.address}
+          softMax={PROJECT_ADDRESS_SOFT_MAX}
+          counter
           placeholder={`E.g. ${PROJECT_ADDRESS}`}
           disabled={previewSaved}
           live
