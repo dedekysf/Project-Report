@@ -625,24 +625,21 @@ const STATUS_META = {
 };
 
 // ── Date Range Calendar ──
-function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, singleDate = false, alwaysBelow = false }) {
+function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, singleDate = false, alwaysBelow = false, initialStart = null, initialEnd = null }) {
   const today = APP_TODAY;
-  const [viewYear,   setViewYear]   = useState(today.getFullYear());
-  const [viewMonth,  setViewMonth]  = useState(today.getMonth());
-  const [rangeStart, setRangeStart] = useState(null);
-  const [rangeEnd,   setRangeEnd]   = useState(null);
+  // Reopening with a previously applied range shows that range selected,
+  // in the month it's in — not always today's month.
+  const initialView = initialStart ? new Date(`${initialStart}T00:00:00`) : today;
+  const [viewYear,   setViewYear]   = useState(initialView.getFullYear());
+  const [viewMonth,  setViewMonth]  = useState(initialView.getMonth());
+  const [rangeStart, setRangeStart] = useState(initialStart);
+  const [rangeEnd,   setRangeEnd]   = useState(initialEnd);
   const [hovering,   setHovering]   = useState(null);
   const calRef = useRef(null);
 
   const DAYS   = ["Su","Mo","Tu","We","Th","Fr","Sa"];
   const MONTHS = ["January","February","March","April","May","June",
                   "July","August","September","October","November","December"];
-
-  // ── Scroll wheel to change month ──
-  const handleWheel = (e) => {
-    e.preventDefault();
-    if (e.deltaY > 0) shiftMonth(1); else shiftMonth(-1);
-  };
 
   const shiftMonth = (dir) => {
     setViewMonth(m => {
@@ -652,6 +649,27 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
       return next;
     });
   };
+
+  // Can't navigate past the current month unless future dates are allowed.
+  const canGoNext = allowFuture || viewYear < today.getFullYear() ||
+    (viewYear === today.getFullYear() && viewMonth < today.getMonth());
+
+  // ── Scroll wheel over the calendar changes month and must not also
+  //    scroll the page behind it. A plain JSX onWheel handler isn't
+  //    enough — React attaches "wheel" as a passive listener by default,
+  //    so e.preventDefault() inside it is silently ignored and the page
+  //    scrolls anyway; a native listener with { passive: false } is
+  //    required to actually stop it. ──
+  useEffect(() => {
+    const el = calRef.current;
+    if (!el) return;
+    const handler = (e) => {
+      e.preventDefault();
+      if (e.deltaY > 0) { if (canGoNext) shiftMonth(1); } else shiftMonth(-1);
+    };
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+  }, [canGoNext]);
 
   // ── Fixed position: left-aligned to anchor, always below it ──
   const [pos, setPos] = useState({ top: 0, left: 0 });
@@ -738,7 +756,6 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
   return (
     <div
       ref={calRef}
-      onWheel={handleWheel}
       style={{
         position: alwaysBelow ? "absolute" : "fixed",
         top: alwaysBelow ? "calc(100% + 8px)" : pos.top,
@@ -773,10 +790,15 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
           {MONTHS[viewMonth]} {viewYear}
         </span>
         <button
+          disabled={!canGoNext}
           onClick={() => shiftMonth(1)}
-          onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+          onMouseEnter={e => { if (canGoNext) e.currentTarget.style.background = "var(--tt-grey02)"; }}
           onMouseLeave={e => e.currentTarget.style.background = "none"}
-          style={{ background: "none", border: "none", borderRadius: 6, cursor: "pointer", padding: 4, color: "var(--tt-text-2)", display: "flex", transform: "rotate(180deg)", transition: "background 0.15s" }}
+          style={{
+            background: "none", border: "none", borderRadius: 6, padding: 4, display: "flex", transform: "rotate(180deg)", transition: "background 0.15s",
+            color: canGoNext ? "var(--tt-text-2)" : "var(--tt-grey04)",
+            cursor: canGoNext ? "pointer" : "not-allowed",
+          }}
         >
           <ChevronLeft size={16} strokeWidth={SW} />
         </button>
@@ -863,14 +885,16 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
       {/* Footer */}
       {!singleDate && <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--tt-grey03)" }}>
         <button
-          onClick={onClose}
-          onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+          disabled={!rangeStart}
+          onClick={() => { setRangeStart(null); setRangeEnd(null); }}
+          onMouseEnter={e => { if (rangeStart) e.currentTarget.style.background = "var(--tt-grey02)"; }}
           onMouseLeave={e => e.currentTarget.style.background = "transparent"}
           style={{
             padding: "6px 16px", borderRadius: 8,
             border: "none", background: "transparent",
-            fontSize: 14, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s",
-          }}>Cancel</button>
+            fontSize: 14, fontWeight: 500, color: rangeStart ? "var(--tt-text-2)" : "var(--tt-grey04)",
+            cursor: rangeStart ? "pointer" : "not-allowed", transition: "background 0.15s",
+          }}>Clear</button>
         <button
           disabled={!rangeStart || !rangeEnd}
           onClick={() => onApply ? onApply(rangeStart, rangeEnd) : onClose()}
@@ -4562,7 +4586,8 @@ function ReportsTab({ demoCase }) {
   const [includeNoPhotoTasks, setIncludeNoPhotoTasks] = useState(false); // "Task complete without photos" chip
   const [dateRange,   setDateRange]   = useState("last_7");
   const [showCal,     setShowCal]     = useState(false);
-  const [customRange, setCustomRange] = useState(null); // { start, end } date strings
+  const [customRange, setCustomRange] = useState(null); // { start, end } date strings, for display
+  const [customRangeKeys, setCustomRangeKeys] = useState(null); // same range as raw { start, end } YYYY-MM-DD keys, so reopening the calendar can restore the selection
   const prevDateRangeRef = useRef("last_7"); // dateRange to fall back to if custom is opened but no date is picked
   const [reports,     setReports]     = useState([]);
   // The company identity (logo/name/address) last saved with any report —
@@ -6771,6 +6796,8 @@ function ReportsTab({ demoCase }) {
       {showCal && (
         <DateRangeCalendar
           anchorRef={periodRef}
+          initialStart={customRangeKeys?.start}
+          initialEnd={customRangeKeys?.end}
           onClose={() => {
             if (!customRange) setDateRange(prevDateRangeRef.current);
             setShowCal(false);
@@ -6782,6 +6809,7 @@ function ReportsTab({ demoCase }) {
                 return new Date(y, m-1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
               };
               setCustomRange({ start: fmt(start), end: fmt(end) });
+              setCustomRangeKeys({ start, end });
             } else if (!customRange) {
               setDateRange(prevDateRangeRef.current);
             }
