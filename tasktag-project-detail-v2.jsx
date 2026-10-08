@@ -4044,8 +4044,8 @@ const buildReportHTML = async (report) => {
     );
 
   const checklistItemRowHTML = (item) =>
-    h("div", { style: "display:flex;align-items:center;gap:8px;" },
-      h("span", { style: "flex-shrink:0;color:#16a97d;font-size:12px;font-weight:700;" }, "✓"),
+    h("div", { style: "display:flex;align-items:flex-start;gap:8px;" },
+      h("span", { style: "flex-shrink:0;color:#16a97d;font-size:12px;font-weight:700;line-height:1.4;" }, "✓"),
       h("span", { style: `font-family:${SANS};font-size:14px;color:#303742;line-height:1.4;min-width:0;overflow-wrap:break-word;` }, item.text)
     );
 
