@@ -1329,7 +1329,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
               </div>
               {error && (
                 <p style={{ color: "var(--tt-red)", fontSize: 12, fontWeight: 500, margin: "4px 0 0", textAlign: "left" }}>
-                  {errorMessage || "That doesn't look right."}
+                  {(typeof errorMessage === "function" ? errorMessage(draft) : errorMessage) || "That doesn't look right."}
                 </p>
               )}
             </div>
@@ -1447,7 +1447,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
     // fields that opt into `multiline` use a textarea.
     const useArea = multiline;
     return useArea ? (
-      <div style={boxStyle}>
+      <div data-field={fieldId} style={boxStyle}>
         {aboveWhenEditing}
         <div style={{ position: "relative" }}>
           <Textarea
@@ -1511,7 +1511,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
         {softWarning}
       </div>
     ) : (
-      <div>
+      <div data-field={fieldId}>
         {aboveWhenEditing}
         <div style={{ position: "relative" }}>
           <Input
@@ -1520,7 +1520,14 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
             value={draft}
             // filterInput (e.g. companyPhone's auto-formatter) applies as
             // the user types, same as the popover mode's own onChange.
-            onChange={ev => { setDraft(filterInput ? filterInput(ev.target.value) : ev.target.value); if (error) setError(false); }}
+            // maxLength (a real hard cap, unlike softMax) clips the draft
+            // the same way the multiline branch above already does — once
+            // the counter hits 0 it stops there instead of going negative.
+            onChange={ev => {
+              const v = maxLength ? ev.target.value.slice(0, maxLength) : ev.target.value;
+              setDraft(filterInput ? filterInput(v) : v);
+              if (error) setError(false);
+            }}
             onFocus={() => setActiveField(fieldId)}
             // Same blur-is-cancel reset as the multiline branch above.
             onBlur={handleBlurSave}
@@ -1529,17 +1536,18 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
               if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); cancelBlurRef.current = true; alwaysEditingRef.current?.blur(); }
             }}
             placeholder={placeholder}
-            style={{ fontFamily: "inherit", padding: `0 ${buttonReserve + (counter && softMax ? 40 : 0)}px 0 12px`, ...(error ? { borderColor: "var(--tt-red)" } : {}), ...inputStyle }}
+            maxLength={maxLength}
+            style={{ fontFamily: "inherit", padding: `0 ${buttonReserve + (counter && (maxLength || softMax) ? 40 : 0)}px 0 12px`, ...(error ? { borderColor: "var(--tt-red)" } : {}), ...inputStyle }}
           />
-          {counter && softMax && (
-            <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", fontSize: 12, fontWeight: 500, color: counterColor(draft.length, undefined, softMax) }}>
-              {softMax - draft.length}
+          {counter && (maxLength || softMax) && (
+            <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", fontSize: 12, fontWeight: 500, color: counterColor(draft.length, maxLength, softMax) }}>
+              {(maxLength || softMax) - draft.length}
             </span>
           )}
         </div>
         {error && (
           <p style={{ color: "var(--tt-red)", fontSize: 12, fontWeight: 500, margin: "4px 0 0", textAlign: "left" }}>
-            {errorMessage || "That doesn't look right."}
+            {(typeof errorMessage === "function" ? errorMessage(draft) : errorMessage) || "That doesn't look right."}
           </p>
         )}
         {softWarning}
@@ -1607,7 +1615,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
         )}
         {error && (
           <p style={{ color: "var(--tt-red)", fontSize: 12, fontWeight: 500, margin: "8px 0 0" }}>
-            {errorMessage || "This can't be empty."}
+            {(typeof errorMessage === "function" ? errorMessage(draft) : errorMessage) || "This can't be empty."}
           </p>
         )}
       </div>
@@ -3439,7 +3447,7 @@ const COMPANY_NAME_MAX = 60;
 const COMPANY_ADDRESS_MAX = 120;
 const PROJECT_NAME_SOFT_MAX = 100;
 const PROJECT_ADDRESS_SOFT_MAX = 120;
-const CHECKLIST_SOFT_MAX = 100;
+const CHECKLIST_SOFT_MAX = 255;
 const SOFT_WARNING_COLOR = "var(--tt-orange)";
 // One short message for every soft limit — the counter inside the field
 // already shows by how much the text is over.
@@ -4023,7 +4031,7 @@ const buildReportHTML = async (report) => {
     // ReportPreviewChrome/buildReportHTMLFromParams' navItems); a plain
     // shared-link recipient never sees or uses it, it's just inert markup
     // to them.
-    return h("p", { id: `report-task-${e.entryKey}`, style: `font-family:${SERIF};font-size:18px;font-weight:600;color:#0a1629;line-height:1.4;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;` }, e.note) +
+    return h("p", { id: `report-task-${e.entryKey}`, style: `font-family:${SERIF};font-size:18px;font-weight:600;color:#0a1629;line-height:1.4;margin:0;overflow-wrap:break-word;` }, e.note) +
       h("div", { style: "margin-top:8px;" }, metaLine) +
       dividerHTML;
   };
@@ -4038,7 +4046,7 @@ const buildReportHTML = async (report) => {
   const checklistItemRowHTML = (item) =>
     h("div", { style: "display:flex;align-items:center;gap:8px;" },
       h("span", { style: "flex-shrink:0;color:#16a97d;font-size:12px;font-weight:700;" }, "✓"),
-      h("span", { style: `font-family:${SANS};font-size:14px;color:#303742;line-height:1.4;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;` }, item.text)
+      h("span", { style: `font-family:${SANS};font-size:14px;color:#303742;line-height:1.4;min-width:0;overflow-wrap:break-word;` }, item.text)
     );
 
   // Whole-entry block — used only when the entry has no checklist, so
@@ -5360,8 +5368,10 @@ function ReportsTab({ demoCase }) {
                         fieldId={checklistFieldId}
                         value={item.text}
                         required
-                        errorMessage="Checklist item can't be empty."
+                        validate={v => v.length <= CHECKLIST_SOFT_MAX}
+                        errorMessage={v => v.length > CHECKLIST_SOFT_MAX ? `Checklist item exceeds the ${CHECKLIST_SOFT_MAX} character limit.` : "Checklist item can't be empty."}
                         onEmptyBlur={() => deleteChecklistItem(entryKey, e, idx)}
+                        maxLength={CHECKLIST_SOFT_MAX}
                         softMax={CHECKLIST_SOFT_MAX}
                         counter
                         placeholder="Checklist item"
@@ -5943,6 +5953,22 @@ function ReportsTab({ demoCase }) {
   const sectionRefs = useRef({});
   const mainScrollRef = useRef(null);
   const [activeSectionKey, setActiveSectionKey] = useState(null);
+  // Maps a formErrors fieldId back to the section card it lives in —
+  // companyName/Address/Email/Phone all live in "coverHeader",
+  // projectName/address in "coverContent", and title_${entryKey} /
+  // checklist_${entryKey}_${idx} both key off the same entryKey a task
+  // section is itself keyed by (see `sections.push({ key: entryKey,
+  // type: "task", ... })` above).
+  const sectionKeyForField = (fieldId) => {
+    if (["companyName", "companyAddress", "companyEmail", "companyPhone"].includes(fieldId)) return "coverHeader";
+    if (["projectName", "address"].includes(fieldId)) return "coverContent";
+    if (fieldId.startsWith("title_")) return fieldId.slice("title_".length);
+    if (fieldId.startsWith("checklist_")) {
+      const rest = fieldId.slice("checklist_".length);
+      return rest.slice(0, rest.lastIndexOf("_"));
+    }
+    return null;
+  };
 
   const scrollToSection = (key) => {
     sectionRefs.current[key]?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -6324,10 +6350,41 @@ function ReportsTab({ demoCase }) {
     if (email && !EMAIL_PATTERN.test(email)) errs.companyEmail = "Enter a valid email address.";
     const phone = preview.companyPhone.trim();
     if (phone && !US_PHONE_PATTERN.test(phone)) errs.companyPhone = "Enter a valid US phone number.";
+    // Soft-max fields (project name/address, task titles, checklist
+    // items) never blocked typing or truncated here in the draft — only
+    // the exported document used to clip them, which it no longer does
+    // (see buildReportHTML). So an over-limit value now has to actually
+    // be fixed before saving, same as the required checks above, instead
+    // of silently shipping a value the export would've rendered in full
+    // anyway.
+    if (preview.projectName.length > PROJECT_NAME_SOFT_MAX) errs.projectName = `Project name exceeds the ${PROJECT_NAME_SOFT_MAX} character limit.`;
+    if (preview.address.length > PROJECT_ADDRESS_SOFT_MAX) errs.address = `Address exceeds the ${PROJECT_ADDRESS_SOFT_MAX} character limit.`;
+    previewFinalGroups.forEach(g => g.entries.forEach(entry => {
+      if (entry.isNote) return;
+      if ((entry.note || "").length > TASK_NAME_SOFT_MAX) errs[`title_${entry.entryKey}`] = `Task name exceeds the ${TASK_NAME_SOFT_MAX} character limit.`;
+      (entry.checklist || []).forEach((item, idx) => {
+        if (item.text.length > CHECKLIST_SOFT_MAX) errs[`checklist_${entry.entryKey}_${idx}`] = `Checklist item exceeds the ${CHECKLIST_SOFT_MAX} character limit.`;
+      });
+    }));
     setFormErrors(errs);
     const firstErrorId = Object.keys(errs)[0];
     if (firstErrorId) {
-      setTimeout(() => document.querySelector(`[data-field="${firstErrorId}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" }), 0);
+      const sectionKey = sectionKeyForField(firstErrorId);
+      if (sectionKey) {
+        // Sets the sidebar's active item directly rather than waiting on
+        // the scroll-spy (updateActiveSection) to catch up with whatever
+        // the scrollIntoView below lands on — instant, not dependent on
+        // the scroll event actually firing a recomputation in time.
+        setActiveSectionKey(sectionKey);
+      }
+      setTimeout(() => {
+        // The section's own top edge (block:"start", same as a sidebar
+        // nav click — see scrollToSection) rather than centering just the
+        // one field, so the whole errored card is what comes into view.
+        const sectionEl = sectionKey && sectionRefs.current[sectionKey];
+        const fieldEl = document.querySelector(`[data-field="${firstErrorId}"]`);
+        (sectionEl || fieldEl)?.scrollIntoView({ block: "start", behavior: "smooth" });
+      }, 0);
       return;
     }
     const finalGroups = applyExtraNotesToGroups(applyChecklistOverrides(applyTitleOverrides(applyPhotoExclusions(previewData.groups, preview.excludedPhotos), titleOverrides), checklistOverrides), preview.extraNotes);
