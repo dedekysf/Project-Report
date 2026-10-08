@@ -1186,7 +1186,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
             maxLength={maxLength}
             style={{ fontFamily: "inherit", paddingBottom: counter ? 22 : undefined, resize: "none", overflow: "hidden", ...(liveError ? { borderColor: "var(--tt-red)" } : {}), ...inputStyle }}
           />
-          {counter && maxLength && (
+          {activeField === fieldId && counter && maxLength && (
             <span style={{ position: "absolute", right: 12, bottom: 9, fontSize: 12, fontWeight: 500, color: current.length >= maxLength ? "var(--tt-red)" : "var(--tt-grey05)" }}>
               {maxLength - current.length}
             </span>
@@ -1227,7 +1227,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
             maxLength={maxLength}
             style={{ fontFamily: "inherit", paddingLeft: leadingIcon ? 34 : 12, paddingRight: counter && (maxLength || softMax) ? 48 : 12, ...(liveError ? { borderColor: "var(--tt-red)" } : {}), ...inputStyle, margin: 0 }}
           />
-          {counter && (maxLength || softMax) && (
+          {activeField === fieldId && counter && (maxLength || softMax) && (
             <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", fontSize: 12, fontWeight: 500, color: counterColor(current.length, maxLength, softMax) }}>
               {(maxLength || softMax) - current.length}
             </span>
@@ -1502,7 +1502,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
           {/* Remaining count, not "used/max" — starts at maxLength and
               counts down as you type, same bottom-left corner/style the
               photo caption's own counter uses in PhotoLightbox. */}
-          {counter && (maxLength || softMax) && (
+          {alwaysEditingFocused && counter && (maxLength || softMax) && (
             <span style={{ position: "absolute", right: 12, ...(multiline ? { bottom: 9 } : { top: 14 }), fontSize: 12, fontWeight: 500, color: counterColor(draft.length, maxLength, softMax) }}>
               {(maxLength || softMax) - draft.length}
             </span>
@@ -1539,7 +1539,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
             maxLength={maxLength}
             style={{ fontFamily: "inherit", padding: `0 ${buttonReserve + (counter && (maxLength || softMax) ? 40 : 0)}px 0 12px`, ...(error ? { borderColor: "var(--tt-red)" } : {}), ...inputStyle }}
           />
-          {counter && (maxLength || softMax) && (
+          {alwaysEditingFocused && counter && (maxLength || softMax) && (
             <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", fontSize: 12, fontWeight: 500, color: counterColor(draft.length, maxLength, softMax) }}>
               {(maxLength || softMax) - draft.length}
             </span>
@@ -3435,18 +3435,14 @@ const PER_ENTRY_PHOTO_LIMIT = 15;
 // already-saved caption short later.
 const CAPTION_MAX_LEN = 250;
 
-// Soft limits (character counts) for text that must stay on ONE line in the
-// report output. Values over the limit are NOT blocked or trimmed — the
-// field just opens in edit mode with a warning (see EditableField's
-// softMax) and the output clips to one line with an ellipsis.
-const TASK_NAME_SOFT_MAX = 80;
-// Company name/address are typed by the user, so they are HARD limits
-// (the field stops accepting characters); project name/address arrive from
-// the system (up to 255 / 1000 chars), so theirs are SOFT limits.
-const COMPANY_NAME_MAX = 60;
-const COMPANY_ADDRESS_MAX = 120;
-const PROJECT_NAME_SOFT_MAX = 100;
-const PROJECT_ADDRESS_SOFT_MAX = 120;
+// "Soft" limits — a value over the limit is NOT blocked or trimmed as the
+// user types; the field just opens in edit mode with a warning (see
+// EditableField's softMax) and Save Report refuses to proceed until it's
+// fixed (see handleSaveReportClick). Address fields have no limit at all —
+// no softMax/maxLength is passed for them anywhere.
+const TASK_NAME_SOFT_MAX = 255;
+const COMPANY_NAME_MAX = 255;
+const PROJECT_NAME_SOFT_MAX = 255;
 const CHECKLIST_SOFT_MAX = 255;
 const SOFT_WARNING_COLOR = "var(--tt-orange)";
 // One short message for every soft limit — the counter inside the field
@@ -3457,10 +3453,12 @@ const SOFT_LIMIT_MESSAGE = "Character limit exceeded.";
 const counterColor = (len, hardMax, softMax) =>
   softMax && len > softMax ? SOFT_WARNING_COLOR : (hardMax && len >= hardMax ? "var(--tt-red)" : "var(--tt-grey05)");
 
-// Summary and Additional Information's own caps (EditableField's
-// maxLength) — same "enforced at the source" idea as CAPTION_MAX_LEN above.
+// Summary, Additional Information, and the per-task Note's own caps
+// (EditableField's maxLength) — same "enforced at the source" idea as
+// CAPTION_MAX_LEN above.
 const SUMMARY_MAX_LEN = 1000;
-const ADDITIONAL_INFO_MAX_LEN = 250;
+const ADDITIONAL_INFO_MAX_LEN = 1000;
+const NOTE_MAX_LEN = 255;
 
 // Marks everything past the first PER_ENTRY_PHOTO_LIMIT photos in each entry
 // as excluded by default, using the exact same excludedPhotos shape (and
@@ -5134,7 +5132,7 @@ function ReportsTab({ demoCase }) {
           aboveWhenEditing={<p style={FIELD_LABEL_STYLE}>Note</p>}
           live
           counter
-          maxLength={250}
+          maxLength={NOTE_MAX_LEN}
           onSave={v => {
             setPreview(p => {
               const next = { ...p.extraNotes };
@@ -5614,8 +5612,6 @@ function ReportsTab({ demoCase }) {
       <EditableField
         fieldId="companyAddress"
         value={preview.companyAddress}
-        maxLength={COMPANY_ADDRESS_MAX}
-        counter
         placeholder="E.g. 123 Main St, Austin, TX"
         disabled={previewSaved}
         live
@@ -5844,8 +5840,6 @@ function ReportsTab({ demoCase }) {
         <EditableField
           fieldId="address"
           value={preview.address}
-          softMax={PROJECT_ADDRESS_SOFT_MAX}
-          counter
           placeholder={`E.g. ${PROJECT_ADDRESS}`}
           disabled={previewSaved}
           live
@@ -6358,7 +6352,6 @@ function ReportsTab({ demoCase }) {
     // of silently shipping a value the export would've rendered in full
     // anyway.
     if (preview.projectName.length > PROJECT_NAME_SOFT_MAX) errs.projectName = `Project name exceeds the ${PROJECT_NAME_SOFT_MAX} character limit.`;
-    if (preview.address.length > PROJECT_ADDRESS_SOFT_MAX) errs.address = `Address exceeds the ${PROJECT_ADDRESS_SOFT_MAX} character limit.`;
     previewFinalGroups.forEach(g => g.entries.forEach(entry => {
       if (entry.isNote) return;
       if ((entry.note || "").length > TASK_NAME_SOFT_MAX) errs[`title_${entry.entryKey}`] = `Task name exceeds the ${TASK_NAME_SOFT_MAX} character limit.`;
