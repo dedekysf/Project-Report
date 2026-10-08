@@ -865,20 +865,23 @@ function DateRangeCalendar({ anchorRef, onClose, onApply, allowFuture = false, s
         <button
           onClick={onClose}
           onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
-          onMouseLeave={e => e.currentTarget.style.background = "white"}
+          onMouseLeave={e => e.currentTarget.style.background = "transparent"}
           style={{
             padding: "6px 16px", borderRadius: 8,
-            border: "1px solid var(--tt-grey03)", background: "white",
+            border: "none", background: "transparent",
             fontSize: 14, fontWeight: 500, color: "var(--tt-text-2)", cursor: "pointer", transition: "background 0.15s",
           }}>Cancel</button>
         <button
+          disabled={!rangeStart || !rangeEnd}
           onClick={() => onApply ? onApply(rangeStart, rangeEnd) : onClose()}
-          onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
+          onMouseEnter={e => { if (rangeStart && rangeEnd) e.currentTarget.style.opacity = "0.85"; }}
           onMouseLeave={e => e.currentTarget.style.opacity = "1"}
           style={{
             padding: "6px 16px", borderRadius: 8,
-            border: "none", background: "var(--tt-text-1)",
-            fontSize: 14, fontWeight: 500, color: "#fff", cursor: "pointer", transition: "opacity 0.15s",
+            border: "none", background: (!rangeStart || !rangeEnd) ? "var(--tt-grey05)" : "var(--tt-text-1)",
+            fontSize: 14, fontWeight: 500, color: "#fff",
+            cursor: (!rangeStart || !rangeEnd) ? "not-allowed" : "pointer",
+            transition: "opacity 0.15s",
           }}>Apply</button>
       </div>}
     </div>
@@ -6680,35 +6683,30 @@ function ReportsTab({ demoCase }) {
             {openPeriod && (
               <div style={{
                 position: "fixed", top: openPeriodPos.top, left: openPeriodPos.left, zIndex: 200, width: 264,
-                background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 8, overflow: "hidden",
+                background: "white", border: "1px solid var(--tt-grey03)", borderRadius: 12, padding: 8,
                 boxShadow: "0 8px 24px rgba(10,22,41,0.16)",
               }}>
                 {PERIOD_OPTIONS.map(({ id }, i) => (
-                  <div key={id}>
-                    <div
-                      onClick={() => {
-                        if (id === "custom") prevDateRangeRef.current = dateRange;
-                        setDateRange(id);
-                        setShowCal(id === "custom");
-                        setOpenPeriod(false);
-                      }}
-                      style={{
-                        padding: "10px 12px", cursor: "pointer",
-                        background: dateRange === id ? "var(--tt-grey02)" : "white",
-                        display: "flex", alignItems: "center", justifyContent: "space-between",
-                        transition: "background 0.1s",
-                      }}
-                      onMouseEnter={e => { if (dateRange !== id) e.currentTarget.style.background = "var(--tt-grey02)"; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = dateRange === id ? "var(--tt-grey02)" : "white"; }}
-                    >
-                      <span style={{ fontSize: 14, fontWeight: 500, color: "var(--tt-text-1)", whiteSpace: "nowrap" }}>
-                        {renderPeriodLabel(id)}
-                      </span>
-                      {dateRange === id && <Check size={14} color="var(--tt-secondary)" strokeWidth={2} style={{ flexShrink: 0, marginLeft: 12 }} />}
-                    </div>
-                    {i < PERIOD_OPTIONS.length - 1 && (
-                      <div style={{ height: 1, background: "var(--tt-grey03)", margin: "0 12px" }} />
-                    )}
+                  <div
+                    key={id}
+                    onClick={() => {
+                      if (id === "custom") prevDateRangeRef.current = dateRange;
+                      setDateRange(id);
+                      setShowCal(id === "custom");
+                      setOpenPeriod(false);
+                    }}
+                    style={{
+                      padding: "12px 14px", cursor: "pointer", borderRadius: 8,
+                      background: dateRange === id ? "var(--tt-mint)" : "white",
+                      marginBottom: i < PERIOD_OPTIONS.length - 1 ? 4 : 0,
+                      transition: "background 0.1s",
+                    }}
+                    onMouseEnter={e => { if (dateRange !== id) e.currentTarget.style.background = "var(--tt-grey02)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = dateRange === id ? "var(--tt-mint)" : "white"; }}
+                  >
+                    <span style={{ fontSize: 14, fontWeight: 500, color: "var(--tt-text-1)", whiteSpace: "nowrap" }}>
+                      {renderPeriodLabel(id)}
+                    </span>
                   </div>
                 ))}
               </div>
