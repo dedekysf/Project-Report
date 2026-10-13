@@ -1302,7 +1302,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
           onClick={openPopover}
           onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey03)"}
           onMouseLeave={ev => ev.currentTarget.style.background = "none"}
-          style={{ display: "inline-block", position: "relative", cursor: "pointer", ...textStyle }}
+          style={{ display: "inline-block", position: "relative", cursor: "text", ...textStyle }}
         >
           {value || <span style={{ color: "var(--tt-grey05)", textDecoration: "underline", ...placeholderStyle }}>{placeholder}</span>}
         </Tag>
@@ -1451,7 +1451,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
           onClick={() => { editStartValueRef.current = value; setDraft(value || ""); setActiveField(fieldId); }}
           onMouseEnter={ev => ev.currentTarget.style.background = "var(--tt-grey03)"}
           onMouseLeave={ev => ev.currentTarget.style.background = "none"}
-          style={{ display: "block", cursor: "pointer", borderRadius: 6, margin: 0, whiteSpace: multiline ? "pre-wrap" : "normal", ...textStyle }}
+          style={{ display: "block", cursor: "text", borderRadius: 6, margin: 0, whiteSpace: multiline ? "pre-wrap" : "normal", ...textStyle }}
         >
           {value}
         </Tag>
@@ -1669,7 +1669,7 @@ function EditableField({ fieldId, value, placeholder, placeholderStyle, inputPla
         // line breaks (this branch is reachable by a plain click-to-edit
         // multiline field, not just alwaysEditing ones) collapses them
         // to one line here same as any other CSS "normal" text would.
-        style={{ display: "inline-block", position: boxed ? "static" : "relative", cursor: "pointer", whiteSpace: multiline ? "pre-wrap" : "normal", ...textStyle }}
+        style={{ display: "inline-block", position: boxed ? "static" : "relative", cursor: "text", whiteSpace: multiline ? "pre-wrap" : "normal", ...textStyle }}
       >
         {value || <span style={{ color: "var(--tt-grey05)", textDecoration: "underline", ...placeholderStyle }}>{placeholder}</span>}
       </Tag>
