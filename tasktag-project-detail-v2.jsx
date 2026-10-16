@@ -13,7 +13,7 @@ import {
   ArrowUpDown, Calendar, AlignJustify, Clock,
   UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, Crown, AlertTriangle,
   RotateCw, ZoomIn, ZoomOut, Folder, ArrowLeft, ArrowRight, Info, StickyNote,
-  ExternalLink, Forward, Loader, Mail, Phone, Upload, ImagePlus, GripVertical, Eye, EyeOff, Lock,
+  ExternalLink, Forward, Loader, Mail, Phone, Upload, ImagePlus, GripVertical, Eye, EyeOff, Lock, Undo2,
 } from "lucide-react";
 
 import logoImg from "./src/Img/tasktag-logo.13f1babda8fdbb1b7251572a0fe11f9e.png";
@@ -2296,23 +2296,22 @@ function ManagedPhotoImage({ src, onLoad }) {
 // Report-wide photo list, one section per task with photos — opened by
 // hovering the "Photo Limit" indicator (see the draft chrome), not from
 // any single task item anymore. Every photo shows here (both included and
-// excluded) as a freely checkable/uncheckable thumbnail — but checking one
-// more once already at PHOTO_LIMIT selected is blocked with a warning
-// instead of silently going over, same limit
+// excluded) as a freely checkable/uncheckable thumbnail — but once
+// PHOTO_LIMIT are selected, every unselected one is dimmed and disabled
+// (hover tooltip only, no error message), same limit
 // defaultGlobalOverflowExclusions uses for a fresh report's default
 // selection.
-function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoExcluded, onPreviewPhoto, previewActive, onClose }) {
+function PhotoManagerModal({ groups, excludedPhotos, removedTasks, titleOverrides, onSetPhotoExcluded, onPreviewPhoto, previewActive, onClose }) {
   const sections = groups.flatMap(g => g.entries.map((e, i) => {
     const entryKey = `${g.key}_${i}`;
     const items = (e.photos || []).map((k, pi) => ({ k, pi })).filter(({ k }) => IMG_MAP[k]);
+    if (removedTasks && removedTasks[entryKey]) return null; // removed from the report — its photos are freed
     return items.length > 0 ? { entryKey, taskName: (titleOverrides && titleOverrides[entryKey]) ?? e.note, date: e.date, items } : null;
   })).filter(Boolean);
   const includedCount = sections.reduce(
     (s, sec) => s + sec.items.filter(({ pi }) => !(excludedPhotos && excludedPhotos[`${sec.entryKey}_${pi}`])).length,
     0
   );
-  const [limitWarning, setLimitWarning] = useState(false);
-  const warningTimerRef = useRef(null);
   const [cappedTooltipKey, setCappedTooltipKey] = useState(null); // `${entryKey}_${pi}` of the capped (disabled) photo currently hovered, or null
   const [cappedTooltipPos, setCappedTooltipPos] = useState({ top: 0, left: 0 });
   const [loadedPhotos, setLoadedPhotos] = useState({}); // { [entryKey_pi]: true } — outline/checkbox only draw once the thumbnail itself has loaded, so the skeleton shows as just a skeleton
@@ -2326,15 +2325,6 @@ function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoE
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [onClose, previewActive]);
-
-  // Auto-dismisses the warning a couple seconds after the blocked attempt
-  // that raised it, rather than leaving it stuck until the user notices.
-  useEffect(() => () => { if (warningTimerRef.current) clearTimeout(warningTimerRef.current); }, []);
-  const flashLimitWarning = () => {
-    setLimitWarning(true);
-    if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
-    warningTimerRef.current = setTimeout(() => setLimitWarning(false), 2500);
-  };
 
   return (
     <div
@@ -2363,12 +2353,6 @@ function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoE
           </p>
         </div>
         <div style={{ overflowY: "auto", padding: 24 }}>
-        {limitWarning && (
-          <p style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500, color: "var(--tt-red)", background: "rgba(229,72,77,0.08)", borderRadius: 6, padding: "8px 10px", margin: "0 0 16px" }}>
-            <AlertTriangle size={13} strokeWidth={SW} className="tt-split-alerttriangle" style={{ flexShrink: 0 }} />
-            You can select up to {PHOTO_LIMIT} photos — uncheck one first.
-          </p>
-        )}
         {sections.map(sec => (
           <div key={sec.entryKey} style={{ marginBottom: 40 }}>
             <p style={{ fontSize: 18, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 2px" }}>{sec.taskName}</p>
@@ -2386,7 +2370,7 @@ function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoE
                     key={pi}
                     className="group"
                     onClick={() => {
-                      if (capped) { flashLimitWarning(); return; }
+                      if (capped) return;
                       onSetPhotoExcluded(sec.entryKey, pi, included);
                     }}
                     onMouseEnter={capped ? e => {
@@ -2400,7 +2384,7 @@ function PhotoManagerModal({ groups, excludedPhotos, titleOverrides, onSetPhotoE
                     {/* Dimmed on capped — the checkbox is part of this
                         "can't select" cue, but the preview button below
                         stays outside it since previewing always works. */}
-                    <div style={{ position: "relative", width: "100%", aspectRatio: "16/9", borderRadius: 6, overflow: "hidden", opacity: capped ? 0.45 : 1 }}>
+                    <div style={{ position: "relative", width: "100%", aspectRatio: "16/9", borderRadius: 6, overflow: "hidden", opacity: capped ? 0.25 : 1 }}>
                       <ManagedPhotoImage src={IMG_MAP[k]} onLoad={() => setLoadedPhotos(p => ({ ...p, [key]: true }))} />
                       {/* Hover-revealed like the delete/preview buttons —
                           except once checked, it stays visible so the
@@ -3611,6 +3595,28 @@ function applyChecklistOverrides(groups, checklistOverrides) {
 // added under, not to a date — so it's kept out of buildReportData entirely
 // and spliced into the finalized groups only when producing real output
 // (download / copy-link / save), right after that exact entry.
+// Tasks removed from the draft (trash icon next to the task name) are
+// dropped LAST — after every index-keyed override and note splice has
+// already run against the original ordering — so none of those keys
+// shift. A manual note sits right after its entry (see
+// applyExtraNotesToGroups), so it goes with it. Groups left empty are
+// dropped too, so an emptied week/month never leaves a bare label behind.
+function applyTaskRemovals(groups, removedTasks) {
+  if (!removedTasks || !Object.keys(removedTasks).some(k => removedTasks[k])) return groups;
+  return groups
+    .map(g => {
+      let lastRemoved = false;
+      const entries = g.entries.filter((e, i) => {
+        if (e.isNote) return !lastRemoved;
+        const entryKey = e.entryKey ?? `${g.key}_${i}`;
+        lastRemoved = !!removedTasks[entryKey];
+        return !lastRemoved;
+      });
+      return { ...g, entries };
+    })
+    .filter(g => g.entries.length > 0);
+}
+
 function applyExtraNotesToGroups(groups, extraNotes) {
   const entries = Object.entries(extraNotes || {}).filter(([, text]) => text && text.trim());
   if (entries.length === 0) return groups;
@@ -4691,9 +4697,21 @@ function ReportsTab({ demoCase }) {
     setShowCal(id === "custom");
   };
 
-  const showToast = (type, message) => {
-    setToast({ type, message });
-    setTimeout(() => setToast(null), 2500);
+  const toastTimerRef = useRef(null);
+  const dismissToast = () => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast(null);
+  };
+  const showToast = (type, message, opts = {}) => {
+    // opts.detail — muted text after the message (e.g. "15 photos freed").
+    // opts.action — { label, onClick } button inside the toast (e.g. Undo);
+    // such toasts stay up longer (5s) so there's time to reach the button.
+    // The timer is tracked so a newer toast never gets cut short by an
+    // older one's timeout.
+    const duration = opts.action ? 5000 : 2500;
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ id: Date.now(), type, message, detail: opts.detail, action: opts.action, duration });
+    toastTimerRef.current = setTimeout(() => setToast(null), duration);
   };
 
   // A group with zero entries means there's genuinely nothing to export —
@@ -4704,7 +4722,7 @@ function ReportsTab({ demoCase }) {
   // Adds a report to the results list (called only once the user confirms
   // via "Save report" in the preview modal — Generate no longer does this
   // directly).
-  const pushReport = ({ includeSummary, includeNoPhotoTasks, dateRange, period, version, data, extraNotes, excludedPhotos, titleOverrides, checklistOverrides, photoCaptions, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, contactName, contactRole, contactPhoto, summary, clientName, additionalInfo, coverImage }) => {
+  const pushReport = ({ includeSummary, includeNoPhotoTasks, dateRange, period, version, data, extraNotes, excludedPhotos, removedTasks, titleOverrides, checklistOverrides, photoCaptions, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, contactName, contactRole, contactPhoto, summary, clientName, additionalInfo, coverImage }) => {
     const id = Date.now();
     const newReport = {
       id,
@@ -4718,6 +4736,7 @@ function ReportsTab({ demoCase }) {
       data,
       extraNotes,
       excludedPhotos,
+      removedTasks,
       titleOverrides,
       checklistOverrides,
       photoCaptions,
@@ -4815,6 +4834,7 @@ function ReportsTab({ demoCase }) {
         version: reports.length > 0 && reports[0].period === period ? reports[0].version + 1 : 1,
         extraNotes: {},
         excludedPhotos: defaultExcludedPhotos,
+        removedTasks: {},
         photoCaptions: {},
         // System-generated starting point — freely editable from here, and
         // never regenerated for the life of this draft.
@@ -4934,7 +4954,7 @@ function ReportsTab({ demoCase }) {
   // notes spliced in at their entry — what actually gets downloaded /
   // copy-linked / saved.
   const previewFinalGroups = previewData
-    ? applyExtraNotesToGroups(applyChecklistOverrides(applyTitleOverrides(applyPhotoExclusions(previewData.groups, preview.excludedPhotos), titleOverrides), checklistOverrides), preview.extraNotes)
+    ? applyTaskRemovals(applyExtraNotesToGroups(applyChecklistOverrides(applyTitleOverrides(applyPhotoExclusions(previewData.groups, preview.excludedPhotos), titleOverrides), checklistOverrides), preview.extraNotes), preview.removedTasks)
     : [];
   // Photos actually included (post-exclusion) vs. the account's per-report
   // limit — shown in the modal chrome's Photo Limit indicator. Reuses
@@ -5021,15 +5041,21 @@ function ReportsTab({ demoCase }) {
     sections.push({ key: "coverContent", type: "coverContent", navLabel: "Cover Content" });
     sections.push({ key: "summary", type: "summary", navLabel: "Summary" });
     visibleGroups.forEach(g => {
+      // Removed tasks (trash icon next to the task name) drop out of the
+      // draft entirely — keys still come from the original index `i`, so
+      // nothing else keyed by position shifts.
+      let labelPending = true;
       g.entries.forEach((e, i) => {
         const entryKey = `${g.key}_${i}`;
+        if (preview.removedTasks && preview.removedTasks[entryKey]) return;
         sections.push({
           key: entryKey, type: "task", navLabel: titleOverrides[entryKey] ?? e.note,
           entryKey, e,
-          // Only the first entry of a new group carries that group's own
-          // label — every later entry in the same group leaves it out.
-          g: i === 0 ? g : null,
+          // Only the first remaining entry of a group carries that group's
+          // own label — every later entry in the same group leaves it out.
+          g: labelPending ? g : null,
         });
+        labelPending = false;
       });
     });
     sections.push({ key: "footer", type: "footer", navLabel: "Footer" });
@@ -5231,7 +5257,12 @@ function ReportsTab({ demoCase }) {
       <div>
         {/* Renaming here only overrides the title for this report — the
             original task/entry text is never modified. No pencil icon —
-            hover shows the grey02 affordance, click edits. */}
+            hover shows the grey02 affordance, click edits.
+            Trash at the end of the row removes the whole task from this
+            report (see handleRemoveTask) — hidden while the name itself is
+            being edited, so it never sits next to a live input. */}
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
         <EditableField
           fieldId={`title_${entryKey}`}
           value={displayTitle}
@@ -5254,6 +5285,13 @@ function ReportsTab({ demoCase }) {
           textStyle={{ fontSize: 18, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: "1.35", margin: 0 }}
           inputStyle={{ fontSize: 14, fontWeight: 400, height: 48 }}
         />
+        </div>
+        {!previewSaved && !titleEditing && (
+          <FixedTooltipBtn label="Remove from report" onAction={() => handleRemoveTask(entryKey, visiblePhotoCount)}>
+            <Trash2 size={16} strokeWidth={SW} color="var(--tt-grey06)" className="tt-split-trash2" />
+          </FixedTooltipBtn>
+        )}
+        </div>
         {/* Status/date meta line — Completed (green) folds its date
             directly into the status text ("Completed Sep 9", no
             separator dot, no uppercase); Open (blue) shows only the
@@ -6322,6 +6360,26 @@ function ReportsTab({ demoCase }) {
   // photo straight into preview.excludedPhotos (permanently filtered
   // everywhere, including from the live grid). The original photo itself
   // is never touched, only excluded from this report.
+  // Removes a whole task from this report only (trash icon next to the
+  // task name) — the task itself is untouched, and every override keyed to
+  // it (title, checklist, note, captions, photo picks) is kept, so Undo
+  // brings it back exactly as it was. Its photos stop counting toward the
+  // Photo Limit straight away (previewFinalGroups drops it).
+  const handleRemoveTask = (entryKey, photoCount) => {
+    setPreview(p => ({ ...p, removedTasks: { ...p.removedTasks, [entryKey]: true } }));
+    if (activeEditField && activeEditField.includes(entryKey)) setActiveEditField(null);
+    showToast("success", "Task removed", {
+      detail: photoCount > 0 ? `${photoCount} photo${photoCount === 1 ? "" : "s"} freed` : undefined,
+      action: {
+        label: "Undo",
+        onClick: () => setPreview(p => {
+          const next = { ...p.removedTasks }; delete next[entryKey];
+          return { ...p, removedTasks: next };
+        }),
+      },
+    });
+  };
+
   const handleDeletePhoto = (entryKey, photoIndex) => {
     setPreview(p => ({ ...p, excludedPhotos: { ...p.excludedPhotos, [`${entryKey}_${photoIndex}`]: true } }));
   };
@@ -6346,7 +6404,7 @@ function ReportsTab({ demoCase }) {
 
   const handlePreviewCopy = async () => {
     if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to export"); return; }
-    const ok = await handleCopy({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, version: preview.version, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides, checklistOverrides, photoCaptions: preview.photoCaptions });
+    const ok = await handleCopy({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, version: preview.version, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, removedTasks: preview.removedTasks, titleOverrides, checklistOverrides, photoCaptions: preview.photoCaptions });
     // Paywalled — handleCopy already opened the modal instead of copying
     // anything, so there's nothing to flash "Link copied" about.
     if (!ok) return;
@@ -6423,7 +6481,7 @@ function ReportsTab({ demoCase }) {
     // the confirm modal sits open long enough (however briefly) that
     // re-deriving it here keeps this from ever saving a stale snapshot if
     // anything changed while it was up.
-    const finalGroups = applyExtraNotesToGroups(applyChecklistOverrides(applyTitleOverrides(applyPhotoExclusions(previewData.groups, preview.excludedPhotos), titleOverrides), checklistOverrides), preview.extraNotes);
+    const finalGroups = applyTaskRemovals(applyExtraNotesToGroups(applyChecklistOverrides(applyTitleOverrides(applyPhotoExclusions(previewData.groups, preview.excludedPhotos), titleOverrides), checklistOverrides), preview.extraNotes), preview.removedTasks);
     if (!hasGroupData(finalGroups)) { showToast("error", "No data to save"); return; }
     setSaving(true);
     setTimeout(() => {
@@ -6434,7 +6492,7 @@ function ReportsTab({ demoCase }) {
         showToast("error", "Save failed. Try again.");
         return;
       }
-      pushReport({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, version: preview.version, data: { ...previewData, groups: finalGroups }, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, titleOverrides, checklistOverrides, photoCaptions: preview.photoCaptions, projectName: preview.projectName.trim(), address: preview.address.trim(), logo: preview.logo, companyName: preview.companyName.trim(), companyAddress: preview.companyAddress.trim(), companyEmail: preview.companyEmail.trim(), companyPhone: preview.companyPhone.trim(), contactName: preview.contactName.trim(), contactRole: preview.contactRole.trim(), contactPhoto: preview.contactPhoto, summary: preview.summary.trim(), clientName: preview.clientName.trim(), additionalInfo: preview.additionalInfo.trim(), coverImage: preview.coverImage });
+      pushReport({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, version: preview.version, data: { ...previewData, groups: finalGroups }, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, removedTasks: preview.removedTasks, titleOverrides, checklistOverrides, photoCaptions: preview.photoCaptions, projectName: preview.projectName.trim(), address: preview.address.trim(), logo: preview.logo, companyName: preview.companyName.trim(), companyAddress: preview.companyAddress.trim(), companyEmail: preview.companyEmail.trim(), companyPhone: preview.companyPhone.trim(), contactName: preview.contactName.trim(), contactRole: preview.contactRole.trim(), contactPhoto: preview.contactPhoto, summary: preview.summary.trim(), clientName: preview.clientName.trim(), additionalInfo: preview.additionalInfo.trim(), coverImage: preview.coverImage });
       setDateRange("since_last");
       setSaving(false);
       showToast("success", "Report saved");
@@ -6518,6 +6576,11 @@ function ReportsTab({ demoCase }) {
     const excludedKeys = Object.keys(report.excludedPhotos || {}).filter(k => report.excludedPhotos[k]);
     if (excludedKeys.length > 0) {
       params.set("excluded", JSON.stringify(excludedKeys));
+    }
+    // Tasks removed from the draft — same client-side-only reasoning.
+    const removedKeys = Object.keys(report.removedTasks || {}).filter(k => report.removedTasks[k]);
+    if (removedKeys.length > 0) {
+      params.set("removed", JSON.stringify(removedKeys));
     }
     // Same reasoning again — an edited task name only lives in this
     // report's draft state, not in DUMMY_ENTRIES, so it has to ride along
@@ -7471,20 +7534,37 @@ function ReportsTab({ demoCase }) {
 
       {/* Toast — success (secondary green accent + check) / error (red accent + cross) */}
       {toast && (
-        <div style={{
+        <div key={toast.id} style={{
           position: "fixed", bottom: 32, left: "50%", transform: "translateX(-50%)",
           zIndex: 3000, background: "var(--tt-text-1)", borderRadius: 12, overflow: "hidden",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.25)", pointerEvents: "none",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+          // Only a toast with an action (Undo) takes clicks — the plain ones
+          // stay click-through so they never block what's underneath.
+          pointerEvents: toast.action ? "auto" : "none",
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 24px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: toast.action ? "10px 10px 10px 24px" : "16px 24px" }}>
             {toast.type === "success"
               ? <Check size={16} color="white" strokeWidth={2.5} />
               : <AlertTriangle size={16} color="white" strokeWidth={2.5} />}
             <span style={{ color: "white", fontSize: 16, fontWeight: 700, whiteSpace: "nowrap" }}>{toast.message}</span>
+            {toast.detail && (
+              <span style={{ color: "var(--tt-grey04)", fontSize: 14, fontWeight: 500, whiteSpace: "nowrap" }}>{toast.detail}</span>
+            )}
+            {toast.action && (
+              <button
+                type="button"
+                onClick={() => { toast.action.onClick(); dismissToast(); }}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.2)"}
+                onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.12)"}
+                style={{ marginLeft: 14, height: 36, display: "flex", alignItems: "center", gap: 6, padding: "0 14px", border: "none", borderRadius: 8, background: "rgba(255,255,255,0.12)", color: "white", fontSize: 14, fontWeight: 600, cursor: "pointer", transition: "background 0.15s" }}
+              >
+                <Undo2 size={16} strokeWidth={SW} /> {toast.action.label}
+              </button>
+            )}
           </div>
           <div style={{
             height: 4, background: toast.type === "success" ? "var(--tt-secondary)" : "var(--tt-red)",
-            transformOrigin: "left", animation: "tt-toast-progress 2.5s linear forwards",
+            transformOrigin: "left", animation: `tt-toast-progress ${toast.duration / 1000}s linear forwards`,
           }} />
         </div>
       )}
@@ -7649,6 +7729,7 @@ function ReportsTab({ demoCase }) {
         <PhotoManagerModal
           groups={previewData.groups}
           excludedPhotos={preview.excludedPhotos}
+          removedTasks={preview.removedTasks}
           titleOverrides={titleOverrides}
           onSetPhotoExcluded={(entryKey, idx, excluded) => setPreview(p => ({ ...p, excludedPhotos: { ...p.excludedPhotos, [`${entryKey}_${idx}`]: excluded } }))}
           onPreviewPhoto={lb => setLightbox(lb)}
@@ -7750,7 +7831,7 @@ function PaywallModal({ onClose }) {
 // from ReportPage below so ReportPreviewChrome's own Download button can
 // build the exact same HTML on demand (e.g. for a fresh preview tab)
 // without duplicating this reconstruction logic a second time.
-async function buildReportHTMLFromParams({ dateRange, period, version, includeSummary, includeNoPhotoTasks, notesParam, excludedParam, titlesParam, checklistsParam, captionsParam, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, contactName, contactRole, contactPhoto, summaryText, clientName, additionalInfo, coverImage, missingImages, date }) {
+async function buildReportHTMLFromParams({ dateRange, period, version, includeSummary, includeNoPhotoTasks, notesParam, excludedParam, removedParam, titlesParam, checklistsParam, captionsParam, projectName, address, logo, companyName, companyAddress, companyEmail, companyPhone, contactName, contactRole, contactPhoto, summaryText, clientName, additionalInfo, coverImage, missingImages, date }) {
   let data = buildReportData(dateRange, period, null, includeNoPhotoTasks);
   let groups = data.groups;
   // Always runs (even with nothing excluded) — this is what embeds each
@@ -7785,6 +7866,14 @@ async function buildReportHTMLFromParams({ dateRange, period, version, includeSu
   if (captionsParam) {
     try { photoCaptions = JSON.parse(captionsParam); }
     catch { /* malformed/tampered param — ignore */ }
+  }
+  // Same "applied last" reasoning as the draft — see applyTaskRemovals.
+  if (removedParam) {
+    try {
+      const removedTasks = {};
+      JSON.parse(removedParam).forEach(k => { removedTasks[k] = true; });
+      groups = applyTaskRemovals(groups, removedTasks);
+    } catch { /* malformed/tampered param — ignore */ }
   }
   data = { ...data, groups };
   // navItems — only ReportPreviewChrome's own sidebar reads this
@@ -8109,6 +8198,7 @@ export default function ProjectDetail() {
       includeNoPhotoTasks: params.get("nophotos") !== "0",
       notesParam: params.get("notes"),
       excludedParam: params.get("excluded"),
+      removedParam: params.get("removed"),
       titlesParam: params.get("titles"),
       checklistsParam: params.get("checklists"),
       captionsParam: params.get("captions"),
