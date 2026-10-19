@@ -2225,7 +2225,7 @@ function PhotoGrid({ photos, onOpen, excludedPhotos, entryKey, onDeletePhoto, ca
                   width: 20, height: 20, borderRadius: "50%",
                   border: "none", background: "white",
                   display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
-                  cursor: "default", boxShadow: "0 0 0 1px rgba(0,0,0,0.15)",
+                  cursor: "default",
                   zIndex: 2,
                 }}
               >
@@ -6888,11 +6888,11 @@ function ReportsTab({ demoCase }) {
           it still lives inside the table the header describes rather
           than replacing the whole table with an unrelated card) and the
           real rows below. */}
-      <div style={{ marginTop: 24, border: "1px solid var(--tt-grey03)", borderRadius: 12, overflow: "hidden" }}>
-        <div style={{ maxHeight: 556, overflowY: "auto" }}>
+      <div style={{ marginTop: 24, border: "1px solid var(--tt-grey02)", borderRadius: 12, overflow: "hidden" }}>
+        <div>
         <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
           <thead style={{ position: "sticky", top: 0, zIndex: 1 }}>
-            <tr style={{ background: "var(--tt-grey02)", borderBottom: `1px solid var(--tt-grey03)` }}>
+            <tr style={{ background: "var(--tt-grey02)", borderBottom: `1px solid var(--tt-grey02)` }}>
               {["Project Name", "Period", "Generation date"].map((h) => (
                 <th key={h} style={{ textAlign: "left", padding: "10px 16px", fontSize: 14, fontWeight: 600, color: "var(--tt-text-2)" }}>{h}</th>
               ))}
@@ -6919,7 +6919,7 @@ function ReportsTab({ demoCase }) {
                    tier's one report never gets a next save to hand the
                    highlight off to (see lastSavedId), so it would just
                    sit there permanently instead of reading as recent. */
-                <tr key={r.id} style={{ background: (!paywalled && r.id === lastSavedId) ? "var(--tt-mint)" : "white", borderTop: i > 0 ? `1px solid var(--tt-grey03)` : "none", transition: "background 0.6s ease" }}>
+                <tr key={r.id} style={{ background: (!paywalled && r.id === lastSavedId) ? "var(--tt-mint)" : "white", borderTop: i > 0 ? `1px solid var(--tt-grey02)` : "none", transition: "background 0.6s ease" }}>
                   <td style={{ padding: "0 16px", fontSize: 14, fontWeight: 500, color: "var(--tt-text-2)", height: 52, verticalAlign: "middle", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.projectName || PROJECT_NAME}</td>
                   <td style={{ padding: "0 16px", fontSize: 14, fontWeight: 500, color: "var(--tt-text-2)", height: 52, verticalAlign: "middle", whiteSpace: "nowrap" }}>
                     {/* Update No. shown alongside the period since the same
