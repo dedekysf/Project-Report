@@ -2899,8 +2899,9 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
                 style={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, resize: "none", overflow: "hidden", paddingLeft: 12, paddingRight: 12, paddingBottom: 30 }}
               />
               {/* Remaining count, not "used/max" — starts at CAPTION_MAX_LEN
-                  and counts down (250, 249, 248, ...) as you type. */}
-              <span style={{ position: "absolute", left: 12, bottom: 9, fontSize: 12, fontWeight: 500, color: (caption || "").length >= CAPTION_MAX_LEN ? "var(--tt-red)" : "var(--tt-grey05)" }}>
+                  and counts down (250, 249, 248, ...) as you type. Bottom-
+                  right, same corner as every other field's counter. */}
+              <span style={{ position: "absolute", right: 12, bottom: 9, fontSize: 12, fontWeight: 500, color: (caption || "").length >= CAPTION_MAX_LEN ? "var(--tt-red)" : "var(--tt-grey05)" }}>
                 {CAPTION_MAX_LEN - (caption || "").length}
               </span>
             </div>
