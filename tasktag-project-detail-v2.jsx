@@ -3733,8 +3733,13 @@ const measureTextWidth = (text, font) => {
 };
 
 const buildReportHTML = async (report) => {
-  const { groups, grouping, completed, total, pct } =
+  const { groups, grouping, total } =
     report.data || buildReportData("custom", report.period, null, report.includeNoPhotoTasks);
+  // Recounted from the final groups rather than taken from report.data —
+  // tasks removed in the draft (applyTaskRemovals) are gone from groups but
+  // not from the counts buildReportData computed before the removal.
+  const completed = groups.reduce((s, g) => s + g.entries.filter(e => !e.isNote).length, 0);
+  const pct = Math.round(completed / total * 100);
 
   const h = (tag, attrs, ...children) => {
     const attrStr = Object.entries(attrs || {}).map(([k, v]) => ` ${k}="${v}"`).join("");
@@ -4957,6 +4962,10 @@ function ReportsTab({ demoCase }) {
   const previewFinalGroups = previewData
     ? applyTaskRemovals(applyExtraNotesToGroups(applyChecklistOverrides(applyTitleOverrides(applyPhotoExclusions(previewData.groups, preview.excludedPhotos), titleOverrides), checklistOverrides), preview.extraNotes), preview.removedTasks)
     : [];
+  // previewData's own completed/pct were counted before any task was
+  // removed from the draft — recount from what's actually left.
+  const previewCompleted = previewFinalGroups.reduce((s, g) => s + g.entries.filter(e => !e.isNote).length, 0);
+  const previewPct = previewData ? Math.round(previewCompleted / previewData.total * 100) : 0;
   // Photos actually included (post-exclusion) vs. the account's per-report
   // limit — shown in the modal chrome's Photo Limit indicator. Reuses
   // previewFinalGroups (already exclusion-filtered) rather than
@@ -6125,13 +6134,13 @@ function ReportsTab({ demoCase }) {
             dominates the row. */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, maxWidth: 260 }}>
           <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", margin: 0, whiteSpace: "nowrap", flexShrink: 0 }}>
-            {previewData.completed} of {previewData.total} complete
+            {previewCompleted} of {previewData.total} complete
           </p>
           <div style={{ flex: 1, minWidth: 0, height: 6, background: "var(--tt-grey03)", borderRadius: 99, overflow: "hidden" }}>
-            <div style={{ width: `${previewData.pct}%`, height: "100%", background: "var(--tt-secondary)", borderRadius: 99 }} />
+            <div style={{ width: `${previewPct}%`, height: "100%", background: "var(--tt-secondary)", borderRadius: 99 }} />
           </div>
           <span style={{ fontSize: 28, fontWeight: 700, fontStyle: "italic", color: "var(--tt-text-1)", flexShrink: 0, lineHeight: 1 }}>
-            {previewData.pct}%
+            {previewPct}%
           </span>
         </div>
       </div>
@@ -7279,13 +7288,13 @@ function ReportsTab({ demoCase }) {
                         <p style={{ ...skeletonGroupHeadingStyle, margin: 0 }}>{group.label}</p>
                         <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, maxWidth: 260 }}>
                           <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", margin: 0, whiteSpace: "nowrap", flexShrink: 0 }}>
-                            {previewData.completed} of {previewData.total} complete
+                            {previewCompleted} of {previewData.total} complete
                           </p>
                           <div style={{ flex: 1, minWidth: 0, height: 6, background: "var(--tt-grey03)", borderRadius: 99, overflow: "hidden" }}>
-                            <div style={{ width: `${previewData.pct}%`, height: "100%", background: "var(--tt-secondary)", borderRadius: 99 }} />
+                            <div style={{ width: `${previewPct}%`, height: "100%", background: "var(--tt-secondary)", borderRadius: 99 }} />
                           </div>
                           <span style={{ fontSize: 28, fontWeight: 700, fontStyle: "italic", color: "var(--tt-text-1)", flexShrink: 0, lineHeight: 1 }}>
-                            {previewData.pct}%
+                            {previewPct}%
                           </span>
                         </div>
                       </div>
@@ -7578,10 +7587,13 @@ function ReportsTab({ demoCase }) {
         >
           <div
             onClick={e => e.stopPropagation()}
-            style={{ width: 420, maxWidth: "calc(100vw - 32px)", background: "white", borderRadius: 16, padding: 24, boxShadow: "0 16px 48px rgba(10,22,41,0.25)" }}
+            style={{ width: 483, maxWidth: "calc(100vw - 32px)", background: "white", borderRadius: 16, padding: "16px 24px 24px", boxShadow: "0 4px 4px rgba(0,0,0,0.06)", display: "flex", flexDirection: "column", gap: 24 }}
           >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <p style={{ fontSize: 20, fontWeight: 700, color: "var(--tt-text-1)", margin: 0 }}>Delete Report</p>
+            {/* Matches the Figma "Modal/Delete Report" component: 18/500
+                title, project + period block, the 30-day shared-link
+                message, and the DS fill button (125×48, radius 12). */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <p style={{ fontSize: 18, fontWeight: 500, lineHeight: "24px", color: "var(--tt-text-1)", margin: 0 }}>Delete Report</p>
               <button
                 onClick={() => setDeleteTarget(null)}
                 style={{ background: "none", border: "none", cursor: "pointer", color: "var(--tt-text-1)", padding: 4, display: "flex", borderRadius: 6, transition: "background 0.15s" }}
@@ -7591,21 +7603,24 @@ function ReportsTab({ demoCase }) {
                 <X size={20} strokeWidth={SW} className="tt-split-x" />
               </button>
             </div>
-            {/* Same layout as the Save Report confirmation: project name,
-                period, then the message. */}
-            <p style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", lineHeight: 1.6, margin: "0 0 4px" }}>
-              {deleteTarget.projectName || PROJECT_NAME}
-            </p>
-            <p style={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, margin: "0 0 16px" }}>
-              Update No. {deleteTarget.version} · {deleteTarget.period}
-            </p>
-            <p style={{ fontSize: 14, color: "var(--tt-text-2)", lineHeight: 1.6, margin: "0 0 24px" }}>
-              This can't be undone.
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <p style={{ fontSize: 16, fontWeight: 600, lineHeight: "21px", color: "var(--tt-text-1)", margin: 0 }}>
+                {deleteTarget.projectName || PROJECT_NAME}
+              </p>
+              <p style={{ fontSize: 14, lineHeight: "16px", letterSpacing: "0.28px", color: "var(--tt-text-1)", margin: 0 }}>
+                Update No. {deleteTarget.version} · {deleteTarget.period}
+              </p>
+            </div>
+            {/* A shared link keeps working for 30 days after delete (see the
+                Figma Remove report notes) — the prototype has no server, so
+                its self-contained links actually never expire. */}
+            <p style={{ fontSize: 14, lineHeight: "24px", letterSpacing: "0.28px", color: "var(--tt-text-1)", margin: 0 }}>
+              This can't be undone. If you shared a link to this report, the link still works for 30 days. After that, the report is permanently deleted.
             </p>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button
                 onClick={handleDeleteReport}
-                style={{ height: 40, padding: "0 20px", borderRadius: 8, border: "none", background: "var(--tt-text-1)", color: "white", fontSize: 14, fontWeight: 600, cursor: "pointer", transition: "opacity 0.15s" }}
+                style={{ width: 125, height: 48, padding: 16, borderRadius: 12, border: "none", background: "black", color: "white", fontSize: 14, fontWeight: 500, lineHeight: "16px", cursor: "pointer", transition: "opacity 0.15s", display: "flex", alignItems: "center", justifyContent: "center" }}
                 onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
                 onMouseLeave={e => e.currentTarget.style.opacity = "1"}
               >
