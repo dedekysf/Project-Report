@@ -3779,7 +3779,9 @@ const buildReportHTML = async (report) => {
   // share URL keeps whatever pathname was current when it was built).
   const useRowGrouping = typeof window !== "undefined" && /\/row-grouping\/?$/.test(window.location.pathname);
 
-  const STATUS_HEX = { completed: "#16a97d", open: "#138eff" };
+  // Output report only: darker than the app's status colors (DS greenDark /
+  // pastelBlue) so the 12 px status text reads well on white.
+  const STATUS_HEX = { completed: "#035b60", open: "#1572a1" };
   // Editorial serif for headline/body content (title, address, summary,
   // task headings, descriptions, captions); small uppercase UI labels
   // (status pills, meta lines, section/footer chrome) stay on the sans
@@ -6965,7 +6967,7 @@ function ReportsTab({ demoCase }) {
                   <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", marginBottom: 4 }}>No reports yet</p>
                   <p style={{ fontSize: 14, color: "var(--tt-grey05)", lineHeight: "20px", marginTop: 4 }}>
                     {paywalled
-                      ? "Generate your first report free — download or share it anytime"
+                      ? "Generate your first report free"
                       : "Configure your report first and click Generate to create your report."}
                   </p>
                 </td>
@@ -7870,7 +7872,7 @@ function ReportPaywall() {
         Send a Report, Not a Wall of Text
       </h3>
       <p style={{ fontSize: 14, color: "var(--tt-grey05)", lineHeight: 1.6, margin: "0 0 28px" }}>
-        Generate a ready-to-share report from your activity log in seconds. Photos, progress, and notes — all in one place.
+        Turn your tasks, checklists, and photos into a ready-to-share report in seconds. Photos, progress, and notes — all in one place.
       </p>
 
       <div style={{ background: "var(--tt-grey02)", borderRadius: 12, padding: "20px 24px", textAlign: "left", margin: "0 0 24px" }}>
