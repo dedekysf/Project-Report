@@ -4602,6 +4602,10 @@ function ReportsTab({ demoCase }) {
   const [customRangeKeys, setCustomRangeKeys] = useState(null); // same range as raw { start, end } YYYY-MM-DD keys, so reopening the calendar can restore the selection
   const prevDateRangeRef = useRef("last_7"); // dateRange to fall back to if custom is opened but no date is picked
   const [reports,     setReports]     = useState([]);
+  // { period, version } of the report saved most recently. Kept even after
+  // that report is deleted, so the next Update No. keeps counting up for the
+  // same period instead of reusing the deleted number.
+  const [lastIssued,  setLastIssued]  = useState(null);
   // The company identity (logo/name/address) last saved with any report —
   // reused as the default for every new draft, and also substituted into
   // every previously-saved report's download/copy output, so a later
@@ -4762,6 +4766,7 @@ function ReportsTab({ demoCase }) {
       coverImage,
     };
     setReports(prev => [newReport, ...prev]);
+    setLastIssued({ period, version });
     // Saving is what promotes this draft's identity to "the" company
     // identity — future drafts start from it, and every already-saved
     // report's download/copy switches to it too (see handleDownload/
@@ -4834,10 +4839,10 @@ function ReportsTab({ demoCase }) {
         // This draft's position in the project's save history if it gets
         // saved right now — see pushReport, which assigns the same number.
         // Continues the running count only while the period matches the
-        // most recently saved report (reports[0], since pushReport
-        // prepends); a different period starts a fresh Update No. 1
-        // instead of just tacking onto the global save count.
-        version: reports.length > 0 && reports[0].period === period ? reports[0].version + 1 : 1,
+        // most recently saved report (lastIssued, which survives that
+        // report being deleted); a different period starts a fresh Update
+        // No. 1 instead of just tacking onto the global save count.
+        version: lastIssued && lastIssued.period === period ? lastIssued.version + 1 : 1,
         extraNotes: {},
         excludedPhotos: defaultExcludedPhotos,
         removedTasks: {},
