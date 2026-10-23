@@ -2654,7 +2654,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
           <LightboxIconBtn label="Share">
             <Forward size={20} strokeWidth={SW} className="tt-split-forward" />
           </LightboxIconBtn>
-          <LightboxIconBtn label={locked ? "Upgrade to unlock" : linkCopied ? "Link copied" : "Copy link to share"} disabled={actionsDisabled} onClick={onCopyLink}>
+          <LightboxIconBtn label={locked ? "Upgrade to unlock" : linkCopied ? "Link copied" : "Copy link to share. Anyone with the link can see this."} disabled={actionsDisabled} onClick={onCopyLink}>
             {linkCopied ? <Check size={20} strokeWidth={SW} /> : <LockedIcon locked={locked} dark><Link size={20} strokeWidth={SW} className="tt-split-link" /></LockedIcon>}
           </LightboxIconBtn>
           <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.15)", margin: "0 6px" }} />
@@ -3381,19 +3381,29 @@ function getGrouping(start, end) {
   return "month";
 }
 
+// A task is in the report when it was created or completed in the period.
+// It is grouped by its completion date when it was completed in the period,
+// otherwise by its created date. TODO(BE): the dummy entries carry one date
+// (used as the completion date of completed tasks); createdDate falls back
+// to it until the API sends the real created date.
+function entryReportDate(e, start, end) {
+  const inRange = d => d >= start && d <= end;
+  const created = e.createdDate || e.date;
+  if (statusForEntry(e).kind === "completed" && inRange(parseDate(e.date))) return e.date;
+  return inRange(parseDate(created)) ? created : null;
+}
+
 function groupEntries(entries, start, end, grouping) {
-  // Filter entries within range
-  const filtered = entries.filter(e => {
-    const d = parseDate(e.date);
-    return d >= start && d <= end;
-  });
+  const filtered = entries
+    .map(e => ({ e, reportDate: entryReportDate(e, start, end) }))
+    .filter(x => x.reportDate);
 
   const groups = {};
-  filtered.forEach(entry => {
-    const d = parseDate(entry.date);
+  filtered.forEach(({ e: entry, reportDate }) => {
+    const d = parseDate(reportDate);
     let key;
     if (grouping === "day") {
-      key = entry.date;
+      key = reportDate;
     } else if (grouping === "week") {
       const day = d.getDay();
       const mon = new Date(d); mon.setDate(d.getDate() - ((day + 6) % 7));
@@ -6996,7 +7006,7 @@ function ReportsTab({ demoCase }) {
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                         <FixedTooltipBtn label="Preview" onAction={() => handlePreviewOpen(r)}><Eye size={16} strokeWidth={SW} color="var(--tt-grey06)" className="tt-split-eye" /></FixedTooltipBtn>
                         <FixedTooltipBtn label={paywalled ? "Upgrade to unlock" : "Download"} onAction={async () => { const ok = await handleDownload(r); if (ok) showToast("success", "Downloaded"); }}><LockedIcon locked={paywalled}><Download size={16} strokeWidth={SW} color="var(--tt-grey06)" className="tt-split-download" /></LockedIcon></FixedTooltipBtn>
-                        <FixedTooltipBtn label={paywalled ? "Upgrade to unlock" : "Copy link to share"} onAction={async () => { const ok = await handleCopy(r); if (ok) showToast("success", "Link copied"); }}><LockedIcon locked={paywalled}><Link size={16} strokeWidth={SW} color="var(--tt-grey06)" className="tt-split-link" /></LockedIcon></FixedTooltipBtn>
+                        <FixedTooltipBtn label={paywalled ? "Upgrade to unlock" : "Copy link to share. Anyone with the link can see this."} onAction={async () => { const ok = await handleCopy(r); if (ok) showToast("success", "Link copied"); }}><LockedIcon locked={paywalled}><Link size={16} strokeWidth={SW} color="var(--tt-grey06)" className="tt-split-link" /></LockedIcon></FixedTooltipBtn>
                         {/* Free tier's one report is a one-time allowance
                             (see handleGenerate) — Delete stays hidden while
                             paywalled so there's no way to clear it and
