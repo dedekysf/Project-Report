@@ -14,6 +14,7 @@ import {
   UserPlus, Link2, ChevronUp, ChevronDown, X, Pencil, Trash2, Crown, AlertTriangle,
   RotateCw, ZoomIn, ZoomOut, Folder, ArrowLeft, ArrowRight, Info, StickyNote,
   ExternalLink, Forward, Loader, Mail, Phone, Upload, ImagePlus, GripVertical, Eye, EyeOff, Lock, Undo2,
+  Image as ImageIcon,
 } from "lucide-react";
 
 import logoImg from "./src/Img/tasktag-logo.13f1babda8fdbb1b7251572a0fe11f9e.png";
@@ -2353,6 +2354,14 @@ function PhotoManagerModal({ groups, excludedPhotos, removedTasks, titleOverride
           </p>
         </div>
         <div style={{ overflowY: "auto", padding: 24 }}>
+        {/* Every task in the report has no photos — nothing to pick. */}
+        {sections.length === 0 && (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "48px 0", textAlign: "center" }}>
+            <ImageIcon size={32} strokeWidth={SW} color="var(--tt-text-1)" />
+            <p style={{ fontSize: 16, fontWeight: 600, color: "var(--tt-text-1)", margin: 0 }}>No photos to manage</p>
+            <p style={{ fontSize: 14, color: "var(--tt-text-2)", margin: 0 }}>None of the tasks in this report have photos.</p>
+          </div>
+        )}
         {sections.map(sec => (
           <div key={sec.entryKey} style={{ marginBottom: 40 }}>
             <p style={{ fontSize: 18, fontWeight: 600, color: "var(--tt-text-1)", margin: "0 0 2px" }}>{sec.taskName}</p>
@@ -3324,6 +3333,17 @@ const DUMMY_TASKS = [
 ];
 
 // ── Report generation engine ──
+// Everything a user can type, pick or remove in a draft, as one string — two
+// snapshots differ exactly when the draft was edited (see draftIsDirty).
+function draftSnapshot(p, titleOverrides = {}, checklistOverrides = {}) {
+  return JSON.stringify([
+    p.extraNotes, p.excludedPhotos, p.removedTasks, p.photoCaptions,
+    p.projectName, p.address, p.logo, p.companyName, p.companyAddress, p.companyEmail, p.companyPhone,
+    p.contactName, p.contactRole, p.contactPhoto, p.summary, p.clientName, p.additionalInfo, p.coverImage,
+    titleOverrides, checklistOverrides,
+  ]);
+}
+
 function parseDate(str) {
   const [y, m, d] = str.split("-").map(Number);
   return new Date(y, m - 1, d);
@@ -4622,6 +4642,8 @@ function ReportsTab({ demoCase }) {
   const [toast,       setToast]       = useState(null); // { type: "success" | "error", message }
   const [deleteTarget, setDeleteTarget] = useState(null); // report pending delete confirmation
   const [showSaveConfirm, setShowSaveConfirm] = useState(false); // Save Report clicked, confirmation pending
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false); // Cancel clicked after an edit (or the last task removed), discard confirmation pending
+  const draftBaselineRef = useRef(""); // draftSnapshot of the draft as it opened, to tell whether anything was edited since
   const [lightbox, setLightbox] = useState(null); // { photos, index, caption } | null — full-screen photo viewer
   const [photoManager, setPhotoManager] = useState(false); // report-wide "manage photos" modal, opened by hovering the Photo Limit indicator
   const [expandedPhotoGroups, setExpandedPhotoGroups] = useState({}); // { [entryKey]: revealedChunkCount } — how many extra "+N more" chunks are showing per entry; lifted (not local to PhotoGrid) so every PhotoGrid call for that entry (see renderTaskSection's chunkNums) agrees on how many chunks to render
@@ -4828,7 +4850,7 @@ function ReportsTab({ demoCase }) {
       // defaultGlobalOverflowExclusions).
       const perEntryExcluded = defaultOverflowExclusions(data.groups);
       const defaultExcludedPhotos = { ...perEntryExcluded, ...defaultGlobalOverflowExclusions(data.groups, perEntryExcluded) };
-      setPreview({
+      const draft = {
         includeSummary,
         includeNoPhotoTasks,
         dateRange,
@@ -4870,7 +4892,11 @@ function ReportsTab({ demoCase }) {
         // choice instead of a random one the user has to notice and
         // swap out.
         coverImage: null,
-      });
+      };
+      // What the draft looked like when it opened — Cancel only asks to
+      // discard once something differs from this (see draftIsDirty).
+      draftBaselineRef.current = draftSnapshot(draft);
+      setPreview(draft);
       setActiveEditField(null);
       setFormErrors({});
       setTitleOverrides({});
@@ -4897,14 +4923,24 @@ function ReportsTab({ demoCase }) {
     setExpandedPhotoGroups({});
     setExpandedChecklists({});
     setShowSaveConfirm(false);
+    setShowDiscardConfirm(false);
   };
 
+  // True once something in the draft was typed, picked, removed or changed
+  // since it opened.
+  const draftIsDirty = () => !!preview && draftBaselineRef.current !== draftSnapshot(preview, titleOverrides, checklistOverrides);
+  // Cancel / Esc: an untouched draft just closes; an edited one asks first.
+  const requestDiscard = () => { if (draftIsDirty()) setShowDiscardConfirm(true); else closePreview(); };
+
   useEffect(() => {
-    if (!preview || lightbox || deleteTarget || photoManager || showSaveConfirm) return;
-    const handler = (e) => { if (e.key === "Escape") closePreview(); };
+    // Modals (Save, Delete, Upgrade, Discard) close with their X only, so Esc
+    // does nothing while one is open.
+    if (!preview || lightbox || deleteTarget || photoManager || showSaveConfirm || showDiscardConfirm || showPaywallModal) return;
+    // A saved report just closes.
+    const handler = (e) => { if (e.key === "Escape") { if (previewSaved) closePreview(); else requestDiscard(); } };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [preview, lightbox, deleteTarget, photoManager, showSaveConfirm]);
+  }, [preview, previewSaved, titleOverrides, checklistOverrides, lightbox, deleteTarget, photoManager, showSaveConfirm, showDiscardConfirm, showPaywallModal]);
 
   // First-time setup nudge: when a draft finishes loading and there is no
   // company identity yet (nothing carried over from a previous saved
@@ -5792,11 +5828,11 @@ function ReportsTab({ demoCase }) {
             : { borderRadius: 8, border: `1px dashed ${coverImageError ? "var(--tt-red)" : "var(--tt-grey04)"}`, background: "var(--tt-grey01)" }),
         }}>
           {coverImageSrc ? (
-            <img src={coverImageSrc} alt="" style={{ display: "block", width: "100%", maxHeight: 360, objectFit: "cover" }} />
+            <img src={coverImageSrc} alt="" style={{ display: "block", width: "100%", height: 360, objectFit: "cover" }} />
           ) : (
             <div
               onClick={() => !coverImageUploading && !previewSaved && coverImageInputRef.current?.click()}
-              style={{ width: "100%", height: 240, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 0, cursor: previewSaved ? "default" : "pointer" }}
+              style={{ width: "100%", height: 360, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 0, cursor: previewSaved ? "default" : "pointer" }}
             >
               {coverImageUploading ? (
                 <Loader size={40} strokeWidth={SW} color="var(--tt-grey05)" className="tt-split-loader" style={{ display: "block", flexShrink: 0, animation: "tt-spin 0.75s linear infinite, tt-fade-in 0.15s ease-out" }} />
@@ -6379,6 +6415,10 @@ function ReportsTab({ demoCase }) {
   // brings it back exactly as it was. Its photos stop counting toward the
   // Photo Limit straight away (previewFinalGroups drops it).
   const handleRemoveTask = (entryKey, photoCount) => {
+    // Removing the only task left would leave an empty report — that is the
+    // same as cancelling the report, so it asks to discard it instead. The
+    // task stays until the user confirms.
+    if (previewCompleted <= 1) { setShowDiscardConfirm(true); return; }
     setPreview(p => ({ ...p, removedTasks: { ...p.removedTasks, [entryKey]: true } }));
     if (activeEditField && activeEditField.includes(entryKey)) setActiveEditField(null);
     showToast("success", "Task removed", {
@@ -7116,7 +7156,7 @@ function ReportsTab({ demoCase }) {
                   <>
                     <button
                       disabled={previewLoading || saving}
-                      onClick={closePreview}
+                      onClick={requestDiscard}
                       onMouseEnter={e => !(previewLoading || saving) && (e.currentTarget.style.background = "var(--tt-grey02)")}
                       onMouseLeave={e => e.currentTarget.style.background = "white"}
                       style={{
@@ -7372,7 +7412,7 @@ function ReportsTab({ demoCase }) {
                         <div key={section.key} style={skeletonCardStyle}>
                           <div style={{ padding: DRAFT_PAD }}>
                             {SECTION_INTRO_SKELETON}
-                            <div className="tt-skeleton" style={{ width: "100%", height: 242, borderRadius: 12 }} />
+                            <div className="tt-skeleton" style={{ width: "100%", height: 360, borderRadius: 12 }} />
                           </div>
                         </div>
                       );
@@ -7632,6 +7672,47 @@ function ReportsTab({ demoCase }) {
                 onMouseLeave={e => e.currentTarget.style.opacity = "1"}
               >
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Discard Changes — Cancel in the draft (or removing its last task)
+          asks before the draft is thrown away. Same shell as the Delete
+          Report window: one Discard button, closed with the X or by
+          clicking the dark area. */}
+      {showDiscardConfirm && preview && (
+        <div
+          style={{ position: "fixed", inset: 0, zIndex: 4000, background: "rgba(10,22,41,0.45)", display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setShowDiscardConfirm(false)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ width: 483, maxWidth: "calc(100vw - 32px)", background: "white", borderRadius: 16, padding: "16px 24px 24px", boxShadow: "0 4px 4px rgba(0,0,0,0.06)", display: "flex", flexDirection: "column", gap: 24 }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <p style={{ fontSize: 18, fontWeight: 500, lineHeight: "24px", color: "var(--tt-text-1)", margin: 0 }}>Discard Changes</p>
+              <button
+                onClick={() => setShowDiscardConfirm(false)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--tt-text-1)", padding: 4, display: "flex", borderRadius: 6, transition: "background 0.15s" }}
+                onMouseEnter={e => e.currentTarget.style.background = "var(--tt-grey02)"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              >
+                <X size={20} strokeWidth={SW} className="tt-split-x" />
+              </button>
+            </div>
+            <p style={{ fontSize: 14, lineHeight: "24px", letterSpacing: "0.28px", color: "var(--tt-text-1)", margin: 0 }}>
+              Are you sure you want to discard this report?
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                onClick={closePreview}
+                style={{ width: 125, height: 48, padding: 16, borderRadius: 12, border: "none", background: "black", color: "white", fontSize: 14, fontWeight: 500, lineHeight: "16px", cursor: "pointer", transition: "opacity 0.15s", display: "flex", alignItems: "center", justifyContent: "center" }}
+                onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
+                onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+              >
+                Discard
               </button>
             </div>
           </div>
