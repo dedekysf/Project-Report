@@ -2654,7 +2654,7 @@ function PhotoLightbox({ photos, index, entryDate, taskName, entryKey, originalI
           <LightboxIconBtn label="Share">
             <Forward size={20} strokeWidth={SW} className="tt-split-forward" />
           </LightboxIconBtn>
-          <LightboxIconBtn label={locked ? "Upgrade to unlock" : linkCopied ? "Link copied" : "Copy link to share. Anyone with the link can see this."} disabled={actionsDisabled} onClick={onCopyLink}>
+          <LightboxIconBtn label={locked ? "Upgrade to unlock" : linkCopied ? "Link copied" : "Anyone with the link can see this."} disabled={actionsDisabled} onClick={onCopyLink}>
             {linkCopied ? <Check size={20} strokeWidth={SW} /> : <LockedIcon locked={locked} dark><Link size={20} strokeWidth={SW} className="tt-split-link" /></LockedIcon>}
           </LightboxIconBtn>
           <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.15)", margin: "0 6px" }} />
@@ -7006,7 +7006,7 @@ function ReportsTab({ demoCase }) {
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                         <FixedTooltipBtn label="Preview" onAction={() => handlePreviewOpen(r)}><Eye size={16} strokeWidth={SW} color="var(--tt-grey06)" className="tt-split-eye" /></FixedTooltipBtn>
                         <FixedTooltipBtn label={paywalled ? "Upgrade to unlock" : "Download"} onAction={async () => { const ok = await handleDownload(r); if (ok) showToast("success", "Downloaded"); }}><LockedIcon locked={paywalled}><Download size={16} strokeWidth={SW} color="var(--tt-grey06)" className="tt-split-download" /></LockedIcon></FixedTooltipBtn>
-                        <FixedTooltipBtn label={paywalled ? "Upgrade to unlock" : "Copy link to share. Anyone with the link can see this."} onAction={async () => { const ok = await handleCopy(r); if (ok) showToast("success", "Link copied"); }}><LockedIcon locked={paywalled}><Link size={16} strokeWidth={SW} color="var(--tt-grey06)" className="tt-split-link" /></LockedIcon></FixedTooltipBtn>
+                        <FixedTooltipBtn label={paywalled ? "Upgrade to unlock" : "Anyone with the link can see this."} onAction={async () => { const ok = await handleCopy(r); if (ok) showToast("success", "Link copied"); }}><LockedIcon locked={paywalled}><Link size={16} strokeWidth={SW} color="var(--tt-grey06)" className="tt-split-link" /></LockedIcon></FixedTooltipBtn>
                         {/* Free tier's one report is a one-time allowance
                             (see handleGenerate) — Delete stays hidden while
                             paywalled so there's no way to clear it and
