@@ -4767,11 +4767,9 @@ function ReportsTab({ demoCase }) {
     };
     setReports(prev => [newReport, ...prev]);
     setLastIssued({ period, version });
-    // Saving is what promotes this draft's identity to "the" company
-    // identity — future drafts start from it, and every already-saved
-    // report's download/copy switches to it too (see handleDownload/
-    // handleCopy, which read companyIdentity instead of their own
-    // frozen report.logo/companyName/companyAddress).
+    // Saving makes this draft's identity the starting point for future
+    // drafts only. Already-saved reports keep their own frozen
+    // logo/companyName/companyAddress (see handleDownload/handleCopy).
     setCompanyIdentity({ logo, companyName, companyAddress, companyEmail, companyPhone });
     // Same reasoning as companyIdentity — see contactIdentity.
     setContactIdentity({ name: contactName, role: contactRole, photo: contactPhoto });
@@ -6412,14 +6410,19 @@ function ReportsTab({ demoCase }) {
   };
 
 
+  // The draft's own company/contact identity — handleDownload/handleCopy use
+  // the report's own values (frozen per report), so a draft has to carry its
+  // current ones too.
+  const previewIdentity = () => ({ logo: preview.logo, companyName: preview.companyName, companyAddress: preview.companyAddress, companyEmail: preview.companyEmail, companyPhone: preview.companyPhone, contactName: preview.contactName, contactRole: preview.contactRole, contactPhoto: preview.contactPhoto });
+
   const handlePreviewDownload = async () => {
     if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to export"); return; }
-    await handleDownload({ includeSummary: preview.includeSummary, period: preview.period, version: preview.version, data: { ...previewData, groups: previewFinalGroups }, photoCaptions: preview.photoCaptions });
+    await handleDownload({ includeSummary: preview.includeSummary, period: preview.period, version: preview.version, data: { ...previewData, groups: previewFinalGroups }, photoCaptions: preview.photoCaptions, ...previewIdentity() });
   };
 
   const handlePreviewCopy = async () => {
     if (!hasGroupData(previewFinalGroups)) { showToast("error", "No data to export"); return; }
-    const ok = await handleCopy({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, version: preview.version, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, removedTasks: preview.removedTasks, titleOverrides, checklistOverrides, photoCaptions: preview.photoCaptions });
+    const ok = await handleCopy({ includeSummary: preview.includeSummary, includeNoPhotoTasks: preview.includeNoPhotoTasks, dateRange: preview.dateRange, period: preview.period, version: preview.version, extraNotes: preview.extraNotes, excludedPhotos: preview.excludedPhotos, removedTasks: preview.removedTasks, titleOverrides, checklistOverrides, photoCaptions: preview.photoCaptions, ...previewIdentity() });
     // Paywalled — handleCopy already opened the modal instead of copying
     // anything, so there's nothing to flash "Link copied" about.
     if (!ok) return;
@@ -6546,10 +6549,9 @@ function ReportsTab({ demoCase }) {
     // period" unlock item — that's about OTHER periods, not this one).
     // What's actually gated is Generate past that first save (see
     // handleGenerate) and Delete (see the row actions), not this.
-    // Company/contact identity always reflect the latest save, not this
-    // report's own (possibly older) snapshot — see companyIdentity/
-    // contactIdentity.
-    const html = await buildReportHTML({ ...report, logo: companyIdentity.logo, companyName: companyIdentity.companyName, companyAddress: companyIdentity.companyAddress, companyEmail: companyIdentity.companyEmail, companyPhone: companyIdentity.companyPhone, contactName: contactIdentity.name, contactRole: contactIdentity.role, contactPhoto: contactIdentity.photo });
+    // Company/contact identity is frozen per report: the report's own saved
+    // values, so an older report never picks up later changes.
+    const html = await buildReportHTML(report);
     const fileName = "report_" + sanitizePeriodForUrl(report.period) + ".html";
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -6622,22 +6624,22 @@ function ReportsTab({ demoCase }) {
     // downloaded HTML instead of a stripped-down one missing them.
     if (report.projectName) params.set("projectName", report.projectName);
     if (report.address) params.set("address", report.address);
-    // Same reasoning as the download branch — the latest saved identity,
-    // not this report's own snapshot. The logo is deliberately left out
+    // Same reasoning as the download branch — this report's own frozen
+    // identity, not the latest one. The logo is deliberately left out
     // here even though it IS a small downscaled data URL (see
     // resizeImageToDataURL) — it's still the single largest thing in this
     // URL by far, and turns an otherwise short, simple link into an
     // unreadable multi-thousand-character block. The download (which has
     // no such constraint) still includes it in full.
-    if (companyIdentity.companyName) params.set("companyName", companyIdentity.companyName);
-    if (companyIdentity.companyAddress) params.set("companyAddress", companyIdentity.companyAddress);
-    if (companyIdentity.companyEmail) params.set("companyEmail", companyIdentity.companyEmail);
-    if (companyIdentity.companyPhone) params.set("companyPhone", companyIdentity.companyPhone);
-    // Same "latest identity, not this report's frozen snapshot" reasoning.
+    if (report.companyName) params.set("companyName", report.companyName);
+    if (report.companyAddress) params.set("companyAddress", report.companyAddress);
+    if (report.companyEmail) params.set("companyEmail", report.companyEmail);
+    if (report.companyPhone) params.set("companyPhone", report.companyPhone);
+    // Same "this report's frozen identity" reasoning.
     // contactPhoto is left out for the same reason the logo is — a data
     // URL, the single largest thing that would otherwise be in this link.
-    if (contactIdentity.name) params.set("contactName", contactIdentity.name);
-    if (contactIdentity.role) params.set("contactRole", contactIdentity.role);
+    if (report.contactName) params.set("contactName", report.contactName);
+    if (report.contactRole) params.set("contactRole", report.contactRole);
     // "summary" is already taken (the includeSummary toggle above) — the
     // summary text content gets its own key.
     if (report.summary) params.set("summaryText", report.summary);
@@ -6655,7 +6657,7 @@ function ReportsTab({ demoCase }) {
     // placeholder where they'd be instead of silently leaving blank space
     // (or, worse, looking like they were never set).
     const missingImages = [];
-    if (companyIdentity.logo) missingImages.push("logo");
+    if (report.logo) missingImages.push("logo");
     if (report.coverImage && !IMG_MAP[report.coverImage]) missingImages.push("cover");
     if (missingImages.length > 0) params.set("missing", missingImages.join(","));
     // date rides along unconditionally now (not just for preview) — the
@@ -6705,14 +6707,14 @@ function ReportsTab({ demoCase }) {
   // the URL alone rendered without them while the table's own Download
   // (built from the full report object) had them. The owner's own new tab
   // is same-origin, so those three ride along via localStorage instead,
-  // keyed by report id (pid); same latest-identity values handleDownload
+  // keyed by report id (pid); same frozen per-report values handleDownload
   // uses, so Preview, its Download and the table's Download all match.
   const handlePreviewOpen = (report) => {
     const url = new URL(buildShareURL(report, { preview: true, paywall: paywalled }));
     try {
       localStorage.setItem(`tt-preview-assets-${report.id}`, JSON.stringify({
-        logo: companyIdentity.logo,
-        contactPhoto: contactIdentity.photo,
+        logo: report.logo,
+        contactPhoto: report.contactPhoto,
         coverImage: report.coverImage,
       }));
       url.searchParams.set("pid", String(report.id));
