@@ -3541,15 +3541,16 @@ function buildReportData(dateRange, periodStr, customRange, includeNoPhotoTasks 
     entries: g.entries.map(e => ({ ...e, noPhotos: e.photos.length === 0 })),
   }));
 
-  // completed = entries actually attached to this report (countable from
-  // what's shown below), total = the whole project's activity log — so the
-  // number is always directly verifiable against the visible entries,
-  // rather than referencing an unrelated, invisible task list.
-  const completed = groups.reduce((s, g) => s + g.entries.length, 0);
-  const total = DUMMY_ENTRIES.length;
-  const pct = Math.round(completed / total * 100);
+  return { groups, grouping, ...reportProgress(groups) };
+}
 
-  return { groups, grouping, completed, total, pct };
+// Progress of the tasks in a report: total = every task in it (the same N as
+// the left menu's "Show all (N)"), completed = how many of them are completed.
+function reportProgress(groups) {
+  const tasks = groups.flatMap(g => g.entries.filter(e => !e.isNote));
+  const total = tasks.length;
+  const completed = tasks.filter(e => statusForEntry(e).kind === "completed").length;
+  return { completed, total, pct: total ? Math.round(completed / total * 100) : 0 };
 }
 
 // Photos checked off in the side panel are excluded from the final output
@@ -3763,13 +3764,12 @@ const measureTextWidth = (text, font) => {
 };
 
 const buildReportHTML = async (report) => {
-  const { groups, grouping, total } =
+  const { groups, grouping } =
     report.data || buildReportData("custom", report.period, null, report.includeNoPhotoTasks);
-  // Recounted from the final groups rather than taken from report.data —
+  // Progress of the tasks in this report, recounted from the final groups —
   // tasks removed in the draft (applyTaskRemovals) are gone from groups but
   // not from the counts buildReportData computed before the removal.
-  const completed = groups.reduce((s, g) => s + g.entries.filter(e => !e.isNote).length, 0);
-  const pct = Math.round(completed / total * 100);
+  const { completed, total, pct } = reportProgress(groups);
 
   const h = (tag, attrs, ...children) => {
     const attrStr = Object.entries(attrs || {}).map(([k, v]) => ` ${k}="${v}"`).join("");
@@ -5013,10 +5013,9 @@ function ReportsTab({ demoCase }) {
   const previewFinalGroups = previewData
     ? applyTaskRemovals(applyExtraNotesToGroups(applyChecklistOverrides(applyTitleOverrides(applyPhotoExclusions(previewData.groups, preview.excludedPhotos), titleOverrides), checklistOverrides), preview.extraNotes), preview.removedTasks)
     : [];
-  // previewData's own completed/pct were counted before any task was
-  // removed from the draft — recount from what's actually left.
-  const previewCompleted = previewFinalGroups.reduce((s, g) => s + g.entries.filter(e => !e.isNote).length, 0);
-  const previewPct = previewData ? Math.round(previewCompleted / previewData.total * 100) : 0;
+  // Progress of the tasks still in the draft — recounted from what's left
+  // after removals, so it always matches the left menu.
+  const { completed: previewCompleted, total: previewTaskCount, pct: previewPct } = reportProgress(previewFinalGroups);
   // Photos actually included (post-exclusion) vs. the account's per-report
   // limit — shown in the modal chrome's Photo Limit indicator. Reuses
   // previewFinalGroups (already exclusion-filtered) rather than
@@ -6185,7 +6184,7 @@ function ReportsTab({ demoCase }) {
             dominates the row. */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, maxWidth: 260 }}>
           <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", margin: 0, whiteSpace: "nowrap", flexShrink: 0 }}>
-            {previewCompleted} of {previewData.total} complete
+            {previewCompleted} of {previewTaskCount} tasks complete
           </p>
           <div style={{ flex: 1, minWidth: 0, height: 6, background: "var(--tt-grey03)", borderRadius: 99, overflow: "hidden" }}>
             <div style={{ width: `${previewPct}%`, height: "100%", background: "var(--tt-secondary)", borderRadius: 99 }} />
@@ -6430,7 +6429,7 @@ function ReportsTab({ demoCase }) {
     // Removing the only task left would leave an empty report — that is the
     // same as cancelling the report, so it asks to discard it instead. The
     // task stays until the user confirms.
-    if (previewCompleted <= 1) { setShowDiscardConfirm(true); return; }
+    if (previewTaskCount <= 1) { setShowDiscardConfirm(true); return; }
     setPreview(p => ({ ...p, removedTasks: { ...p.removedTasks, [entryKey]: true } }));
     if (activeEditField && activeEditField.includes(entryKey)) setActiveEditField(null);
     showToast("success", "Task removed", {
@@ -7347,7 +7346,7 @@ function ReportsTab({ demoCase }) {
                         <p style={{ ...skeletonGroupHeadingStyle, margin: 0 }}>{group.label}</p>
                         <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, maxWidth: 260 }}>
                           <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tt-text-1)", margin: 0, whiteSpace: "nowrap", flexShrink: 0 }}>
-                            {previewCompleted} of {previewData.total} complete
+                            {previewCompleted} of {previewTaskCount} tasks complete
                           </p>
                           <div style={{ flex: 1, minWidth: 0, height: 6, background: "var(--tt-grey03)", borderRadius: 99, overflow: "hidden" }}>
                             <div style={{ width: `${previewPct}%`, height: "100%", background: "var(--tt-secondary)", borderRadius: 99 }} />
